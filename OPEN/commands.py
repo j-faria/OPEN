@@ -15,7 +15,7 @@ from IPython.utils.io import ask_yes_no
 
 from docopt import docopt
 from classes import rvSeries
-
+from logger import clogger, logging
 
 ################################################################################
 ################################################################################
@@ -89,14 +89,25 @@ class EmbeddedMagics(Magics):
     def plot(self, parameter_s='', local_ns=None):
     	args = parse_arg_string('plot', parameter_s)
     	print args
-    	if local_ns.has_key('default') and not args['-n']:
-    		system = local_ns['default']
-    	else:
-    		system_name = args['-n']
-    		system = local_ns[system_name]
+
+    	# use default system or user defined
+    	try:
+    		if local_ns.has_key('default') and not args['-n']:
+    			system = local_ns['default']
+    		else:
+    			system_name = args['-n']
+    			system = local_ns[system_name]
+    	except KeyError:
+    		from shell_colors import red
+    		msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+    		                       'name with the -n option'
+    		clogger.fatal(msg)
+    		return
+
     	
     	if args['obs']:
     		system.do_plot_obs()
+
 
 def parse_arg_string(command, arg_string):
 	splitted = str(arg_string).split()
