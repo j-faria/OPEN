@@ -15,6 +15,7 @@ from IPython.utils.io import ask_yes_no
 
 from docopt import docopt
 from classes import rvSeries
+from periodograms import gls
 from logger import clogger, logging
 
 ################################################################################
@@ -38,6 +39,16 @@ Options:
 	-n SYSTEM 	  Specify name of system (else use default)
 """
 
+per_usage = \
+"""
+Usage:
+	per [obs]
+	per [obs] -n SYSTEM
+	per -h | --help
+Options:
+	-n SYSTEM     Specify name of system (else use default)
+	-h --help     Show this help message
+"""
 
 # this is the most awesome function
 def do_awesome(s):
@@ -103,10 +114,39 @@ class EmbeddedMagics(Magics):
     		                       'name with the -n option'
     		clogger.fatal(msg)
     		return
-
     	
     	if args['obs']:
     		system.do_plot_obs()
+
+    @needs_local_scope
+    @line_magic
+    def per(self, parameter_s='', local_ns=None):
+    	args = parse_arg_string('per', parameter_s)
+    	print args
+    	
+    	# use default system or user defined
+    	try:
+    		if local_ns.has_key('default') and not args['-n']:
+    			system = local_ns['default']
+    		else:
+    			system_name = args['-n']
+    			system = local_ns[system_name]
+    	except KeyError:
+    		from shell_colors import red
+    		msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+    		                       'name with the -n option'
+    		clogger.fatal(msg)
+    		return
+    	
+    	if args['obs']:
+    		try: 
+    			system.per
+    			system.per._output()
+    			system.per._plot()
+    		except AttributeError:
+	    		system.per = gls(system, hifac=5)
+	    		system.per._output()
+	    		system.per._plot()
 
 
 def parse_arg_string(command, arg_string):
@@ -118,6 +158,10 @@ def parse_arg_string(command, arg_string):
 
 	if command is 'plot':
 		doc = plot_usage
+		args = docopt(doc, splitted)
+
+	if command is 'per':
+		doc = per_usage
 		args = docopt(doc, splitted)
 
 	return args
