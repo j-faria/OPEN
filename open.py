@@ -29,8 +29,11 @@ from default import default_a
 
 if __name__ == "__main__":
 
+    # version info
+    from _version import __version__
+    version = 'OPEN v' + __version__    
     # command-line argument parser
-    args = docopt(__doc__, version='OPEN v0.0')
+    args = docopt(__doc__, version=version)
     print args
     
     if '--art' in sys.argv:
