@@ -15,7 +15,7 @@ from IPython.utils.io import ask_yes_no
 
 from docopt import docopt
 from classes import rvSeries
-from periodograms import gls
+import periodograms
 from logger import clogger, logging
 
 ################################################################################
@@ -44,9 +44,11 @@ per_usage = \
 Usage:
 	per [obs]
 	per [obs] -n SYSTEM
+	per [obs] -v
 	per -h | --help
 Options:
 	-n SYSTEM     Specify name of system (else use default)
+	-v --verbose  Verbose statistical output 
 	-h --help     Show this help message
 """
 
@@ -98,7 +100,10 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def plot(self, parameter_s='', local_ns=None):
+    	""" Plot various quantities. 
+    	Type 'plot -h' for more help """
     	args = parse_arg_string('plot', parameter_s)
+    	if args == 1: return
     	print args
 
     	# use default system or user defined
@@ -121,7 +126,11 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def per(self, parameter_s='', local_ns=None):
+    	""" Calculate periodograms of various quantities. 
+    	Type 'per -h' for more help. """
+
     	args = parse_arg_string('per', parameter_s)
+    	if args == 1: return
     	print args
     	
     	# use default system or user defined
@@ -138,18 +147,25 @@ class EmbeddedMagics(Magics):
     		clogger.fatal(msg)
     		return
     	
+    	verb = True if args['--verbose'] else False
     	if args['obs']:
     		try: 
     			system.per
-    			system.per._output()
+    			system.per._output(verbose=verb)
     			system.per._plot()
     		except AttributeError:
-	    		system.per = gls(system, hifac=5)
-	    		system.per._output()
+	    		system.per = periodograms.gls(system, hifac=5)
+	    		system.per._output(verbose=verb)
 	    		system.per._plot()
 
 
+
+
 def parse_arg_string(command, arg_string):
+	""" Parse arguments for each of the commands. """
+	# docopt does the heavy-lifting parsing, we just split the argument string
+	# and catch the exceptions raised by -h or --help
+
 	splitted = str(arg_string).split()
 
 	if command is 'read':
@@ -157,11 +173,15 @@ def parse_arg_string(command, arg_string):
 		args = docopt(doc, splitted)
 
 	if command is 'plot':
-		doc = plot_usage
-		args = docopt(doc, splitted)
+		try:
+			args = docopt(plot_usage, splitted)
+		except SystemExit:
+			return 1
 
 	if command is 'per':
-		doc = per_usage
-		args = docopt(doc, splitted)
+		try:
+			args = docopt(per_usage, splitted)
+		except SystemExit:
+			return 1
 
 	return args
