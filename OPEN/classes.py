@@ -26,6 +26,11 @@ class rvSeries:
         One or more files to read radial velocities from.
     """
 
+    def __repr__(self):
+        return "System with RV info from %s" % self.provenance
+    # def __str__(self):
+    #     return "member of Test"
+
     def __init__(self, *filenames):
         
         assert len(filenames)>=1, "Need at least one file to read"
