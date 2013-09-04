@@ -58,6 +58,14 @@ def do_awesome(s):
     print 'I also print this:', s
 
     
+command_list = \
+"""
+ read 	Read RV files. 
+ plot 	Plot various quantities.
+ per 	Calculate periodograms.
+"""
+
+
     
 # These are additional magics that are exposed (only?) in embedded shells.
 @magics_class
@@ -157,6 +165,11 @@ class EmbeddedMagics(Magics):
 	    		system.per = periodograms.gls(system, hifac=5)
 	    		system.per._output(verbose=verb)
 	    		system.per._plot()
+
+
+    @line_magic
+    def listcommands(self, parameter_s=''):
+    	print command_list
 
 
 
