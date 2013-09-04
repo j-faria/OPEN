@@ -52,6 +52,8 @@ Options:
 	-h --help     Show this help message
 """
 
+
+
 # this is the most awesome function
 def do_awesome(s):
     print 'I am a function and I do someting awesome!!!'
@@ -171,6 +173,24 @@ class EmbeddedMagics(Magics):
     def listcommands(self, parameter_s=''):
     	print command_list
 
+    @needs_local_scope
+    @line_magic
+    def mod(self, parameter_s='', local_ns=None):
+    	from shell_colors import yellow, blue
+    	args = parse_arg_string('mod', parameter_s)
+    	if args == 1:  # called without arguments, show how it's done
+    		clogger.fatal(yellow('Usage: ') + 'mod [k<n>] [d<n>]')
+    		return
+
+    	k = int(args[0][1])
+    	d = int(args[1][1])
+
+    	# this should be logged?
+    	print blue('Current model:'), k, 'kep,', d, 'drifts'
+
+    	# ... do someting with this ...
+
+
 
 
 
@@ -196,5 +216,19 @@ def parse_arg_string(command, arg_string):
 			args = docopt(per_usage, splitted)
 		except SystemExit:
 			return 1
+
+	# this is a little different
+	if command is 'mod':
+		import re
+		if arg_string == '': 
+			return 1 # mod needs arguments
+
+		k = re.compile("k[0-9]").findall(arg_string)
+		if k == []: # if just drifts
+			k = ['k0']
+		d = re.compile("d[0-9]").findall(arg_string)
+		if d == []: # if just keplerians
+			d = ['d0']
+		args = k+d
 
 	return args
