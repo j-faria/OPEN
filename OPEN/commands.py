@@ -13,7 +13,7 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
 from IPython.core.magic_arguments import argument
 from IPython.utils.io import ask_yes_no
 
-from docopt import docopt
+from docopt import docopt, DocoptExit
 from classes import rvSeries
 import core
 import periodograms
@@ -60,6 +60,16 @@ Usage:
 Options:
 	-v --verbose  Verbose statistical output 
 """
+
+
+restrict_usage = \
+"""
+Usage:
+	restrict [(err <maxerr>)]
+Options:
+	-h --help     Show this help message
+"""
+
 
 
 # this is the most awesome function
@@ -224,6 +234,38 @@ class EmbeddedMagics(Magics):
         	system.do_plot_drift()
 
 
+    @needs_local_scope
+    @line_magic
+    def restrict(self, parameter_s='', local_ns=None):
+    	from shell_colors import yellow, blue, red
+    	args = parse_arg_string('restrict', parameter_s)
+    	if args == DocoptExit:
+    		msg = yellow('Warning: ') + "I'm not doing anything. See restrict -h"
+    		clogger.fatal(msg)
+    		return
+
+    	print args
+
+    	# use default system or user defined
+    	if local_ns.has_key('default'):
+    		system = local_ns['default']
+    	else:
+    		print 'No default!'  # handle this!
+    		return
+
+
+    	if args['err']: 
+    		try:
+    			maxerr = int(args['<maxerr>'])
+    		except ValueError:
+    			msg = red('ERROR: ') + 'maxerr shoud be a number!'
+    			clogger.fatal(msg)
+    			return
+    		core.do_restrict(system, 'error', maxerr)
+
+
+
+
 
 def parse_arg_string(command, arg_string):
 	""" Parse arguments for each of the commands. """
@@ -253,6 +295,8 @@ def parse_arg_string(command, arg_string):
 		import re
 		if arg_string == '': 
 			return 1 # mod needs arguments
+		if arg_string in ('-h', '--help'):
+			return 1 # explain what to do
 
 		k = re.compile("k[0-9]").findall(arg_string)
 		if k == []: # if just drifts
@@ -267,5 +311,13 @@ def parse_arg_string(command, arg_string):
 			args = docopt(fit_usage, splitted)
 		except SystemExit:
 			return 1
+
+	if command is 'restrict':
+		if arg_string == '': 
+			return DocoptExit # restrict needs arguments
+		try:
+			args = docopt(restrict_usage, splitted)
+		except (SystemExit, DocoptExit) as e:
+			return e
 
 	return args

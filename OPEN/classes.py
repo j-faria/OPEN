@@ -39,6 +39,11 @@ class rvSeries:
 
         t, rv, err, self.provenance = rvIO.read_rv(*filenames, verbose=False)
         self.time, self.vrad, self.error = (t, rv, err)
+        # time, vrad and error can change, 
+        # the *_full ones correspond always to the full set
+        self.time_full = self.time
+        self.vrad_full = self.vrad
+        self.error_full = self.error
 
     # associated model to be adjusted to the data
     # this will be a dict with the following key:value pairs:
@@ -57,10 +62,13 @@ class rvSeries:
         
         plt.figure()
         # plot each files' values
-        for i, (fname, n) in enumerate(self.provenance.iteritems()):
-            plt.errorbar(t[:n], rv[:n], yerr=err[:n], \
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            print fname, m
+
+            plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
-            t, rv, err = t[n:], rv[n:], err[n:]
+            t, rv, err = t[m:], rv[m:], err[m:]
         
         plt.xlabel('Time [days]')
         plt.ylabel('RV [m/s]')
@@ -81,10 +89,11 @@ class rvSeries:
 
         ax1 = plt.subplot(2,1,1)
         # plot each file's values
-        for i, (fname, n) in enumerate(self.provenance.iteritems()):
-            ax1.errorbar(t[:n], rv[:n], yerr=err[:n], \
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
-            t, rv, err = t[n:], rv[n:], err[n:]
+            t, rv, err = t[m:], rv[m:], err[m:]
         
         drift = self.model['drift']
         p = numpy.polyval(drift, self.time) # normal polynomial, for 2nd plot
@@ -95,10 +104,11 @@ class rvSeries:
         t, rv, err = self.time, self.vrad, self.error # temporaries
         ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
         # plot each file's values minus the drift
-        for i, (fname, n) in enumerate(self.provenance.iteritems()):
-            ax2.errorbar(t[:n], rv[:n]-p[:n], yerr=err[:n], \
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            ax2.errorbar(t[:m], rv[:m]-p[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
-            t, rv, err, p = t[n:], rv[n:], err[n:], p[n:]
+            t, rv, err, p = t[m:], rv[m:], err[m:], p[m:]
 
         plt.xlabel('Time [days]')
         plt.ylabel('RV [m/s]')
