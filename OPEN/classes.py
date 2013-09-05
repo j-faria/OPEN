@@ -40,9 +40,18 @@ class rvSeries:
         t, rv, err, self.provenance = rvIO.read_rv(*filenames, verbose=False)
         self.time, self.vrad, self.error = (t, rv, err)
 
-
+    # associated model to be adjusted to the data
+    # this will be a dict with the following key:value pairs:
+    #   k : number of keplerians in the model
+    #   d : degree of drift in the model
+    #   drift : array with parameters from drift fit (the polynomial coefficients)
+    model = None
 
     def do_plot_obs(self):
+        """ Plot the observed radial velocities as a function of time.
+        Data from each file is color coded and labeled.
+        """
+
         colors = 'rgbmk' # possible colors
         t, rv, err = self.time, self.vrad, self.error # temporaries
         
@@ -53,6 +62,44 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[n:], rv[n:], err[n:]
         
+        plt.xlabel('Time [days]')
+        plt.ylabel('RV [m/s]')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+    def do_plot_drift(self):
+        """ Plot the observed radial velocities as a function of time, plus an
+        extra drift of specified degree (see *mod*). Lower panel presents RV 
+        minus drift. Data from each file is color coded and labeled.
+        """
+        colors = 'rgbmk' # possible colors
+        t, rv, err = self.time, self.vrad, self.error # temporaries
+        
+        plt.close(1)
+        plt.figure(1)
+
+        ax1 = plt.subplot(2,1,1)
+        # plot each file's values
+        for i, (fname, n) in enumerate(self.provenance.iteritems()):
+            ax1.errorbar(t[:n], rv[:n], yerr=err[:n], \
+                         fmt='o'+colors[i], label=fname)
+            t, rv, err = t[n:], rv[n:], err[n:]
+        
+        drift = self.model['drift']
+        p = numpy.polyval(drift, self.time) # normal polynomial, for 2nd plot
+        st = numpy.sort(self.time) # need this otherwise the plot gets messed up
+        sp = numpy.polyval(drift, st) # "sorted" polynomial
+        ax1.plot(st, sp, 'y-')
+
+        t, rv, err = self.time, self.vrad, self.error # temporaries
+        ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
+        # plot each file's values minus the drift
+        for i, (fname, n) in enumerate(self.provenance.iteritems()):
+            ax2.errorbar(t[:n], rv[:n]-p[:n], yerr=err[:n], \
+                         fmt='o'+colors[i], label=fname)
+            t, rv, err, p = t[n:], rv[n:], err[n:], p[n:]
+
         plt.xlabel('Time [days]')
         plt.ylabel('RV [m/s]')
         plt.legend()

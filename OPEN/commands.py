@@ -15,6 +15,7 @@ from IPython.utils.io import ask_yes_no
 
 from docopt import docopt
 from classes import rvSeries
+import core
 import periodograms
 from logger import clogger, logging
 
@@ -52,6 +53,13 @@ Options:
 	-h --help     Show this help message
 """
 
+fit_usage = \
+"""
+Usage:
+	fit [-v]
+Options:
+	-v --verbose  Verbose statistical output 
+"""
 
 
 # this is the most awesome function
@@ -171,26 +179,49 @@ class EmbeddedMagics(Magics):
 
     @line_magic
     def listcommands(self, parameter_s=''):
+    	""" List available commands """
     	print command_list
 
     @needs_local_scope
     @line_magic
     def mod(self, parameter_s='', local_ns=None):
-    	from shell_colors import yellow, blue
+    	from shell_colors import yellow, blue, red
     	args = parse_arg_string('mod', parameter_s)
     	if args == 1:  # called without arguments, show how it's done
     		clogger.fatal(yellow('Usage: ') + 'mod [k<n>] [d<n>]')
     		return
 
-    	k = int(args[0][1])
-    	d = int(args[1][1])
+    	if local_ns.has_key('default'):
+    		system = local_ns['default']
+    		system.model = {}
+    		system.model['k'] = k = int(args[0][1])
+    		system.model['d'] = d = int(args[1][1])
+    	else:
+    		msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+    		                       'name with the -n option'
+    		clogger.fatal(msg)
+    		return
 
     	# this should be logged?
     	print blue('Current model:'), k, 'kep,', d, 'drifts'
 
     	# ... do someting with this ...
 
+    @needs_local_scope
+    @line_magic
+    def fit(self, parameter_s='', local_ns=None):
+        args = parse_arg_string('fit', parameter_s)
+        if args == 1: return
+        print args
 
+        verb = True if args['--verbose'] else False
+
+        if local_ns.has_key('default'):
+        	system = local_ns['default']
+        	result = core.do_fit(system, verb)
+        	system.model['drift'] = result
+        	print result
+        	system.do_plot_drift()
 
 
 
@@ -230,5 +261,11 @@ def parse_arg_string(command, arg_string):
 		if d == []: # if just keplerians
 			d = ['d0']
 		args = k+d
+
+	if command is 'fit':
+		try:
+			args = docopt(fit_usage, splitted)
+		except SystemExit:
+			return 1
 
 	return args
