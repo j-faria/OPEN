@@ -223,14 +223,17 @@ class gls(PeriodogramBase):
     """
       Create a plot.
     """
-    self.fig = plt.figure()
-    self.ax = self.fig.add_subplot(1,1,1)
-    self.ax.set_title("Normalized periodogram")
-    self.ax.set_xlabel("Period")
-    self.ax.set_ylabel("Power")
-    self.ax.semilogx(1./self.freq, self.power, 'b-')
-    plt.tight_layout()
-    plt.show()
+    # self.fig = plt.figure()
+    # self.ax = self.fig.add_subplot(1,1,1)
+    # self.ax.set_title("Normalized periodogram")
+    # self.ax.set_xlabel("Period")
+    # self.ax.set_ylabel("Power")
+    # self.ax.semilogx(1./self.freq, self.power, 'b-')
+    # plt.tight_layout()
+    # plt.show()
+    import pyqtgraph as pg
+    pg.plot(1./self.freq, self.power, title="Periodogram")
+    pg.QtGui.QApplication.exec_()
 
   def _output(self, verbose=False):
     """
