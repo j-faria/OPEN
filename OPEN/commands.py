@@ -70,13 +70,6 @@ Options:
 	-h --help     Show this help message
 """
 
-
-
-# this is the most awesome function
-def do_awesome(s):
-    print 'I am a function and I do someting awesome!!!'
-    print 'I also print this:', s
-
     
 command_list = \
 """
@@ -110,16 +103,19 @@ class EmbeddedMagics(Magics):
             print ("This embedded IPython will not reactivate anymore "
                    "once you exit.")
 
-    @line_magic
-    def awesome(self, parameter_s=''):
-        do_awesome(parameter_s)
 
     @needs_local_scope
     @line_magic
     def read(self, parameter_s='', local_ns=None):
+    	""" Read files with RV measurements.
+    	Type 'read -h' for more help """
+
     	args = parse_arg_string('read', parameter_s)
     	filenames = args['<file>']
 
+    	# if 'default' system is already set, return the rvSeries class
+    	# this is useful when working with various systems simultaneously so 
+    	# that we can do, e.g., HDXXXX = %read file1 file2
     	if local_ns.has_key('default') and not args['-d']:
     		return rvSeries(*filenames)
     	else:
@@ -195,10 +191,16 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def mod(self, parameter_s='', local_ns=None):
+    	""" Define the type of model that will be adjusted to the data.
+    	Type 'mod -h' for more help
+    	"""
     	from shell_colors import yellow, blue, red
     	args = parse_arg_string('mod', parameter_s)
     	if args == 1:  # called without arguments, show how it's done
-    		clogger.fatal(yellow('Usage: ') + 'mod [k<n>] [d<n>]')
+    		msg = yellow('Usage: ') + 'mod [k<n>] [d<n>]\n' + \
+    		      'Options: k<n>	Number of keplerian signals\n' + \
+    		      '         d<n>	Degree of polynomial drift'
+    		clogger.fatal(msg)
     		return
 
     	if local_ns.has_key('default'):
@@ -237,6 +239,9 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def restrict(self, parameter_s='', local_ns=None):
+    	""" Select data based on date, SNR or radial velocity accuracy.
+    	Type 'restrict -h' for more help
+    	"""
     	from shell_colors import yellow, blue, red
     	args = parse_arg_string('restrict', parameter_s)
     	if args == DocoptExit:

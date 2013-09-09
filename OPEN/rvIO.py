@@ -17,7 +17,7 @@ logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
 def read_rv(*filenames, **kwargs):
     """
-    Read one or more file with radial velocity measurements.
+    Read one or more files containing radial velocity measurements.
     
     Parameters
     ----------
@@ -33,7 +33,7 @@ def read_rv(*filenames, **kwargs):
     err: array
         Error in the radial velocity.
     dic: dict
-        Dictionary with name and number of values from each file read.
+        Dictionary with name and number of values from each file.
     """
 
     #optional keyword argument (i don't think we need this!)

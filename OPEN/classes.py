@@ -15,7 +15,7 @@ import plots_config
 
 class rvSeries:
     """
-    A container class that holds the observed radial velocity curve. 
+    A container class that holds the observed radial velocity data. 
     
     It includes a *plot* method that takes care of points from one or more 
     files.
@@ -32,12 +32,14 @@ class rvSeries:
     #     return "member of Test"
 
     def __init__(self, *filenames):
-        
+
         assert len(filenames)>=1, "Need at least one file to read"
         # don't repeat files
         filenames = unique(filenames)
 
+        # read data
         t, rv, err, self.provenance = rvIO.read_rv(*filenames, verbose=False)
+
         self.time, self.vrad, self.error = (t, rv, err)
         # time, vrad and error can change, 
         # the *_full ones correspond always to the full set
@@ -56,16 +58,23 @@ class rvSeries:
         """ Plot the observed radial velocities as a function of time.
         Data from each file is color coded and labeled.
         """
+        # import pyqtgraph as pg
 
         colors = 'rgbmk' # possible colors
         t, rv, err = self.time, self.vrad, self.error # temporaries
         
         plt.figure()
+        # p = pg.plot()
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
-            print fname, m
-
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
             plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
@@ -75,6 +84,7 @@ class rvSeries:
         plt.legend()
         plt.tight_layout()
         plt.show()
+        # pg.QtGui.QApplication.exec_()
 
     def do_plot_drift(self):
         """ Plot the observed radial velocities as a function of time, plus an
