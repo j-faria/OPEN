@@ -417,22 +417,20 @@ footer {
 
 #commands { font-size: 12px; text-align: center; }
 #commands ul { margin: 0 0px; text-align: left; padding: 0 0 0 0; }
-#commands li { -webkit-border-radius: 5px; -moz-border-radius: 5px; -ms-border-radius: 5px; -o-border-radius: 5px; border-radius: 5px; -webkit-box-shadow: #e0e0e0; -moz-box-shadow: #e0e0e0; box-shadow: #e0e0e0; background-color: #fafafa; margin: 0 0 10px 0; padding: 10px 10px; overflow: hidden; }
+#commands li { -webkit-border-radius: 5px; -moz-border-radius: 5px; -ms-border-radius: 5px; -o-border-radius: 5px; border-radius: 5px; -webkit-box-shadow: #e0e0e0; -moz-box-shadow: #e0e0e0; box-shadow: #e0e0e0; background-color: #fafafa; margin: 0 0 10px 0; padding: 10px 10px; overflow: hidden; display: inline; }
 #commands li .command { white-space: nowrap; overflow: hidden; -ms-text-overflow: ellipsis; -o-text-overflow: ellipsis; text-overflow: ellipsis; display: block; font-family: "Monaco", "Menlo", monospace; font-size: 16px; margin: 0 0 2px 0; }
-#commands li .command a { color: #0066aa; text-decoration: none; font-size: 14px; text-shadow: #f0f0f0, 1px, 1px, 0px; }
+#commands li .command a { color: #0066aa; text-decoration: none; font-size: 16px; text-shadow: #f0f0f0, 1px, 1px, 0px; }
 #commands li .command a:hover { color: #0099ff; }
-#commands li .command .args { font-size: 10px; color: #555555; }
-#commands li .summary { display: block; font-size: 11.5px; line-height: 1.5em; }
+#commands li .command .args { font-size: 11px; color: #555555; }
+#commands li .summary { display: block; font-size: 13px; line-height: 1.5em; }
 
 #commands .sort-by {
   margin-bottom: 10px;
-  width: 100%;
-  float: left;
+/*  float: left;*/
   clear: both;
 }
 #commands .filter {
   margin-bottom: 10px;
-  width: 100%;
-  float: left;
+/*  float: left;*/
   clear: both;
 }
