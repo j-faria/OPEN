@@ -7,6 +7,7 @@
 from classes import PeriodogramBase
 from numpy import *
 import matplotlib.pyplot as plt 
+import pyqtgraph as pg
 
 
 # This is the ...... periodogram etc etc etc
@@ -231,7 +232,6 @@ class gls(PeriodogramBase):
     # self.ax.semilogx(1./self.freq, self.power, 'b-')
     # plt.tight_layout()
     # plt.show()
-    import pyqtgraph as pg
     pg.plot(1./self.freq, self.power, title="Periodogram")
     pg.QtGui.QApplication.exec_()
 
