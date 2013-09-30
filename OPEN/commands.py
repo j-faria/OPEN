@@ -225,6 +225,7 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def fit(self, parameter_s='', local_ns=None):
+        from shell_colors import red
         args = parse_arg_string('fit', parameter_s)
         if args == 1: return
         print args
@@ -240,7 +241,25 @@ class EmbeddedMagics(Magics):
                 system.do_plot_drift()
             else:
                 return
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
 
+    @needs_local_scope
+    @line_magic
+    def gen(self, parameter_s='', local_ns=None):
+        from shell_colors import red
+
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+            core.do_genetic(system)
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
 
     @needs_local_scope
     @line_magic
