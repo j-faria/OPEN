@@ -236,7 +236,7 @@ class EmbeddedMagics(Magics):
             result = core.do_fit(system, verb)
             if result is not None:
                 system.model['drift'] = result
-                print result
+                if verb: print 'Coeff:', result
                 system.do_plot_drift()
             else:
                 return
