@@ -11,8 +11,13 @@ from logger import clogger, logging
 import sys
 
 def do_fit(system, verbose):
-	from shell_colors import yellow
-	degree = system.model['d']
+	from shell_colors import yellow, red
+	try:
+		degree = system.model['d']
+	except TypeError:
+		msg = red('Error: ') + 'Need to run mod before fit. '
+		clogger.error(msg)
+		return
 	with warnings.catch_warnings(record=True) as w:
 		p = polyfit(system.time, system.vrad, degree)
 		if len(w):

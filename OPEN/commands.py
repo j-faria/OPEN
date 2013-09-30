@@ -73,9 +73,12 @@ Options:
     
 command_list = \
 """
- read 	Read RV files. 
- plot 	Plot various quantities.
- per 	Calculate periodograms.
+ read       Read RV files. 
+ plot       Plot various quantities.
+ per        Calculate periodograms.
+ mod        Define the model that will be adjusted to the data.
+ fit        ...
+ restrict   Select data based on date, SNR or RV accuracy.
 """
 
 
@@ -229,11 +232,14 @@ class EmbeddedMagics(Magics):
         verb = True if args['--verbose'] else False
 
         if local_ns.has_key('default'):
-        	system = local_ns['default']
-        	result = core.do_fit(system, verb)
-        	system.model['drift'] = result
-        	print result
-        	system.do_plot_drift()
+            system = local_ns['default']
+            result = core.do_fit(system, verb)
+            if result is not None:
+                system.model['drift'] = result
+                print result
+                system.do_plot_drift()
+            else:
+                return
 
 
     @needs_local_scope
