@@ -84,15 +84,6 @@ def do_genetic(system):
 		get_rv(system.time, P, K, ecc, omega, t0, vel)
 		return 1./sum(((system.vrad - vel)/system.error)**2)
 
-	def chi2_2(params):
-		P = params[0]
-		K = params[1]
-		ecc = params[2]
-		omega = params[3]
-		t0 = params[4]
-		get_rv(system.time, P, K, ecc, omega, t0, vel)
-		return system.vrad - vel
-
     #create an initial population of 10 chromosomes
 	p = Population(10)
 	#use fitness (above) as our evaluation function
@@ -137,22 +128,38 @@ def do_genetic(system):
 	  #print info
 	#  print p.minFitness, p.maxFitness, p.avgFitness, p.sumFitness
 	print 'Genetic:', p.bestFitIndividual, p.bestFitIndividual.fitness
-	lm = leastsq(chi2_2, p.bestFitIndividual.genes, full_output=0)
+	lm = do_lm(system, p.bestFitIndividual.genes)
 	lm_par = lm[0]
 	print 'LM:', lm_par
+
 	# get best solution curve
+	new_time = system.get_time_to_plot()
+	vel = zeros_like(new_time)
+
 	P, K, ecc, omega, t0 = p.bestFitIndividual.genes
-	get_rv(system.time, P, K, ecc, omega, t0, vel)
+	get_rv(new_time, P, K, ecc, omega, t0, vel)
 	# plot RV with time
 	plot(system.time, system.vrad, 'o')
-	plot(system.time, vel, '-')
+	plot(new_time, vel, '-')
 
 	P, K, ecc, omega, t0 = lm_par
-	get_rv(system.time, P, K, ecc, omega, t0, vel)
-	plot(system.time, vel, 'r-')
+	get_rv(new_time, P, K, ecc, omega, t0, vel)
+	plot(new_time, vel, 'r-')
 	show()
 
 	return
 
-def do_lm(system):
-	pass
+def do_lm(system, x0):
+
+	vel = zeros_like(system.time)
+
+	def chi2_2(params):
+		P = params[0]
+		K = params[1]
+		ecc = params[2]
+		omega = params[3]
+		t0 = params[4]
+		get_rv(system.time, P, K, ecc, omega, t0, vel)
+		return system.vrad - vel
+
+	return leastsq(chi2_2, x0, full_output=0)

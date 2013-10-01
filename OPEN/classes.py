@@ -136,6 +136,16 @@ class rvSeries:
             Half the sampling frequency of the time series.
         """
         return 0.5*1./numpy.mean(self.time[1::]-self.time[0:-1])
+
+    def get_time_to_plot(self):
+        """
+        Returns sufficiently resolved time vector for plots
+        """
+        std = self.time.std()
+        N = len(self.time)
+        minim = self.time.min() - 1.*std
+        maxim = self.time.max() + 1.*std
+        return numpy.linspace(minim, maxim, 2*N)
         
         
 class PeriodogramBase:
