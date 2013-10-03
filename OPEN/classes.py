@@ -126,16 +126,22 @@ class rvSeries:
         plt.tight_layout()
         plt.show()
 
-    def get_nyquist(self):
+    def get_nyquist(self, smallest=False):
         """
-        Calculate the average Nyquist frequency.
+        Calculate the average Nyquist frequency. 
+        If smallest is True, calculates highest Nyquist frequency 
+        (with smallest time interval)
           
         Returns
         -------
         Nyquist frequency : float
             Half the sampling frequency of the time series.
         """
-        return 0.5*1./numpy.mean(self.time[1::]-self.time[0:-1])
+        # this way is about 2 times faster than np.ediff1d
+        if smallest:
+            return 0.5*1./numpy.min(self.time[1::]-self.time[0:-1])
+        else:
+            return 0.5*1./numpy.mean(self.time[1::]-self.time[0:-1])
 
     def get_time_to_plot(self):
         """
