@@ -6,6 +6,7 @@
 #
 from classes import PeriodogramBase
 from numpy import *
+import cmath
 import matplotlib.pyplot as plt 
 import pyqtgraph as pg
 
@@ -433,3 +434,31 @@ class gls(PeriodogramBase):
     if self.norm=="Cumming": return (self.N-3.)/2.*(Prob**(-2./(self.N-3.))-1.)
 
   
+
+## not sure if this should be a class derived off of PeriodogramBase...
+def SpectralWindow(freq,time):
+  """ Calculate the spectral window function and its phase angles.
+  See Eq. (1) of Dawson & Fabrycky (2010).
+
+    Parameters
+    ----------
+    freq : float, array
+        Frequencies at which to calculate the spectral window.
+    time : float, array
+        Times of the data points.
+    
+    Returns
+    -------
+    amp : float, array, len(freq)
+        Amplitude of the spectral window function.
+    phase : float, array, len(freq)
+        Phase angles of the spectral window function.
+    """
+
+  n = len(time)
+  W = [sum([cmath.exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
+
+  amp = [sqrt(w.real*w.real + w.imag*w.imag) for w in W]
+  phase = [atan2(w.imag, w.real) for w in W]
+
+  return amp, phase
