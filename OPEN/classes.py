@@ -170,7 +170,53 @@ class PeriodogramBase:
     """
     
     name = None # which periodogram
-        
+
+
+    def get_peaks(self, n=1, output_period=False):
+        """ Get the frequencies of the largest n peaks in the periodogram. 
+        If output_period is True, also return the periods. 
+        """
+
+        nf = len(self.freq)
+        temp = sorted(zip(self.power, self.freq))
+
+        # largest peak
+        fmax1 = (temp[nf-1])[1]
+        if n==1:
+            if output_period: 
+                return fmax1, 1./fmax1
+            else:
+                return fmax1
+
+        # second largest
+        fmax2 = fmax1
+        i = 1
+        while abs(fmax2 - fmax1) < 0.01:
+            i += 1
+            fmax2 = (temp[nf-i])[1]
+
+        if n==2:
+            if output_period: 
+                return [(fmax1, 1./fmax1), 
+                        (fmax2, 1./fmax2)]
+            else:
+                return fmax1, fmax2
+
+        # third largest
+        fmax3 = fmax2
+        j = i
+        while abs(fmax3 - fmax2) < 0.01 or abs(fmax3 - fmax1) < 0.01:
+            j += 1
+            fmax3 = (temp[nf-j])[1]
+
+        if n==3:
+            if output_period: 
+                return [(fmax1, 1./fmax1), 
+                        (fmax2, 1./fmax2), 
+                        (fmax3, 1./fmax3)]
+            else:
+                return fmax1, fmax2, fmax3
+
     
 #    def do_stats(self):
 #        """
