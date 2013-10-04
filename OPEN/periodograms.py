@@ -193,7 +193,7 @@ class gls(PeriodogramBase):
         The used normalization.
   """
 
-  def __init__(self, rv, ofac=10, hifac=1, freq=None, norm="HorneBaliunas", stats=False, plot=False):
+  def __init__(self, rv, ofac=6, hifac=1, freq=None, norm="HorneBaliunas", stats=False, plot=False):
       
     self.power = None
     self.freq = freq
@@ -365,12 +365,13 @@ class gls(PeriodogramBase):
     if self._showPlot:
       self._plot()
 
-  def __buildFreq(self):
+  def __buildFreq(self, plow=0.5):
     """
       Build frequency array (`freq` attribute).
     """
-    nout = self.ofac * self.hifac * len(self.th)/2
     xdif = max(self.th)-min(self.th)
+    # nout = self.ofac * self.hifac * len(self.th)/2
+    nout = int(xdif * self.ofac / plow)
     self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
   def prob(self, Pn):
@@ -436,7 +437,7 @@ class gls(PeriodogramBase):
   
 
 ## not sure if this should be a class derived off of PeriodogramBase...
-def SpectralWindow(freq,time):
+def SpectralWindow(freq, time):
   """ Calculate the spectral window function and its phase angles.
   See Eq. (1) of Dawson & Fabrycky (2010).
 
