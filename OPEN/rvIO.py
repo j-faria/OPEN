@@ -17,7 +17,7 @@ logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
 def read_rv(*filenames, **kwargs):
     """
-    Read one or more file with radial velocity measurements.
+    Read one or more files containing radial velocity measurements.
     
     Parameters
     ----------
@@ -33,7 +33,7 @@ def read_rv(*filenames, **kwargs):
     err: array
         Error in the radial velocity.
     dic: dict
-        Dictionary with name and number of values from each file read.
+        Dictionary with name and number of values from each file.
     """
 
     #optional keyword argument (i don't think we need this!)
@@ -44,19 +44,19 @@ def read_rv(*filenames, **kwargs):
                 else clogger.setLevel(logging.INFO)
 
     dic = {} # will hold how many values per file
-    for filename in filenames:
+    for filename in sorted(filenames):
         if os.path.isfile(filename) and os.access(filename, os.R_OK):
             # this file exists and is readable
             with open(filename) as f:
                 nlines = len(f.readlines())
-            dic[filename] = nlines
+            dic[filename] = [nlines, 0]
             clogger.info('Reading %d values from file %s' % (nlines, filename))
         else:
             # should raise an error or read from the other files?
             raise IOError("The file '%s' doesn't seem to exist" % filename)
             
     # read data
-    t, rv, err = loadtxt(input(filenames), unpack=True)
+    t, rv, err = loadtxt(input(sorted(filenames)), unpack=True)
     
     # verbose stats about data
     stats = None

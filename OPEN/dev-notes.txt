@@ -1,0 +1,41 @@
+dev notes
+=========
+
+Testing plot performance: Matplotlib .vs. Pyqtgraph
+***************************************************
+
+Periodogram, just calculation: 
+	1st time -> CPU times: user 0.52 s, sys: 0.02 s, total: 0.53 s
+				Wall time: 0.53 s
+
+	2nd time -> CPU times: user 0.00 s, sys: 0.00 s, total: 0.00 s
+				Wall time: 0.00 s
+
+
+Periodogram, calculation + Matplotlib plot:
+	1st time -> CPU times: user 1.67 s, sys: 0.54 s, total: 2.21 s
+				Wall time: 8.31 s
+
+	2nd time -> CPU times: user 0.86 s, sys: 0.74 s, total: 1.60 s
+				Wall time: 8.17 s
+
+Periodogram, calculation + Pyqtgraph plot:
+	1st time -> CPU times: user 1.20 s, sys: 0.23 s, total: 1.43 s
+				Wall time: 9.63 s
+
+	2nd time -> CPU times: user 0.12 s, sys: 0.01 s, total: 0.13 s
+				Wall time: 7.93 s
+
+
+	
+
+	RESULTS FROM PERFORMANCE TEST:
+	******************************
+
+			2nd time call takes virtually no time without plotting, 
+			so it's safe to say all time is spent doing the plots
+			
+			Matplotlib: 0.86, 0.74, 1.60
+			Pyqtgraph : 0.12. 0.01, 0.13 <--- we can see the winner
+
+	Discussion: are we really plotting the same things??

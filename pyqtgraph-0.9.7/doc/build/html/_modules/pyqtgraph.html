@@ -1,0 +1,386 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>pyqtgraph &mdash; pyqtgraph 0.9.7 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.9.7',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="pyqtgraph 0.9.7 documentation" href="../index.html" />
+    <link rel="up" title="Module code" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">pyqtgraph 0.9.7 documentation</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for pyqtgraph</h1><div class="highlight"><pre>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">PyQtGraph - Scientific Graphics and GUI Library for Python</span>
+<span class="sd">www.pyqtgraph.org</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">__version__</span> <span class="o">=</span> <span class="s">&#39;0.9.7&#39;</span>
+
+<span class="c">### import all the goodies and add some helper functions for easy CLI use</span>
+
+<span class="c">## &#39;Qt&#39; is a local module; it is intended mainly to cover up the differences</span>
+<span class="c">## between PyQt4 and PySide.</span>
+<span class="kn">from</span> <span class="nn">.Qt</span> <span class="kn">import</span> <span class="n">QtGui</span>
+
+<span class="c">## not really safe--If we accidentally create another QApplication, the process hangs (and it is very difficult to trace the cause)</span>
+<span class="c">#if QtGui.QApplication.instance() is None:</span>
+    <span class="c">#app = QtGui.QApplication([])</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>  <span class="c">## pyqtgraph requires numpy</span>
+              <span class="c">## (import here to avoid massive error dump later on if numpy is not available)</span>
+
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">sys</span>
+
+<span class="c">## check python version</span>
+<span class="c">## Allow anything &gt;= 2.7</span>
+<span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">6</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s">&quot;Pyqtgraph requires Python version 2.6 or greater (this is </span><span class="si">%d</span><span class="s">.</span><span class="si">%d</span><span class="s">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+<span class="c">## helpers for 2/3 compatibility</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">python2_3</span>
+
+<span class="c">## install workarounds for numpy bugs</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">numpy_fix</span>
+
+<span class="c">## in general openGL is poorly supported with Qt+GraphicsView.</span>
+<span class="c">## we only enable it where the performance benefit is critical.</span>
+<span class="c">## Note this only applies to 2D graphics; 3D graphics always use OpenGL.</span>
+<span class="k">if</span> <span class="s">&#39;linux&#39;</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="p">:</span>  <span class="c">## linux has numerous bugs in opengl implementation</span>
+    <span class="n">useOpenGL</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="k">elif</span> <span class="s">&#39;darwin&#39;</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="p">:</span> <span class="c">## openGL can have a major impact on mac, but also has serious bugs</span>
+    <span class="n">useOpenGL</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="k">if</span> <span class="n">QtGui</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&#39;Warning: QApplication was created before pyqtgraph was imported; there may be problems (to avoid bugs, call QApplication.setGraphicsSystem(&quot;raster&quot;) before the QApplication is created).&#39;</span><span class="p">)</span>
+    <span class="n">QtGui</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">setGraphicsSystem</span><span class="p">(</span><span class="s">&#39;raster&#39;</span><span class="p">)</span>  <span class="c">## work around a variety of bugs in the native graphics system </span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">useOpenGL</span> <span class="o">=</span> <span class="bp">False</span>  <span class="c">## on windows there&#39;s a more even performance / bugginess tradeoff. </span>
+                
+<span class="n">CONFIG_OPTIONS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;useOpenGL&#39;</span><span class="p">:</span> <span class="n">useOpenGL</span><span class="p">,</span> <span class="c">## by default, this is platform-dependent (see widgets/GraphicsView). Set to True or False to explicitly enable/disable opengl.</span>
+    <span class="s">&#39;leftButtonPan&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>  <span class="c">## if false, left button drags a rubber band for zooming in viewbox</span>
+    <span class="s">&#39;foreground&#39;</span><span class="p">:</span> <span class="p">(</span><span class="mi">150</span><span class="p">,</span> <span class="mi">150</span><span class="p">,</span> <span class="mi">150</span><span class="p">),</span>  <span class="c">## default foreground color for axes, labels, etc.</span>
+    <span class="s">&#39;background&#39;</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>        <span class="c">## default background for GraphicsWidget</span>
+    <span class="s">&#39;antialias&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+    <span class="s">&#39;editorCommand&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>  <span class="c">## command used to invoke code editor from ConsoleWidgets</span>
+    <span class="s">&#39;useWeave&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>       <span class="c">## Use weave to speed up some operations, if it is available</span>
+    <span class="s">&#39;weaveDebug&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>    <span class="c">## Print full error message if weave compile fails</span>
+<span class="p">}</span> 
+
+
+<span class="k">def</span> <span class="nf">setConfigOption</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="n">CONFIG_OPTIONS</span><span class="p">[</span><span class="n">opt</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+<span class="k">def</span> <span class="nf">setConfigOptions</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">):</span>
+    <span class="n">CONFIG_OPTIONS</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">opts</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">getConfigOption</span><span class="p">(</span><span class="n">opt</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">CONFIG_OPTIONS</span><span class="p">[</span><span class="n">opt</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="systemInfo"><a class="viewcode-back" href="../functions.html#pyqtgraph.systemInfo">[docs]</a><span class="k">def</span> <span class="nf">systemInfo</span><span class="p">():</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">&quot;sys.platform: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">&quot;sys.version: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">sys</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+    <span class="kn">from</span> <span class="nn">.Qt</span> <span class="kn">import</span> <span class="n">VERSION_INFO</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">&quot;qt bindings: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">VERSION_INFO</span><span class="p">)</span>
+    
+    <span class="k">global</span> <span class="n">__version__</span>
+    <span class="n">rev</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="k">if</span> <span class="n">__version__</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>  <span class="c">## this code was probably checked out from bzr; look up the last-revision file</span>
+        <span class="n">lastRevFile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">__file__</span><span class="p">),</span> <span class="s">&#39;..&#39;</span><span class="p">,</span> <span class="s">&#39;.bzr&#39;</span><span class="p">,</span> <span class="s">&#39;branch&#39;</span><span class="p">,</span> <span class="s">&#39;last-revision&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">lastRevFile</span><span class="p">):</span>
+            <span class="n">rev</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">lastRevFile</span><span class="p">,</span> <span class="s">&#39;r&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    
+    <span class="k">print</span><span class="p">(</span><span class="s">&quot;pyqtgraph: </span><span class="si">%s</span><span class="s">; </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">__version__</span><span class="p">,</span> <span class="n">rev</span><span class="p">))</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">&quot;config:&quot;</span><span class="p">)</span>
+    <span class="kn">import</span> <span class="nn">pprint</span>
+    <span class="n">pprint</span><span class="o">.</span><span class="n">pprint</span><span class="p">(</span><span class="n">CONFIG_OPTIONS</span><span class="p">)</span>
+
+<span class="c">## Rename orphaned .pyc files. This is *probably* safe :)</span>
+<span class="c">## We only do this if __version__ is None, indicating the code was probably pulled</span>
+<span class="c">## from the repository. </span></div>
+<span class="k">def</span> <span class="nf">renamePyc</span><span class="p">(</span><span class="n">startDir</span><span class="p">):</span>
+    <span class="c">### Used to rename orphaned .pyc files</span>
+    <span class="c">### When a python file changes its location in the repository, usually the .pyc file</span>
+    <span class="c">### is left behind, possibly causing mysterious and difficult to track bugs. </span>
+
+    <span class="c">### Note that this is no longer necessary for python 3.2; from PEP 3147:</span>
+    <span class="c">### &quot;If the py source file is missing, the pyc file inside __pycache__ will be ignored. </span>
+    <span class="c">### This eliminates the problem of accidental stale pyc file imports.&quot;</span>
+    
+    <span class="n">printed</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="n">startDir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">startDir</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">startDir</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s">&#39;__pycache__&#39;</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+            <span class="n">fileName</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">base</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">fileName</span><span class="p">)</span>
+            <span class="n">py</span> <span class="o">=</span> <span class="n">base</span> <span class="o">+</span> <span class="s">&quot;.py&quot;</span>
+            <span class="k">if</span> <span class="n">ext</span> <span class="o">==</span> <span class="s">&#39;.pyc&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">py</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">printed</span><span class="p">:</span>
+                    <span class="k">print</span><span class="p">(</span><span class="s">&quot;NOTE: Renaming orphaned .pyc files:&quot;</span><span class="p">)</span>
+                    <span class="n">printed</span> <span class="o">=</span> <span class="bp">True</span>
+                <span class="n">n</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+                    <span class="n">name2</span> <span class="o">=</span> <span class="n">fileName</span> <span class="o">+</span> <span class="s">&quot;.renamed</span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">n</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">name2</span><span class="p">):</span>
+                        <span class="k">break</span>
+                    <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">print</span><span class="p">(</span><span class="s">&quot;  &quot;</span> <span class="o">+</span> <span class="n">fileName</span> <span class="o">+</span> <span class="s">&quot;  ==&gt;&quot;</span><span class="p">)</span>
+                <span class="k">print</span><span class="p">(</span><span class="s">&quot;  &quot;</span> <span class="o">+</span> <span class="n">name2</span><span class="p">)</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">fileName</span><span class="p">,</span> <span class="n">name2</span><span class="p">)</span>
+                
+<span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">__file__</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">if</span> <span class="n">__version__</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s">&#39;frozen&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span> <span class="c">## If we are frozen, there&#39;s a good chance we don&#39;t have the original .py files anymore.</span>
+    <span class="n">renamePyc</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+
+<span class="c">## Import almost everything to make it available from a single namespace</span>
+<span class="c">## don&#39;t import the more complex systems--canvas, parametertree, flowchart, dockarea</span>
+<span class="c">## these must be imported separately.</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">frozenSupport</span>
+<span class="k">def</span> <span class="nf">importModules</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">globals</span><span class="p">,</span> <span class="nb">locals</span><span class="p">,</span> <span class="n">excludes</span><span class="o">=</span><span class="p">()):</span>
+    <span class="sd">&quot;&quot;&quot;Import all modules residing within *path*, return a dict of name: module pairs.</span>
+<span class="sd">    </span>
+<span class="sd">    Note that *path* MUST be relative to the module doing the import.    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="nb">globals</span><span class="p">[</span><span class="s">&#39;__file__&#39;</span><span class="p">])[</span><span class="mi">0</span><span class="p">],</span> <span class="n">path</span><span class="p">)</span>
+    <span class="n">files</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">frozenSupport</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">frozenSupport</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">f</span><span class="p">))</span> <span class="ow">and</span> <span class="n">f</span> <span class="o">!=</span> <span class="s">&#39;__pycache__&#39;</span><span class="p">:</span>
+            <span class="n">files</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">f</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">:]</span> <span class="o">==</span> <span class="s">&#39;.py&#39;</span> <span class="ow">and</span> <span class="n">f</span> <span class="o">!=</span> <span class="s">&#39;__init__.py&#39;</span><span class="p">:</span>
+            <span class="n">files</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">f</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">f</span><span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">:]</span> <span class="o">==</span> <span class="s">&#39;.pyc&#39;</span> <span class="ow">and</span> <span class="n">f</span> <span class="o">!=</span> <span class="s">&#39;__init__.pyc&#39;</span><span class="p">:</span>
+            <span class="n">files</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">f</span><span class="p">[:</span><span class="o">-</span><span class="mi">4</span><span class="p">])</span>
+        
+    <span class="n">mods</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span> <span class="s">&#39;.&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">modName</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">modName</span> <span class="ow">in</span> <span class="n">excludes</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">modName</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="s">&#39;.&#39;</span> <span class="o">+</span> <span class="n">modName</span>
+            <span class="n">mod</span> <span class="o">=</span> <span class="nb">__import__</span><span class="p">(</span><span class="n">modName</span><span class="p">,</span> <span class="nb">globals</span><span class="p">,</span> <span class="nb">locals</span><span class="p">,</span> <span class="n">fromlist</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;*&#39;</span><span class="p">])</span>
+            <span class="n">mods</span><span class="p">[</span><span class="n">modName</span><span class="p">]</span> <span class="o">=</span> <span class="n">mod</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">traceback</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_stack</span><span class="p">()</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">(</span><span class="o">*</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">&quot;[Error importing module: </span><span class="si">%s</span><span class="s">]&quot;</span> <span class="o">%</span> <span class="n">modName</span><span class="p">)</span>
+            
+    <span class="k">return</span> <span class="n">mods</span>
+
+<span class="k">def</span> <span class="nf">importAll</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">globals</span><span class="p">,</span> <span class="nb">locals</span><span class="p">,</span> <span class="n">excludes</span><span class="o">=</span><span class="p">()):</span>
+    <span class="sd">&quot;&quot;&quot;Given a list of modules, import all names from each module into the global namespace.&quot;&quot;&quot;</span>
+    <span class="n">mods</span> <span class="o">=</span> <span class="n">importModules</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">globals</span><span class="p">,</span> <span class="nb">locals</span><span class="p">,</span> <span class="n">excludes</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">mod</span> <span class="ow">in</span> <span class="n">mods</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s">&#39;__all__&#39;</span><span class="p">):</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">__all__</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">dir</span><span class="p">(</span><span class="n">mod</span><span class="p">)</span> <span class="k">if</span> <span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s">&#39;_&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+                <span class="nb">globals</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+
+<span class="n">importAll</span><span class="p">(</span><span class="s">&#39;graphicsItems&#39;</span><span class="p">,</span> <span class="nb">globals</span><span class="p">(),</span> <span class="nb">locals</span><span class="p">())</span>
+<span class="n">importAll</span><span class="p">(</span><span class="s">&#39;widgets&#39;</span><span class="p">,</span> <span class="nb">globals</span><span class="p">(),</span> <span class="nb">locals</span><span class="p">(),</span> <span class="n">excludes</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;MatplotlibWidget&#39;</span><span class="p">,</span> <span class="s">&#39;RemoteGraphicsView&#39;</span><span class="p">])</span>
+
+<span class="kn">from</span> <span class="nn">.imageview</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">.WidgetGroup</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">.Point</span> <span class="kn">import</span> <span class="n">Point</span>
+<span class="kn">from</span> <span class="nn">.Vector</span> <span class="kn">import</span> <span class="n">Vector</span>
+<span class="kn">from</span> <span class="nn">.SRTTransform</span> <span class="kn">import</span> <span class="n">SRTTransform</span>
+<span class="kn">from</span> <span class="nn">.Transform3D</span> <span class="kn">import</span> <span class="n">Transform3D</span>
+<span class="kn">from</span> <span class="nn">.SRTTransform3D</span> <span class="kn">import</span> <span class="n">SRTTransform3D</span>
+<span class="kn">from</span> <span class="nn">.functions</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">.graphicsWindows</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">.SignalProxy</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">.colormap</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">.ptime</span> <span class="kn">import</span> <span class="n">time</span>
+
+
+<span class="kn">import</span> <span class="nn">atexit</span>
+<span class="k">def</span> <span class="nf">cleanup</span><span class="p">():</span>
+    <span class="n">ViewBox</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>  <span class="c">## tell ViewBox that it doesn&#39;t need to deregister views anymore.</span>
+    
+    <span class="c">## Workaround for Qt exit crash:</span>
+    <span class="c">## ALL QGraphicsItems must have a scene before they are deleted.</span>
+    <span class="c">## This is potentially very expensive, but preferred over crashing.</span>
+    <span class="c">## Note: this appears to be fixed in PySide as of 2012.12, but it should be left in for a while longer..</span>
+    <span class="k">if</span> <span class="n">QtGui</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="kn">import</span> <span class="nn">gc</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">QtGui</span><span class="o">.</span><span class="n">QGraphicsScene</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">gc</span><span class="o">.</span><span class="n">get_objects</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="n">QtGui</span><span class="o">.</span><span class="n">QGraphicsItem</span><span class="p">)</span> <span class="ow">and</span> <span class="n">o</span><span class="o">.</span><span class="n">scene</span><span class="p">()</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">s</span><span class="o">.</span><span class="n">addItem</span><span class="p">(</span><span class="n">o</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>  <span class="c">## occurs if a python wrapper no longer has its underlying C++ object</span>
+            <span class="k">continue</span>
+<span class="n">atexit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">cleanup</span><span class="p">)</span>
+
+
+
+<span class="c">## Convenience functions for command-line use</span>
+
+<span class="n">plots</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">images</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">QAPP</span> <span class="o">=</span> <span class="bp">None</span>
+
+<div class="viewcode-block" id="plot"><a class="viewcode-back" href="../functions.html#pyqtgraph.plot">[docs]</a><span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create and return a :class:`PlotWindow &lt;pyqtgraph.PlotWindow&gt;` </span>
+<span class="sd">    (this is just a window with :class:`PlotWidget &lt;pyqtgraph.PlotWidget&gt;` inside), plot data in it.</span>
+<span class="sd">    Accepts a *title* argument to set the title of the window.</span>
+<span class="sd">    All other arguments are used to plot data. (see :func:`PlotItem.plot() &lt;pyqtgraph.PlotItem.plot&gt;`)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mkQApp</span><span class="p">()</span>
+    <span class="c">#if &#39;title&#39; in kargs:</span>
+        <span class="c">#w = PlotWindow(title=kargs[&#39;title&#39;])</span>
+        <span class="c">#del kargs[&#39;title&#39;]</span>
+    <span class="c">#else:</span>
+        <span class="c">#w = PlotWindow()</span>
+    <span class="c">#if len(args)+len(kargs) &gt; 0:</span>
+        <span class="c">#w.plot(*args, **kargs)</span>
+        
+    <span class="n">pwArgList</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;labels&#39;</span><span class="p">,</span> <span class="s">&#39;name&#39;</span><span class="p">,</span> <span class="s">&#39;left&#39;</span><span class="p">,</span> <span class="s">&#39;right&#39;</span><span class="p">,</span> <span class="s">&#39;top&#39;</span><span class="p">,</span> <span class="s">&#39;bottom&#39;</span><span class="p">]</span>
+    <span class="n">pwArgs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">dataArgs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">pwArgList</span><span class="p">:</span>
+            <span class="n">pwArgs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">kargs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dataArgs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">kargs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+        
+    <span class="n">w</span> <span class="o">=</span> <span class="n">PlotWindow</span><span class="p">(</span><span class="o">**</span><span class="n">pwArgs</span><span class="p">)</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">dataArgs</span><span class="p">)</span>
+    <span class="n">plots</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">w</span>
+    </div>
+<div class="viewcode-block" id="image"><a class="viewcode-back" href="../functions.html#pyqtgraph.image">[docs]</a><span class="k">def</span> <span class="nf">image</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create and return an :class:`ImageWindow &lt;pyqtgraph.ImageWindow&gt;` </span>
+<span class="sd">    (this is just a window with :class:`ImageView &lt;pyqtgraph.ImageView&gt;` widget inside), show image data inside.</span>
+<span class="sd">    Will show 2D or 3D image data.</span>
+<span class="sd">    Accepts a *title* argument to set the title of the window.</span>
+<span class="sd">    All other arguments are used to show data. (see :func:`ImageView.setImage() &lt;pyqtgraph.ImageView.setImage&gt;`)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mkQApp</span><span class="p">()</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">ImageWindow</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">)</span>
+    <span class="n">images</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">w</span></div>
+<span class="n">show</span> <span class="o">=</span> <span class="n">image</span>  <span class="c">## for backward compatibility</span>
+
+<div class="viewcode-block" id="dbg"><a class="viewcode-back" href="../functions.html#pyqtgraph.dbg">[docs]</a><span class="k">def</span> <span class="nf">dbg</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a console window and begin watching for exceptions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mkQApp</span><span class="p">()</span>
+    <span class="kn">import</span> <span class="nn">console</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">console</span><span class="o">.</span><span class="n">ConsoleWidget</span><span class="p">()</span>
+    <span class="n">c</span><span class="o">.</span><span class="n">catchAllExceptions</span><span class="p">()</span>
+    <span class="n">c</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">global</span> <span class="n">consoles</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">consoles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+        <span class="n">consoles</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="p">]</span>
+    
+    </div>
+<span class="k">def</span> <span class="nf">mkQApp</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">QAPP</span>
+    <span class="n">inst</span> <span class="o">=</span> <span class="n">QtGui</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">inst</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">QAPP</span> <span class="o">=</span> <span class="n">QtGui</span><span class="o">.</span><span class="n">QApplication</span><span class="p">([])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">QAPP</span> <span class="o">=</span> <span class="n">inst</span>
+    <span class="k">return</span> <span class="n">QAPP</span>
+        
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">pyqtgraph 0.9.7 documentation</a> &raquo;</li>
+          <li><a href="index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Luke Campagnola.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

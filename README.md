@@ -1,6 +1,7 @@
-open
+OPEN
 ====
 
+Tools for exoplanet detection.
 
 - A description of your project
 - Links to the project's ReadTheDocs page

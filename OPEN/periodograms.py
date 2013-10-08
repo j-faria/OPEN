@@ -6,6 +6,9 @@
 #
 from classes import PeriodogramBase
 from numpy import *
+import cmath
+import matplotlib.pyplot as plt 
+import pyqtgraph as pg
 
 
 # This is the ...... periodogram etc etc etc
@@ -190,7 +193,7 @@ class gls(PeriodogramBase):
         The used normalization.
   """
 
-  def __init__(self, rv, ofac=10, hifac=1, freq=None, norm="HorneBaliunas", stats=False, plot=False):
+  def __init__(self, rv, ofac=6, hifac=1, freq=None, norm="HorneBaliunas", stats=False, plot=False):
       
     self.power = None
     self.freq = freq
@@ -223,25 +226,22 @@ class gls(PeriodogramBase):
       Create a plot.
     """
     self.fig = plt.figure()
-    self.fig.subplots_adjust(hspace=0.35)
-    self.ax = self.fig.add_subplot(2,1,1)
+    self.ax = self.fig.add_subplot(1,1,1)
     self.ax.set_title("Normalized periodogram")
     self.ax.set_xlabel("Period")
     self.ax.set_ylabel("Power")
-    self.ax.plot(1./self.freq, self.power, 'b.--')
-
-    self.ax = self.fig.add_subplot(2,1,2)
-    self.ax.set_title("Data")
-    self.ax.set_xlabel("Time")
-    self.ax.set_ylabel("Data")
-    self.ax.plot(self.t, self.y, 'r.--')
-    
+    self.ax.semilogx(1./self.freq, self.power, 'b-')
+    plt.tight_layout()
     plt.show()
+    # p = pg.plot(1./self.freq, self.power, title="Periodogram")
+    # p.plotItem.setLogMode(1./self.freq, self.power)
+    # pg.QtGui.QApplication.exec_()
 
-  def _output(self):
+  def _output(self, verbose=False):
     """
       Some statistical output.
     """
+    from shell_colors import blue
     # Index with maximum power
     bbin = argmax(self.power)
     # Maximum power
@@ -272,26 +272,33 @@ class gls(PeriodogramBase):
     
     # Statistics
     print "Generalized LS - statistical output"
-    print "-----------------------------------"
-    print "Number of input points:     %6d" % (nt)
-    print "Weighted mean of dataset:   % e" % (self._Y)
-    print "Weighted rms of dataset:    % e" % (sqrt(self._YY))
-    print "Time base:                  % e" % (max(self.th) - min(self.th))
-    print "Number of frequency points: %6d" % (len(self.freq))
-    print
-    print "Maximum power, p :    % e " % (self.power[bbin])
-    print "Maximum power (without normalization):   %e" % (pmax)
-    print "Normalization    : ", self.norm
-    print "RMS of residuals :    % e " % (rms)
-    if self.error is not None:
-      print "  Mean weighted internal error:  % e" %(sqrt(nt/sum(1./self.error**2)))
-    print "Best sine frequency : % e +/- % e" % (fbest, f_err)
-    print "Best sine period    : % e +/- % e" % (1./fbest, Psin_err)
-    print "Amplitude:          : % e +/- % e" % (amp, sqrt(2./nt)*rms)
-    print "Phase (ph) : % e +/- % e" % (ph, sqrt(2./nt)*rms/amp/(2.*pi))
-    print "Phase (T0) : % e +/- % e" % (T0, sqrt(2./nt)*rms/amp/(2.*pi)/fbest)
-    print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
-    print 60*"-"
+    print 33*"-"
+    if verbose:
+      print "Number of input points:     %6d" % (nt)
+      print "Weighted mean of dataset:   % e" % (self._Y)
+      print "Weighted rms of dataset:    % e" % (sqrt(self._YY))
+      print "Time base:                  % e" % (max(self.th) - min(self.th))
+      print "Number of frequency points: %6d" % (len(self.freq))
+      print
+      print "Maximum power, p :    % e " % (self.power[bbin])
+      print "Maximum power (without normalization):   %e" % (pmax)
+      print "Normalization    : ", self.norm
+      print "RMS of residuals :    % e " % (rms)
+      if self.error is not None:
+        print "  Mean weighted internal error:  % e" %(sqrt(nt/sum(1./self.error**2)))
+      print "Best sine frequency : % e +/- % e" % (fbest, f_err)
+      print "Best sine period    : % e +/- % e" % (1./fbest, Psin_err)
+      print "Amplitude:          : % e +/- % e" % (amp, sqrt(2./nt)*rms)
+      print "Phase (ph) : % e +/- % e" % (ph, sqrt(2./nt)*rms/amp/(2.*pi))
+      print "Phase (T0) : % e +/- % e" % (T0, sqrt(2./nt)*rms/amp/(2.*pi)/fbest)
+      print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
+      print 60*"-"
+    else:
+      print "Input points: %6d, frequency points: %6d" % (nt, len(self.freq))
+      print 
+      print "Maximum power   : %f " % (self.power[bbin])
+      print blue("Best sine period") + ": %f +/- %f" % (1./fbest, Psin_err)
+      # print 60*"-"
 
   def __calcPeriodogram(self):
 
@@ -358,13 +365,14 @@ class gls(PeriodogramBase):
     if self._showPlot:
       self._plot()
 
-  def __buildFreq(self):
+  def __buildFreq(self, plow=0.5):
     """
       Build frequency array (`freq` attribute).
     """
-    nout = self.ofac * self.hifac * len(self.th)/2
     xdif = max(self.th)-min(self.th)
-    self.freq = 1./(xdif*self.ofac) + arange(nout)/(self.ofac*xdif)
+    # nout = self.ofac * self.hifac * len(self.th)/2
+    nout = int(xdif * self.ofac / plow)
+    self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
   def prob(self, Pn):
     """
@@ -427,3 +435,72 @@ class gls(PeriodogramBase):
     if self.norm=="Cumming": return (self.N-3.)/2.*(Prob**(-2./(self.N-3.))-1.)
 
   
+
+class SpectralWindow(PeriodogramBase):
+  """ Calculate the spectral window function and its phase angles.
+  See Eq. (1) of Dawson & Fabrycky (2010).
+
+    Parameters
+    ----------
+    freq : float, array
+        Frequencies at which to calculate the spectral window.
+    time : float, array
+        Times of the data points.
+    
+    Returns
+    -------
+    amp : float, array, len(freq)
+        Amplitude of the spectral window function.
+    phase : float, array, len(freq)
+        Phase angles of the spectral window function.
+  """
+
+  def __init__(self, freq, time):
+    self.name = 'SpectralWindow'
+    self.freq = freq
+    self.time = time
+    self.amp = None
+    self.phase = None
+    self._calcWindowFunction()
+    self._plot(dials=True)
+
+
+  def _calcWindowFunction(self):
+    n = len(self.time)
+    W = [sum([cmath.exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq]
+
+    self.amp = [sqrt(w.real*w.real + w.imag*w.imag) for w in W]
+    self.phase = [arctan2(w.imag, w.real) for w in W]
+
+
+  def _plot(self, dials=False, ndials=3):
+    """
+      Create a plot.
+    """
+    self.fig = plt.figure()
+    self.ax = self.fig.add_subplot(1,1,1)
+    self.ax.set_title("Spectral Window Function")
+    self.ax.set_xlabel("Period")
+    self.ax.set_ylabel("Power")
+    self.ax.semilogx(1./self.freq, self.amp, 'b-')
+
+    if dials:
+      fmax1, fmax2, fmax3 = self.get_peaks(n=3)
+      max_amp = max(self.amp)
+
+      self.ax.semilogx(1./fmax1,max_amp+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+      self.ax.semilogx(1./fmax3,max_amp+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+      self.ax.semilogx(1./fmax2,max_amp+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+
+      ph1 = ph2 = ph3 = 0.3
+
+      self.ax.semilogx([1./fmax1,1./fmax1+0.025*cos(ph1)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph1)],'k-',lw=1)
+      self.ax.semilogx([1./fmax2,1./fmax2+0.025*cos(ph2)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph2)],'k-',lw=1)
+      self.ax.semilogx([1./fmax3,1./fmax3+0.025*cos(ph3)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph3)],'k-',lw=1)
+
+
+    plt.tight_layout()
+    plt.show()
+    # p = pg.plot(1./self.freq, self.power, title="Periodogram")
+    # p.plotItem.setLogMode(1./self.freq, self.power)
+    # pg.QtGui.QApplication.exec_()

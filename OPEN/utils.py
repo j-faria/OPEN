@@ -8,6 +8,7 @@
 Utility functions or snippets for all sorts of things
 """
 from math import sqrt
+from sys import stdout
 
 
 ## this code from 
@@ -36,3 +37,9 @@ def rms(array):
     
     
     
+def stdout_write(msg):
+	""" Print to stdout (without carriage return) and flush right away.
+	Useful to print in the same line """
+
+	stdout.write(msg)
+	stdout.flush()
