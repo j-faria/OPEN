@@ -436,8 +436,7 @@ class gls(PeriodogramBase):
 
   
 
-## not sure if this should be a class derived off of PeriodogramBase...
-def SpectralWindow(freq, time):
+class SpectralWindow(PeriodogramBase):
   """ Calculate the spectral window function and its phase angles.
   See Eq. (1) of Dawson & Fabrycky (2010).
 
@@ -454,12 +453,37 @@ def SpectralWindow(freq, time):
         Amplitude of the spectral window function.
     phase : float, array, len(freq)
         Phase angles of the spectral window function.
+  """
+
+  def __init__(self, freq, time):
+    self.f = freq
+    self.t = time
+    self.amp = None
+    self.phase = None
+    self._calcWindowFunction()
+    self._plot()
+
+
+  def _calcWindowFunction(self):
+    n = len(self.t)
+    W = [sum([cmath.exp(-2.j*pi*f*t) for t in self.t])/float(n) for f in self.f]
+
+    self.amp = [sqrt(w.real*w.real + w.imag*w.imag) for w in W]
+    self.phase = [arctan2(w.imag, w.real) for w in W]
+
+
+  def _plot(self):
     """
-
-  n = len(time)
-  W = [sum([cmath.exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
-
-  amp = [sqrt(w.real*w.real + w.imag*w.imag) for w in W]
-  phase = [atan2(w.imag, w.real) for w in W]
-
-  return amp, phase
+      Create a plot.
+    """
+    self.fig = plt.figure()
+    self.ax = self.fig.add_subplot(1,1,1)
+    self.ax.set_title("Spectral Window Function")
+    self.ax.set_xlabel("Period")
+    self.ax.set_ylabel("Power")
+    self.ax.semilogx(1./self.f, self.amp, 'b-')
+    plt.tight_layout()
+    plt.show()
+    # p = pg.plot(1./self.freq, self.power, title="Periodogram")
+    # p.plotItem.setLogMode(1./self.freq, self.power)
+    # pg.QtGui.QApplication.exec_()
