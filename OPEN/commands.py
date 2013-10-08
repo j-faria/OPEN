@@ -17,6 +17,7 @@ from docopt import docopt, DocoptExit
 from classes import rvSeries
 import core
 import periodograms
+from utils import stdout_write
 from logger import clogger, logging
 
 ################################################################################
@@ -57,13 +58,13 @@ Options:
 wf_usage = \
 """
 Usage:
-    wf [obs]
-    wf [obs] -n SYSTEM
-    wf [obs] -v
+    wf 
+    wf -n SYSTEM
+    wf --dials
     wf -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
-    -v --verbose  Verbose statistical output 
+    --dials       Plot phase "dials" in largest (3) peaks
     -h --help     Show this help message
 """
 
@@ -224,14 +225,19 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
         
-        verb = True if args['--verbose'] else False
         try: 
             system.per
         except AttributeError:
-            clogger.info('Calculating periodogram to get frequencies')
+            from shell_colors import green
+            clogger.debug('Calculating periodogram to get frequencies')
+            stdout_write('Calculating periodogram to get frequencies...')
             system.per = periodograms.gls(system, hifac=5)
+            print green(' done')
         
-        system.wf = periodograms.SpectralWindow(system.per.freq, system.time)
+        try: 
+            system.wf._plot()
+        except AttributeError:
+            system.wf = periodograms.SpectralWindow(system.per.freq, system.time)
 
     @line_magic
     def listcommands(self, parameter_s=''):

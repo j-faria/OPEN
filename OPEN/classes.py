@@ -178,6 +178,8 @@ class PeriodogramBase:
         """
 
         nf = len(self.freq)
+        if self.name is 'SpectralWindow':
+            self.power = self.amp
         temp = sorted(zip(self.power, self.freq))
 
         # largest peak

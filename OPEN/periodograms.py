@@ -456,23 +456,24 @@ class SpectralWindow(PeriodogramBase):
   """
 
   def __init__(self, freq, time):
-    self.f = freq
-    self.t = time
+    self.name = 'SpectralWindow'
+    self.freq = freq
+    self.time = time
     self.amp = None
     self.phase = None
     self._calcWindowFunction()
-    self._plot()
+    self._plot(dials=True)
 
 
   def _calcWindowFunction(self):
-    n = len(self.t)
-    W = [sum([cmath.exp(-2.j*pi*f*t) for t in self.t])/float(n) for f in self.f]
+    n = len(self.time)
+    W = [sum([cmath.exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq]
 
     self.amp = [sqrt(w.real*w.real + w.imag*w.imag) for w in W]
     self.phase = [arctan2(w.imag, w.real) for w in W]
 
 
-  def _plot(self):
+  def _plot(self, dials=False, ndials=3):
     """
       Create a plot.
     """
@@ -481,7 +482,23 @@ class SpectralWindow(PeriodogramBase):
     self.ax.set_title("Spectral Window Function")
     self.ax.set_xlabel("Period")
     self.ax.set_ylabel("Power")
-    self.ax.semilogx(1./self.f, self.amp, 'b-')
+    self.ax.semilogx(1./self.freq, self.amp, 'b-')
+
+    if dials:
+      fmax1, fmax2, fmax3 = self.get_peaks(n=3)
+      max_amp = max(self.amp)
+
+      self.ax.semilogx(1./fmax1,max_amp+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+      self.ax.semilogx(1./fmax3,max_amp+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+      self.ax.semilogx(1./fmax2,max_amp+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+
+      ph1 = ph2 = ph3 = 0.3
+
+      self.ax.semilogx([1./fmax1,1./fmax1+0.025*cos(ph1)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph1)],'k-',lw=1)
+      self.ax.semilogx([1./fmax2,1./fmax2+0.025*cos(ph2)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph2)],'k-',lw=1)
+      self.ax.semilogx([1./fmax3,1./fmax3+0.025*cos(ph3)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph3)],'k-',lw=1)
+
+
     plt.tight_layout()
     plt.show()
     # p = pg.plot(1./self.freq, self.power, title="Periodogram")
