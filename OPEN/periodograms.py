@@ -475,14 +475,26 @@ class SpectralWindow(PeriodogramBase):
 
   def _plot(self, dials=False, ndials=3):
     """
-      Create a plot.
+      Plot the spectral window function as a function of frequency.
     """
     self.fig = plt.figure()
     self.ax = self.fig.add_subplot(1,1,1)
-    self.ax.set_title("Spectral Window Function")
+    # self.ax.set_title("Spectral Window Function")
     self.ax.set_xlabel("Period")
     self.ax.set_ylabel("Power")
     self.ax.semilogx(1./self.freq, self.amp, 'b-')
+
+    # Trying to get labels on top representing frequency - does not work!
+    # self.ax2 = self.ax.twiny()
+    # def tick_function(X):
+    #   V = 1./X
+    #   return ["%.e" % z for z in V]
+
+    # bottom_tick_loc = self.ax.get_xticks()
+    # self.ax2.set_xticks(bottom_tick_loc)
+    # self.ax2.set_xticklabels(tick_function(bottom_tick_loc))
+    # self.ax2.set_xlabel(r"Frequency [day$^{-1}$]")
+    # # self.ax2.get_xaxis().get_major_formatter().set_scientific(True)
 
     if dials:
       fmax1, fmax2, fmax3 = self.get_peaks(n=3)
@@ -499,7 +511,7 @@ class SpectralWindow(PeriodogramBase):
       self.ax.semilogx([1./fmax3,1./fmax3+0.025*cos(ph3)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph3)],'k-',lw=1)
 
 
-    plt.tight_layout()
+    self.fig.tight_layout()
     plt.show()
     # p = pg.plot(1./self.freq, self.power, title="Periodogram")
     # p.plotItem.setLogMode(1./self.freq, self.power)
