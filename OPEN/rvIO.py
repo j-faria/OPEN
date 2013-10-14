@@ -4,16 +4,20 @@
 # This file is part of OPEN which is licensed under the MIT license.
 # You should have received a copy of the license along with OPEN. See LICENSE.
 #
-from __future__ import absolute_import
 
-from logger import clogger, logging
-from utils import day2year, rms
-
+# standard library imports
 from fileinput import input
-from numpy import loadtxt
 import os
 
+# other imports
+from numpy import loadtxt
+
+# intra-package imports
+from .logger import clogger, logging
+from .utils import day2year, rms
+
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+
 
 def read_rv(*filenames, **kwargs):
     """

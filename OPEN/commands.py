@@ -7,18 +7,19 @@
 """
 This module defines the commands that are used as magics in OPEN. 
 """
-from __future__ import absolute_import
+# IPython imports
 from IPython.core.magic import (Magics, magics_class, line_magic, 
                                 needs_local_scope)
 from IPython.core.magic_arguments import argument
 from IPython.utils.io import ask_yes_no
 
-from docopt import docopt, DocoptExit
-from classes import rvSeries
+# intra-package imports
+from .docopt import docopt, DocoptExit
+from .classes import rvSeries
+from .utils import stdout_write
+from .logger import clogger, logging
 import core
 import periodograms
-from utils import stdout_write
-from logger import clogger, logging
 
 ################################################################################
 ################################################################################

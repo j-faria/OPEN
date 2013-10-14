@@ -4,12 +4,15 @@
 # This file is part of OPEN which is licensed under the MIT license.
 # You should have received a copy of the license along with OPEN. See LICENSE.
 #
-import numpy
-import rvIO
-from utils import unique
-from logger import clogger, logging
 
+# other imports
+import numpy
 import matplotlib.pylab as plt
+
+# intra-package imports
+import rvIO
+from .utils import unique
+from .logger import clogger, logging
 import plots_config
 
 

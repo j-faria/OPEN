@@ -21,14 +21,15 @@ Options:
   --nobanner    Start OPEN without welcome message.
 """
 
+# standard library imports
 import sys
-from ipshell import EmbedShell, cfg
-from docopt import docopt
+# intra-package imports
+from OPEN.ipshell import EmbedShell, cfg
+from OPEN.docopt import docopt
+from OPEN._OPENversion import __version__
 
 if __name__ == "__main__":
-
     # version info
-    from _OPENversion import __version__
     version = 'OPEN v' + __version__    
     # command-line argument parser
     args = docopt(__doc__, version=version)
