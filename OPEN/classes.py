@@ -303,7 +303,71 @@ class PeriodogramBase:
       # p = pg.plot(1./self.freq, self.power, title="Periodogram")
       # p.plotItem.setLogMode(1./self.freq, self.power)
       # pg.QtGui.QApplication.exec_()
-    
+
+    def _output(self, verbose=False):
+    """
+      Some statistical output.
+    """
+    from shell_colors import blue
+    # Index with maximum power
+    bbin = argmax(self.power)
+    # Maximum power
+    pmax = self._upow[bbin]
+
+    rms = sqrt(self._YY * (1.-pmax))
+
+    # Get the curvature in the power peak by fitting a parabola y=aa*x^2
+    if (bbin > 1) and (bbin < len(self.freq)-2):
+      # Shift the parabola origin to power peak
+      xh = (self.freq[bbin-1:bbin+2] - self.freq[bbin])**2
+      yh = self._upow[bbin-1:bbin+2] - self._upow[bbin]
+      # Calculate the curvature (final equation from least square)
+      aa = sum(yh*xh)/sum(xh*xh)
+      nt = float(self.N)
+      f_err = sqrt(-2./nt * pmax/aa*(1.-pmax)/pmax)
+      Psin_err = sqrt(-2./nt* pmax/aa*(1.-pmax)/pmax) / self.freq[bbin]**2
+    else:
+      f_err = None
+      Psin_err = None
+
+    fbest = self.freq[bbin]
+    amp = sqrt(self._a[bbin]**2 + self._b[bbin]**2)
+    ph  = arctan2(self._a[bbin], self._b[bbin]) / (2.*pi)
+    T0  = min(self.th) - ph/fbest
+    # Re-add the mean
+    offset = self._off[bbin] + self._Y
+
+    # Statistics
+    print "Generalized LS - statistical output"
+    print 33*"-"
+    if verbose:
+      print "Number of input points:     %6d" % (nt)
+      print "Weighted mean of dataset:   % e" % (self._Y)
+      print "Weighted rms of dataset:    % e" % (sqrt(self._YY))
+      print "Time base:                  % e" % (max(self.th) - min(self.th))
+      print "Number of frequency points: %6d" % (len(self.freq))
+      print
+      print "Maximum power, p :    % e " % (self.power[bbin])
+      print "Maximum power (without normalization):   %e" % (pmax)
+      print "Normalization    : ", self.norm
+      print "RMS of residuals :    % e " % (rms)
+      if self.error is not None:
+        print "  Mean weighted internal error:  % e" %(sqrt(nt/sum(1./self.error**2)))
+      print "Best sine frequency : % e +/- % e" % (fbest, f_err)
+      print "Best sine period    : % e +/- % e" % (1./fbest, Psin_err)
+      print "Amplitude:          : % e +/- % e" % (amp, sqrt(2./nt)*rms)
+      print "Phase (ph) : % e +/- % e" % (ph, sqrt(2./nt)*rms/amp/(2.*pi))
+      print "Phase (T0) : % e +/- % e" % (T0, sqrt(2./nt)*rms/amp/(2.*pi)/fbest)
+      print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
+      print 60*"-"
+    else:
+      print "Input points: %6d, frequency points: %6d" % (nt, len(self.freq))
+      print 
+      print "Maximum power   : %f " % (self.power[bbin])
+      print blue("Best sine period") + ": %f +/- %f" % (1./fbest, Psin_err)
+      # print 60*"-"
+
+      
 #    def do_stats(self):
 #        """
 #        Some statistics about the periodogram
