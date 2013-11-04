@@ -222,6 +222,87 @@ class PeriodogramBase:
             else:
                 return fmax1, fmax2, fmax3
 
+    def FAP(self, Pn):
+      """
+      Calculate the false-alarm probability (FAP).
+
+      The FAP denotes the probability that at least one out of M
+      independent power values in a prescribed search band of a
+      power spectrum computed from a white-noise time series is
+      as large as or larger than the threshold Pn.
+      It is assessed through
+      
+      .. math:: FAP(Pn) = 1 - (1-Prob(P>Pn))^M \\; ,
+      
+      where "Prob(P>Pn)" depends on the type of periodogram and 
+      normalization and is calculated by using the *prob* method;
+      M is the number of independent power values and (an estimate)
+      is computed internally (see self.M).
+
+      Parameters
+      ----------
+        Pn : float
+            Power threshold.
+        
+      Returns
+      -------
+        FAP : float
+            False alarm probability.
+      """
+      prob = self.M * self.prob(Pn)
+      if prob > 0.01:  return 1.-(1.-self.prob(Pn))**self.M
+      return prob
+
+    def powerLevel(self, FAPlevel):
+      """
+        Power threshold for FAP level.
+      
+        Parameters
+        ----------
+        FAPlevel : float or array
+              "False Alarm Probability" threshold
+      
+        Returns
+        -------
+        Threshold : float or array
+            The power threshold pertaining to a specified
+            false-alarm probability (FAP). Powers exceeding this
+            threshold have FAPs smaller than FAPlevel.
+      """
+      Prob = 1.-(1.-FAPlevel)**(1./self.M)
+      return self.probInv(Prob)   
+
+    def _plot(self, doFAP=None):
+      """
+        Create a plot.
+      """
+      xlabel = 'Period [d]'
+      ylabel = 'Power'
+
+      self.fig = plt.figure()
+      self.ax = self.fig.add_subplot(1,1,1)
+      self.ax.set_title("Normalized periodogram")
+      self.ax.set_xlabel(xlabel)
+      self.ax.set_ylabel(ylabel)
+      self.ax.semilogx(1./self.freq, self.power, 'b-')
+      # plot FAPs
+      if doFAP is None: 
+        pass
+      elif doFAP is True: # do default FAPs of 10%, 1% and 0.1%
+        pmin = 1./self.freq.min()
+        pmax = 1./self.freq.max()
+        plvl1 = self.powerLevel(0.1) # 10% FAP
+        plvl2 = self.powerLevel(0.01) # 1% FAP
+        plvl3 = self.powerLevel(0.001) # 0.1% FAP
+        self.ax.semilogx([pmin, pmax],[plvl1, plvl1],'k-')
+        self.ax.semilogx([pmin, pmax],[plvl2, plvl2],'k--')
+        self.ax.semilogx([pmin, pmax],[plvl3, plvl3],'k:')
+
+      plt.tight_layout()
+      plt.show()
+      # p = pg.plot(1./self.freq, self.power, title="Periodogram")
+      # p.plotItem.setLogMode(1./self.freq, self.power)
+      # pg.QtGui.QApplication.exec_()
     
 #    def do_stats(self):
 #        """

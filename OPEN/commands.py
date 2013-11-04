@@ -47,11 +47,15 @@ per_usage = \
 Usage:
     per [obs]
     per [obs] -n SYSTEM
+    per [obs] [--gls|--bayes|--fast]
     per [obs] -v
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
     -v --verbose  Verbose statistical output 
+    --gls         Calculate the Generalized Lomb-Scargle periodogram (default)
+    --bayes       Calculate the Bayesian periodogram
+    --fast        Calculate the Lomb-Scargle periodogram with fast algorithm
     -h --help     Show this help message
 """
 
@@ -192,15 +196,36 @@ class EmbeddedMagics(Magics):
             return
         
         verb = True if args['--verbose'] else False
+        # which periodogram should be calculated?
+        per_fcn = None
+        if args['--bayes']: 
+            per_fcn = periodograms.bls
+            name = 'Bayesian Lomb-Scargle'
+        if args['--fast']: 
+            per_fcn = periodograms.LombScargle
+            name = 'Lomb Scargle'
+        if args['--gls']: 
+            per_fcn = periodograms.gls
+            name ='Generalized Lomb-Scargle'
+        # this is the default if user did not specify arguments
+        if per_fcn is None: 
+            per_fcn = periodograms.gls
+            name ='Generalized Lomb-Scargle'
+
         if args['obs']:
             try: 
-                system.per
-                system.per._output(verbose=verb)
+                # it was calculated already?
+                system.per 
+                # the same periodogram?
+                if system.per.name != name:
+                    raise AttributeError
+                # system.per._output(verbose=verb)  # not ready
                 system.per._plot()
             except AttributeError:
-                system.per = periodograms.gls(system, hifac=5)
-                system.per._output(verbose=verb)
+                system.per = per_fcn(system)
+                # system.per._output(verbose=verb)  # not ready
                 system.per._plot()
+                print system.per.name
 
     @needs_local_scope
     @line_magic
