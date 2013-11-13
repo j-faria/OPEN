@@ -7,6 +7,9 @@
 """
 This module defines the commands that are used as magics in OPEN. 
 """
+# standard library imports
+import glob
+
 # IPython imports
 from IPython.core.magic import (Magics, magics_class, line_magic, 
                                 needs_local_scope)
@@ -28,9 +31,11 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... -d
+    read <file>... [-d] [--skip=<sn>]
+    read -h | --help
 Options:
-    -d 
+    --skip=<sn>  How many header lines to skip [default: 0]
+    -h --help     Show this help message
 """
 
 plot_usage = \
@@ -137,13 +142,16 @@ class EmbeddedMagics(Magics):
         args = parse_arg_string('read', parameter_s)
         filenames = args['<file>']
 
+        # expand "glob" paths
+        # filenames = glob.glob(filenames)
+
         # if 'default' system is already set, return the rvSeries class
         # this is useful when working with various systems simultaneously so 
         # that we can do, e.g., HDXXXX = %read file1 file2
         if local_ns.has_key('default') and not args['-d']:
-            return rvSeries(*filenames)
+            return rvSeries(*filenames, skip=args['--skip'])
         else:
-            local_ns['default'] = rvSeries(*filenames)
+            local_ns['default'] = rvSeries(*filenames, skip=args['--skip'])
 
     @needs_local_scope
     @line_magic

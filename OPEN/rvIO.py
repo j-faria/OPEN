@@ -6,7 +6,8 @@
 #
 
 # standard library imports
-from fileinput import input
+from fileinput import FileInput
+from itertools import islice, chain
 import os
 
 # other imports
@@ -47,20 +48,31 @@ def read_rv(*filenames, **kwargs):
                 if (kwargs.has_key('verbose') and kwargs['verbose']) \
                 else clogger.setLevel(logging.INFO)
 
+    # how many header lines to skip?
+    if (kwargs.has_key('skip')): header_skip = int(kwargs['skip'])
+
     dic = {} # will hold how many values per file
     for filename in sorted(filenames):
         if os.path.isfile(filename) and os.access(filename, os.R_OK):
             # this file exists and is readable
-            with open(filename) as f:
-                nlines = len(f.readlines())
+            with rvfile(filename) as f:
+                nlines = len(f.readuncommented())
             dic[filename] = [nlines, 0]
             clogger.info('Reading %d values from file %s' % (nlines, filename))
         else:
             # should raise an error or read from the other files?
             raise IOError("The file '%s' doesn't seem to exist" % filename)
             
+    # black magic to build input from file list while skipping headers
+    finput = [FileInput(f) for f in sorted(filenames)]
+    iterables = [islice(f, header_skip, None) for f in finput]
+    files = chain(*iterables)
+
     # read data
-    t, rv, err = loadtxt(input(sorted(filenames)), unpack=True)
+    try:
+        t, rv, err = loadtxt(files, unpack=True)
+    except Exception as e:
+        raise e
     
     # verbose stats about data
     stats = None
@@ -76,3 +88,12 @@ def read_rv(*filenames, **kwargs):
     
     
     
+class rvfile(file):
+    """
+    Subclass of Python's File class that implements specific methods
+    for I/O of files usually used to store radial velocity measurements.
+    """
+    def readuncommented(self):
+        lines = self.readlines()
+        uncommented = [l for l in lines if l.strip()[0].isdigit()]
+        return uncommented

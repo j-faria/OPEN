@@ -34,14 +34,26 @@ class rvSeries:
     # def __str__(self):
     #     return "member of Test"
 
-    def __init__(self, *filenames):
+    def __init__(self, *filenames, **kwargs):
 
         assert len(filenames)>=1, "Need at least one file to read"
         # don't repeat files
         filenames = unique(filenames)
 
+        # skip header lines?
+        try:
+          skip = kwargs.pop('skip')
+        except KeyError:
+          skip = 0
+
         # read data
-        t, rv, err, self.provenance = rvIO.read_rv(*filenames, verbose=False)
+        try:
+          t, rv, err, self.provenance = rvIO.read_rv(*filenames, verbose=False, skip=skip)
+        except ValueError:
+          from shell_colors import red
+          msg = red('ERROR: ') + 'If your files have header lines set --skip option.'
+          clogger.fatal(msg)
+          return
 
         self.time, self.vrad, self.error = (t, rv, err)
         # time, vrad and error can change, 
