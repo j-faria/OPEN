@@ -51,8 +51,8 @@ def read_rv(*filenames, **kwargs):
     for filename in sorted(filenames):
         if os.path.isfile(filename) and os.access(filename, os.R_OK):
             # this file exists and is readable
-            with open(filename) as f:
-                nlines = len(f.readlines())
+            with rvfile(filename) as f:
+                nlines = len(f.readuncommented())
             dic[filename] = [nlines, 0]
             clogger.info('Reading %d values from file %s' % (nlines, filename))
         else:
@@ -76,3 +76,12 @@ def read_rv(*filenames, **kwargs):
     
     
     
+class rvfile(file):
+    """
+    Subclass of Python's File class that implements specific methods
+    for I/O of files usually used to store radial velocity measurements.
+    """
+    def readuncommented(self):
+        lines = self.readlines()
+        uncommented = [l for l in lines if l.strip()[0].isdigit()]
+        return uncommented
