@@ -6,7 +6,8 @@
 #
 
 # standard library imports
-from fileinput import input
+from fileinput import FileInput
+from itertools import islice, chain
 import os
 
 # other imports
@@ -47,6 +48,9 @@ def read_rv(*filenames, **kwargs):
                 if (kwargs.has_key('verbose') and kwargs['verbose']) \
                 else clogger.setLevel(logging.INFO)
 
+    # how many header lines to skip?
+    if (kwargs.has_key('skip')): header_skip = int(kwargs['skip'])
+
     dic = {} # will hold how many values per file
     for filename in sorted(filenames):
         if os.path.isfile(filename) and os.access(filename, os.R_OK):
@@ -59,8 +63,16 @@ def read_rv(*filenames, **kwargs):
             # should raise an error or read from the other files?
             raise IOError("The file '%s' doesn't seem to exist" % filename)
             
+    # black magic to build input from file list while skipping headers
+    finput = [FileInput(f) for f in sorted(filenames)]
+    iterables = [islice(f, header_skip, None) for f in finput]
+    files = chain(*iterables)
+
     # read data
-    t, rv, err = loadtxt(input(sorted(filenames)), unpack=True)
+    try:
+        t, rv, err = loadtxt(files, unpack=True)
+    except Exception as e:
+        raise e
     
     # verbose stats about data
     stats = None
