@@ -9,6 +9,7 @@ This module defines the commands that are used as magics in OPEN.
 """
 # standard library imports
 import glob
+from itertools import chain
 
 # IPython imports
 from IPython.core.magic import (Magics, magics_class, line_magic, 
@@ -140,10 +141,9 @@ class EmbeddedMagics(Magics):
         Type 'read -h' for more help """
 
         args = parse_arg_string('read', parameter_s)
-        filenames = args['<file>']
-
-        # expand "glob" paths
-        # filenames = glob.glob(filenames)
+        # take care of glob expansions
+        globs = [glob.glob(f) for f in args['<file>']]
+        filenames = list(chain.from_iterable(globs)) # not very pythonic...
 
         # if 'default' system is already set, return the rvSeries class
         # this is useful when working with various systems simultaneously so 

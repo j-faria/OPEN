@@ -75,7 +75,7 @@ class rvSeries:
         """
         # import pyqtgraph as pg
 
-        colors = 'rgbmk' # possible colors
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
         t, rv, err = self.time, self.vrad, self.error # temporaries
         
         plt.figure()
