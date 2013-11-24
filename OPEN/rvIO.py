@@ -41,8 +41,6 @@ def read_rv(*filenames, **kwargs):
         Dictionary with name and number of values from each file.
     """
 
-    #optional keyword argument (i don't think we need this!)
-    ##skip = kwargs['skip'] if kwargs.has_key('skip') else 2
     # set logging level
     clogger.setLevel(logging.VERBOSE) \
                 if (kwargs.has_key('verbose') and kwargs['verbose']) \
