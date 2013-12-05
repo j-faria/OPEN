@@ -9,13 +9,11 @@ FFLAGS= -ffree-form -O3
 
 FPY = f2py
 FPYFLAGS = --f77flags="-O3 -Ofast" --quiet
-
-OBJECTS = hello.o complex-math.o
-LIBS = -L/usr/local/lib/sprng/lib -llcg -L/usr/local/lib/pgplot -lcpgplot -lpgplot -lX11 -lftn -lm
-
+FPYFLAGS += --f90exec="/opt/mesasdk/bin/gfortran" --opt="-O3 -Ofast"
+FPYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 
 # --- targets
-all: blombscargle.so 
+all: blombscargle.so get_rv.so
 	@echo "\n Done!"
 
 
@@ -23,6 +21,10 @@ all: blombscargle.so
 blombscargle.so: lombscargle_bayes.f90
 	@$(FPY) -m blombscargle -c $< $(FPYFLAGS)
 
+## compile radial velocity curve builder
+get_rv.so: get_rv.f90
+	@$(FPY) -m get_rv -c $< $(FPYFLAGS)
+
 # --- remove binary and executable files
 clean:
-	rm -f blombscargle.so $(OBJECTS)
+	rm -f blombscargle.so get_rv.so

@@ -12,7 +12,7 @@ import warnings
 from logger import clogger, logging
 import sys
 from scipy.optimize import leastsq
-from get_rv import get_rv
+from ext.get_rv import get_rv
 from galileo import *
 
 def do_fit(system, verbose):
