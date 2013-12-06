@@ -68,7 +68,7 @@ def read_rv(*filenames, **kwargs):
 
     # read data
     try:
-        t, rv, err = loadtxt(files, unpack=True)
+        t, rv, err = loadtxt(files, unpack=True, usecols=(0,1,2))
     except Exception as e:
         raise e
     
