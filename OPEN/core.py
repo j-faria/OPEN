@@ -6,17 +6,19 @@
 #
 from numpy import polyfit, RankWarning, append
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
-from numpy import zeros_like
+from numpy import zeros_like, savetxt
 from matplotlib.pylab import *
 import warnings
+from datetime import datetime
+import subprocess
 from logger import clogger, logging
-import sys
+import sys, os
 from scipy.optimize import leastsq
 from ext.get_rv import get_rv
 from galileo import *
+from shell_colors import yellow, red, blue
 
 def do_fit(system, verbose):
-	from shell_colors import yellow, red
 	try:
 		degree = system.model['d']
 	except TypeError:
@@ -89,9 +91,9 @@ def do_genetic(system):
 	#use fitness (above) as our evaluation function
 	p.evalFunc = chi2_1
 	#minimum values the genes can take
-	p.chromoMinValues = [1000,0,0,0,2451000]    
+	p.chromoMinValues = [5, 0, 0, 0, 2451000]    
 	#maximum values the genes can take
-	p.chromoMaxValues = [2000,100,0.5,6.28,2451500]
+	p.chromoMaxValues = [10000, 100, 0.9, 6.28, 2451500]
 	#use integers instead of floats
 	p.useInteger = 0
 	#always crossover
@@ -114,7 +116,7 @@ def do_genetic(system):
 	#variables above, but before actually running the GA!
 	p.prepPopulation()
 
-	for i in range(2000):
+	for i in range(500):
 	  #evaluate each chromosomes
 	  p.evaluate()
 	  #apply selection
@@ -163,3 +165,26 @@ def do_lm(system, x0):
 		return system.vrad - vel
 
 	return leastsq(chi2_2, x0, full_output=0)
+
+
+def do_multinest(system):
+	msg = blue('INFO: ') + 'Transfering data to MultiNest...'
+	clogger.info(msg)
+
+	# write data to file to be read by MultiNest
+	nest_filename = 'input.rv'
+	nest_header = 'file automatically generated for MultiNest analysis, ' + str(datetime.now())
+	savetxt(nest_filename, zip(system.time, system.vrad, system.error),
+		    #header=nest_header,
+		    fmt=['%12.4f', '%6.1f', '%6.2f'])
+
+
+	msg = blue('INFO: ') + 'Starting MultiNest...'
+	clogger.info(msg)
+
+	cmd = 'mpirun -np 2 ./OPEN/multinest/gaussian'
+	subprocess.call(cmd, shell=True)
+	# os.system(cmd)
+
+
+	return

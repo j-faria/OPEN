@@ -337,8 +337,8 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def gen(self, parameter_s='', local_ns=None):
+        """ Run the genetic algorithm minimization - stub """
         from shell_colors import red
-
         if local_ns.has_key('default'):
             system = local_ns['default']
             core.do_genetic(system)
@@ -347,6 +347,22 @@ class EmbeddedMagics(Magics):
                                    'name with the -n option'
             clogger.fatal(msg)
             return
+
+    @needs_local_scope
+    @line_magic
+    def nest(self, parameter_s='', local_ns=None):
+        """ Start the MultiNest analysis and handle data interaction and IO """
+        from shell_colors import red
+
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+            core.do_multinest(system)
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
 
     @needs_local_scope
     @line_magic
