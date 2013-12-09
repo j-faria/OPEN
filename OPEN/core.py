@@ -34,9 +34,12 @@ def do_fit(system, verbose):
 	return p
 
 
-def do_restrict(system, quantity, maxval):
+def do_restrict(system, quantity, *args):
 	if quantity == 'error':
-		print 'the max is ', maxval
+		msg = blue('INFO: ') + 'Removing data with uncertainty higher than %f km/s' % args[0]
+		clogger.info(msg)
+		maxerr = args[0]
+		return
 
 		# we have to keep a record of how many values come out of each file
 		t, rv, err = system.time_full, system.vrad_full, system.error_full # temporaries
@@ -44,7 +47,7 @@ def do_restrict(system, quantity, maxval):
 			print i, n1, n2
 			# print err[:n1]
 
-			val = err[:n1] <= maxval
+			val = err[:n1] <= maxerr
 			nout = (val == False).sum()
 			# system.provenance keeps the record
 			if nout >= n1: 
@@ -56,7 +59,7 @@ def do_restrict(system, quantity, maxval):
 			t, rv, err = t[n1:], rv[n1:], err[n1:]
 
 		# now build the full boolean vector 
-		vals = system.error_full <= maxval
+		vals = system.error_full <= maxerr
 		print vals, len(vals)
 
 		# and pop out the values from time, vrad, and error
@@ -72,6 +75,41 @@ def do_restrict(system, quantity, maxval):
 		# system.time = system.time_full[vals]
 		# system.vrad = system.vrad_full[vals]
 		# system.error = system.error_full[vals]
+
+	if quantity == 'date':
+		msg = blue('INFO: ') + 'Retaining data between %i and %i JD' % (args[0], args[1])
+		clogger.info(msg)
+		minjd, maxjd = args[0], args[1]
+
+		# we have to keep a record of how many values come out of each file
+		t, rv, err = system.time_full, system.vrad_full, system.error_full # temporaries
+		for i, (fname, [n1, n2]) in enumerate(sorted(system.provenance.iteritems())):
+			print i, n1, n2
+			# print err[:n1]
+
+			lower = t[:n1] <= minjd
+			higher = t[:n1] <= maxjd
+			nout = (lower == True).sum()
+			nout += (higher == True).sum()
+			# system.provenance keeps the record
+			if nout >= n1: 
+				system.provenance[fname][1] = n1
+			else:
+				system.provenance[fname][1] = n1 - nout
+
+			t, rv, err = t[n1:], rv[n1:], err[n1:]
+
+		# now build the full boolean vector 
+		lowers = system.time_full <= minjd
+		highers = system.time_full >= maxjd
+		# fancy syntax just to negate the intersection of lowers and highers
+		keepers = ~(lowers | highers)
+
+		# and pop out the values from time, vrad, and error
+		# leaving all *_full vectors intact
+		system.time = system.time_full[keepers]
+		system.vrad = system.vrad_full[keepers]
+		system.error = system.error_full[keepers]	
 
 
 def do_genetic(system):

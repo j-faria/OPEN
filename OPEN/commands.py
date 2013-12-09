@@ -20,7 +20,7 @@ from IPython.utils.io import ask_yes_no
 # intra-package imports
 from .docopt import docopt, DocoptExit
 from .classes import rvSeries
-from .utils import stdout_write
+from .utils import stdout_write, selectable_plot
 from .logger import clogger, logging
 import core
 import periodograms
@@ -93,7 +93,10 @@ restrict_usage = \
 """
 Usage:
     restrict [(err <maxerr>)]
+    restrict [(jd <minjd> <maxjd>)]
+    restrict --gui
 Options:
+    --gui         Restrict data using a graphical interface (experimental)
     -h --help     Show this help message
 """
 
@@ -383,7 +386,9 @@ class EmbeddedMagics(Magics):
         if local_ns.has_key('default'):
             system = local_ns['default']
         else:
-            print 'No default!'  # handle this!
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
             return
 
 
@@ -395,6 +400,20 @@ class EmbeddedMagics(Magics):
                 clogger.fatal(msg)
                 return
             core.do_restrict(system, 'error', maxerr)
+
+        if args['jd']:
+            try:
+                maxjd = int(args['<maxjd>'])
+                minjd = int(args['<minjd>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'minjd and maxjd shoud be numbers!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'date', minjd, maxjd)
+
+
+        if args['--gui']:
+            selectable_plot([1,2,3], [4, 16, 32], 'ro')
 
 
 
