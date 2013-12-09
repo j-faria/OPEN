@@ -48,6 +48,9 @@ def read_rv(*filenames, **kwargs):
 
     # how many header lines to skip?
     if (kwargs.has_key('skip')): header_skip = int(kwargs['skip'])
+    # format of file
+    if (kwargs.has_key('format')): format = kwargs['format']
+    format = 'drs35' if (format is None) else format
 
     dic = {} # will hold how many values per file
     for filename in sorted(filenames):
@@ -67,10 +70,26 @@ def read_rv(*filenames, **kwargs):
     files = chain(*iterables)
 
     # read data
-    try:
+    if format.lower() == 'drs35': # default
+        t, rv, err, \
+        fwhm, contrast, bis_span, noise, s_mw, sig_s, \
+        rhk, sig_rhk, sn_CaII, sn10, sn50, sn60 = loadtxt(files, unpack=True)
+        others = (fwhm, contrast, bis_span, noise, s_mw, sig_s, rhk, sig_rhk, sn_CaII, sn10, sn50, sn60)
+
+    elif format.lower() == 'drs34':
+        t, rv, err,
+        fwhm, contrast, bis_span, noise, sn10, sn50, sn60  = loadtxt(files, unpack=True, usecols=(0,1,2))
+        others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
+
+    elif format.lower() == 'coralie':
+        t, rv, err, 
+        fwhm, contrast, bis_span, noise, sn10, sn50, sn60 = loadtxt(files, unpack=True)
+        others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
+
+    elif format.lower() == 'basic':
         t, rv, err = loadtxt(files, unpack=True, usecols=(0,1,2))
-    except Exception as e:
-        raise e
+        others = ()
+
     
     # verbose stats about data
     stats = None
@@ -82,7 +101,7 @@ def read_rv(*filenames, **kwargs):
     
     clogger.verbose(stats)
     
-    return t, rv, err, dic
+    return t, rv, err, dic, others
     
     
     

@@ -32,7 +32,7 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... [-d] [--skip=<sn>]
+    read <file>... [-d] [--skip=<sn>] [--format=<form>]
     read -h | --help
 Options:
     --skip=<sn>  How many header lines to skip [default: 0]
@@ -154,7 +154,8 @@ class EmbeddedMagics(Magics):
         if local_ns.has_key('default') and not args['-d']:
             return rvSeries(*filenames, skip=args['--skip'])
         else:
-            local_ns['default'] = rvSeries(*filenames, skip=args['--skip'])
+            local_ns['default'] = rvSeries(*filenames, skip=args['--skip'],
+                                                       format=args['--format'])
 
     @needs_local_scope
     @line_magic

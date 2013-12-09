@@ -40,18 +40,25 @@ class rvSeries:
         # don't repeat files
         filenames = unique(filenames)
 
-        # skip header lines?
+        # skip header lines? (no by default)
         try:
           skip = kwargs.pop('skip')
         except KeyError:
           skip = 0
 
+        # in which format are the files? (drs35 by default)
+        try:
+          format = kwargs.pop('format')
+        except KeyError:
+          format = 'drs35'
+
         # read data
         try:
-          t, rv, err, self.provenance = rvIO.read_rv(*filenames, verbose=False, skip=skip)
+          t, rv, err, self.provenance, others = \
+               rvIO.read_rv(*filenames, verbose=False, skip=skip, format=format)
         except ValueError:
           from shell_colors import red
-          msg = red('ERROR: ') + 'If your files have header lines set --skip option.'
+          msg = red('ERROR: ') + 'If your files have header lines set --skip option.\n'
           clogger.fatal(msg)
           return
 
