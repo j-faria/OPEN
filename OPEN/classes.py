@@ -102,7 +102,7 @@ class rvSeries:
             t, rv, err = t[m:], rv[m:], err[m:]
         
         plt.xlabel('Time [days]')
-        plt.ylabel('RV [m/s]')
+        plt.ylabel('RV [km/s]')
         plt.legend()
         plt.tight_layout()
         plt.show()
@@ -143,7 +143,7 @@ class rvSeries:
             t, rv, err, p = t[m:], rv[m:], err[m:], p[m:]
 
         plt.xlabel('Time [days]')
-        plt.ylabel('RV [m/s]')
+        plt.ylabel('RV [km/s]')
         plt.legend()
         plt.tight_layout()
         plt.show()
