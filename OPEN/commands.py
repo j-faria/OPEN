@@ -90,6 +90,15 @@ Options:
 """
 
 
+correlate_usage = \
+"""
+Usage:
+    correlate <var1> <var2> [-v] 
+Options:
+    -v --verbose  Verbose statistical output 
+"""
+
+
 restrict_usage = \
 """
 Usage:
@@ -358,6 +367,27 @@ class EmbeddedMagics(Magics):
 
     @needs_local_scope
     @line_magic
+    def correlate(self, parameter_s='', local_ns=None):
+        from shell_colors import red
+        args = parse_arg_string('correlate', parameter_s)
+        if args == 1: return
+        print args
+
+        verb = True if args['--verbose'] else False
+
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+            var1 = args['<var1>']
+            var2 = args['<var2>']
+            result = core.do_correlate(system, vars=(var1, var2), verbose=verb)
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+    @needs_local_scope
+    @line_magic
     def gen(self, parameter_s='', local_ns=None):
         """ Run the genetic algorithm minimization - stub """
         from shell_colors import red
@@ -480,6 +510,12 @@ def parse_arg_string(command, arg_string):
     if command is 'fit':
         try:
             args = docopt(fit_usage, splitted)
+        except SystemExit:
+            return 1
+
+    if command is 'correlate':
+        try:
+            args = docopt(correlate_usage, splitted)
         except SystemExit:
             return 1
 

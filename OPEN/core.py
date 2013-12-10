@@ -4,16 +4,23 @@
 # This file is part of OPEN which is licensed under the MIT license.
 # You should have received a copy of the license along with OPEN. See LICENSE.
 #
-from numpy import polyfit, RankWarning, append
-# see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
-from numpy import zeros_like, savetxt
-from matplotlib.pylab import *
+
+# standard library imports
 import warnings
 from datetime import datetime
 import subprocess
-from logger import clogger, logging
 import sys, os
+
+# other imports
+from numpy import polyfit, RankWarning, append, zeros_like, savetxt
+
+# see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
+from matplotlib.pylab import *
 from scipy.optimize import leastsq
+from scipy.stats.stats import spearmanr, pearsonr
+
+# intra-package imports
+from logger import clogger, logging
 from ext.get_rv import get_rv
 from galileo import *
 from shell_colors import yellow, red, blue
@@ -224,5 +231,48 @@ def do_multinest(system):
 	subprocess.call(cmd, shell=True)
 	# os.system(cmd)
 
-
 	return
+
+def do_correlate(system, vars=(), verbose=False):
+	# just to be sure, but this should not pass through docopt in commands.py
+	if len(vars) != 2: return
+
+	var1 = vars[0]
+	var2 = vars[1]
+
+	# handle inexistent fields
+	available = system.extras._fields + ('vrad',)
+	if var1 not in available:
+		msg = red('ERROR: ') + 'The name "%s" is not available for correlation.\n' % var1
+		clogger.fatal(msg)
+		return
+	if var2 not in available:
+		msg = red('ERROR: ') + 'The name "%s" is not available for correlation.\n' % var2
+		clogger.fatal(msg)
+		return
+
+	if var1 == 'vrad': 
+		v1 = system.vrad
+	else:
+		i = system.extras._fields.index(var1)
+		v1 = system.extras[i]
+
+	if var2 == 'vrad': 
+		v2 = system.vrad
+	else:
+		i = system.extras._fields.index(var2)
+		v2 = system.extras[i]		
+
+	pr = pearsonr(v1, v2)
+	sr = spearmanr(v1, v2)
+
+	if verbose:
+		print blue('[Pearson correlation]') + ' r=%f, p-value=%f' % pr
+		print blue('[Spearman correlation]') + ' r=%f, p-value=%f' % sr
+	# label = 
+	figure()
+	plot(v1, v2, 'o')
+	xlabel(var1)
+	ylabel(var2)
+	tight_layout()
+	show()
