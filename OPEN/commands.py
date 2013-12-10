@@ -44,6 +44,7 @@ plot_usage = \
 Usage:
     plot [obs]
     plot [obs] -n SYSTEM
+    plot [fwhm] [rhk] [s] [bis] [contrast]
 Options:
     -n SYSTEM       Specify name of system (else use default)
 """
@@ -180,8 +181,25 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
         
+        # plot the observed radial velocities
         if args['obs']:
             system.do_plot_obs()
+
+        # plot other quantities
+        extras_available = ['fwhm', 'contrast', 'bis_span', 'noise', 
+                          's_mw', 'sig_s', 'rhk', 'sig_rhk', 
+                          'sn_CaII', 'sn10', 'sn50', 'sn60']
+        extras_mapping = ['fwhm', 'contrast', 'bis', 'noise',
+                          's', 's', 'rhk', 'rhk',
+                          'sn', 'sn', 'sn', 'sn']
+        for i, e in enumerate(extras_available):
+            try:
+                if args[extras_mapping[i]]: 
+                    system.do_plot_extras(e)
+                    return
+            except KeyError:
+                pass
+
 
     @needs_local_scope
     @line_magic

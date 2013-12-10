@@ -8,12 +8,12 @@
 # other imports
 import numpy
 import matplotlib.pylab as plt
+from collections import namedtuple # this requires Python >= 2.6
 
 # intra-package imports
 import rvIO
 from .utils import unique
 from .logger import clogger, logging
-import plots_config
 
 
 class rvSeries:
@@ -48,13 +48,13 @@ class rvSeries:
 
         # in which format are the files? (drs35 by default)
         try:
-          format = kwargs.pop('format')
-        except KeyError:
+          format = kwargs.pop('format').lower()
+        except (KeyError, AttributeError): # this way we also catch the default None
           format = 'drs35'
 
         # read data
         try:
-          t, rv, err, self.provenance, others = \
+          t, rv, err, self.provenance, extras = \
                rvIO.read_rv(*filenames, verbose=False, skip=skip, format=format)
         except ValueError:
           from shell_colors import red
@@ -63,6 +63,19 @@ class rvSeries:
           return
 
         self.time, self.vrad, self.error = (t, rv, err)
+
+        # save the extra quantities as a namedtuple if we read them
+        if format == 'drs35': # default
+          extras_names = ['fwhm', 'contrast', 'bis_span', 'noise', 
+                          's_mw', 'sig_s', 'rhk', 'sig_rhk', 'sn_CaII', 
+                          'sn10', 'sn50', 'sn60']
+        elif format == 'drs34' or format == 'coralie':
+          extras_names = ['fwhm', 'contrast', 'bis_span', 'noise', 'sn10', 'sn50', 'sn60']
+        else:
+          extras_names = []
+        extra = namedtuple('Extra', extras_names, verbose=False)
+        self.extras = extra._make(extras)
+
         # time, vrad and error can change, 
         # the *_full ones correspond always to the full set
         self.time_full = self.time
@@ -147,6 +160,40 @@ class rvSeries:
         plt.legend()
         plt.tight_layout()
         plt.show()
+
+    def do_plot_extras(self, extra):
+        """ Plot other observed quantities as a function of time.
+
+        Parameters
+        ----------
+        extra: string
+          One of the quantities available in system.extras
+        """
+        # import pyqtgraph as pg
+
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t = self.time
+
+        # handle inexistent field
+        if extra not in self.extras._fields:
+          from shell_colors import red
+          msg = red('ERROR: ') + 'The name "%s" is not available in extras.\n' % extra
+          clogger.fatal(msg)
+          return
+
+        i = self.extras._fields.index(extra) # index corresponding to this quantity
+
+        plt.figure()
+        # p = pg.plot()
+        plt.plot(t, self.extras[i], 'o', label=extra)
+        
+        plt.xlabel('Time [days]')
+        plt.ylabel(extra + ' []')
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05))
+        plt.minorticks_on()
+        plt.tight_layout()
+        plt.show()
+        # pg.QtGui.QApplication.exec_()
 
     def get_nyquist(self, smallest=False):
         """
