@@ -1,13 +1,14 @@
 ### MATPLOTLIBRC FORMAT
 
-# This is a sample matplotlib configuration file - you can find a copy
-# of it on your system in
-# site-packages/matplotlib/mpl-data/matplotlibrc.  If you edit it
-# there, please note that it will be overwritten in your next install.
-# If you want to keep a permanent local copy that will not be
-# overwritten, place it in HOME/.matplotlib/matplotlibrc (unix/linux
-# like systems) and C:\Documents and Settings\yourname\.matplotlib
-# (win32 systems).
+# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2013 João Faria
+# This file is part of OPEN which is licensed under the MIT license.
+# You should have received a copy of the license along with OPEN. See LICENSE.
+#
+##
+## Default configurations for every plot produced by OPEN.
+##
 #
 # This file is best viewed in a editor which supports python mode
 # syntax highlighting. Blank lines, or lines starting with a comment
@@ -230,7 +231,7 @@ interactive  : True
 #axes.linewidth      : 1.0     # edge linewidth
 #axes.grid           : False   # display grid or not
 #axes.titlesize      : large   # fontsize of the axes title
-#axes.labelsize      : medium  # fontsize of the x any y labels
+axes.labelsize      : large  # fontsize of the x any y labels
 #axes.labelweight    : normal  # weight of the x and y labels
 #axes.labelcolor     : black
 #axes.axisbelow      : False   # whether axis gridlines and ticks are below
@@ -244,7 +245,7 @@ interactive  : True
                                    # separator in the fr_FR locale.
 #axes.formatter.use_mathtext : False # When True, use mathtext for scientific
                                      # notation.
-#axes.unicode_minus  : True    # use unicode for the minus symbol
+axes.unicode_minus  : True    # use unicode for the minus symbol
                                # rather than hyphen.  See
                                # http://en.wikipedia.org/wiki/Plus_and_minus_signs#Character_codes
 #axes.color_cycle    : b, g, r, c, m, y, k  # color cycle for plot lines
@@ -259,24 +260,24 @@ interactive  : True
 
 ### TICKS
 # see http://matplotlib.org/api/axis_api.html#matplotlib.axis.Tick
-#xtick.major.size     : 4      # major tick size in points
-#xtick.minor.size     : 2      # minor tick size in points
+xtick.major.size     : 8      # major tick size in points
+xtick.minor.size     : 3      # minor tick size in points
 #xtick.major.width    : 0.5    # major tick width in points
 #xtick.minor.width    : 0.5    # minor tick width in points
 #xtick.major.pad      : 4      # distance to major tick label in points
 #xtick.minor.pad      : 4      # distance to the minor tick label in points
 #xtick.color          : k      # color of the tick labels
-#xtick.labelsize      : medium # fontsize of the tick labels
+xtick.labelsize      : large # fontsize of the tick labels
 #xtick.direction      : in     # direction: in, out, or inout
 
-#ytick.major.size     : 4      # major tick size in points
-#ytick.minor.size     : 2      # minor tick size in points
+ytick.major.size     : 8      # major tick size in points
+ytick.minor.size     : 3      # minor tick size in points
 #ytick.major.width    : 0.5    # major tick width in points
 #ytick.minor.width    : 0.5    # minor tick width in points
 #ytick.major.pad      : 4      # distance to major tick label in points
 #ytick.minor.pad      : 4      # distance to the minor tick label in points
 #ytick.color          : k      # color of the tick labels
-#ytick.labelsize      : medium # fontsize of the tick labels
+ytick.labelsize      : large # fontsize of the tick labels
 #ytick.direction      : in     # direction: in, out, or inout
 
 
