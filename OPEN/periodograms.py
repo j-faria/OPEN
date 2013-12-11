@@ -10,6 +10,9 @@ from numpy.fft import *
 import cmath
 import matplotlib.pyplot as plt 
 
+from ext.blombscargle import blombscargle
+from ext.glombscargle import glombscargle
+
 
 
 # This is the Lomb-Scargle periodogram calculated using the fast 
@@ -321,8 +324,8 @@ class gls(PeriodogramBase):
 
   The constructor takes a RVSeries instance (i.e. a rv curve) as 
   first argument. As the algorithm is slow-ish, an implementation
-  in Fortran is available if the keyword 'use_extensions' is set to
-  True in the constructor or globally. 
+  in Fortran is available if the keyword 'ext' is set to True in 
+  the constructor or globally. 
   There is an optional `freq` array, that can contain the 
   frequencies on which to calculate the periodogram. If not provided
   (....)
@@ -345,6 +348,8 @@ class gls(PeriodogramBase):
         "Cumming". Default is "HorneBaliunas".
     stats : boolean, optional
         Set True to obtain some statistical output (default is False).
+    ext : boolean, optional
+        Use Fortran extension in the calculation (default is True)
   
   Attributes
   ----------
@@ -360,7 +365,7 @@ class gls(PeriodogramBase):
         The normalization used.
   """
 
-  def __init__(self, rv, ofac=6, hifac=1, freq=None, norm="HorneBaliunas", stats=False):
+  def __init__(self, rv, ofac=6, hifac=1, freq=None, norm="HorneBaliunas", stats=False, ext=True):
     self.name = 'Generalized Lomb-Scargle'
 
     self.power = None
@@ -385,7 +390,10 @@ class gls(PeriodogramBase):
       pass
     
     self._stats = stats
-    self.__calcPeriodogram()
+    if ext: 
+      self.__calcPeriodogramFast()
+    else: 
+      self.__calcPeriodogram()
     
   def __calcPeriodogram(self):
     """ Compute the GLS. Notation very close to [ZK09]_ """
@@ -454,13 +462,42 @@ class gls(PeriodogramBase):
     # if self._showPlot:
     #   self._plot()
 
+  def __calcPeriodogramFast(self):
+    """ Compute the GLS using the Fortran extension."""
+
+    # Build frequency array if not present
+    if self.freq is None:
+      self.__buildFreq()
+    # Circular frequencies
+    omegas = 2.*pi * self.freq
+
+    # unnormalized power and an estimate of the number of independent frequencies 
+    self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas)
+
+    self.N = len(self.y)
+    # Normalization:
+    if self.norm == "Scargle":
+      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      self.power = self._upow/float(popvar)
+    if self.norm == "HorneBaliunas":
+      self.power = (self.N-1.)/2.*self._upow
+    if self.norm == "Cumming":
+      self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
+    
+    # Output statistics
+    if self._stats:
+      self._output()
+    # if self._showPlot:
+    #   self._plot()
+
   def __buildFreq(self, plow=0.5):
     """
       Build frequency array (`freq` attribute).
     """
     xdif = max(self.th)-min(self.th)
-    nout = self.ofac * self.hifac * len(self.th)/2
-    #nout = int(xdif * self.ofac / plow)
+    # nout = self.ofac * self.hifac * len(self.th)/2
+    nout = int(xdif * self.ofac / plow)
+    #print nout
     self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
   def prob(self, Pn):
@@ -586,7 +623,6 @@ class bls(PeriodogramBase):
     
   def __calcPeriodogram(self):
     """ Compute the Bayesian Lomb-Scargle Periodogram. """
-    from ext.blombscargle import blombscargle
 
     # Build frequency array if not present
     if self.freq is None:
@@ -760,7 +796,7 @@ class SpectralWindow(PeriodogramBase):
     # pg.QtGui.QApplication.exec_()
 
 
-#####################################################################
+
 #####################################################################
 ### References 
 #####################################################################
