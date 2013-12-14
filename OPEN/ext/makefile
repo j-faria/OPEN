@@ -29,6 +29,11 @@ glombscargle.so: lombscargle_generalized.f90
 get_rv.so: get_rv.f90
 	@$(FPY) -m get_rv -c $< $(FPYFLAGS)
 
+
+## compile Dawson-Fabrycky special periodogram
+periodogram_DF.so: periodogram_DF.c
+	@python setup_periodogram_DF.py build_ext --inplace
+
 # --- remove binary and executable files
 clean:
 	rm -f blombscargle.so get_rv.so
