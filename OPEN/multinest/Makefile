@@ -7,7 +7,7 @@ F2PYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 FC := gfortran # gfortran by default
 FCPATH = /opt/mesasdk/bin/gfortran
 
-FFLAGS +=  -I. -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none
+FFLAGS +=  -I. -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none -fcheck=all
 
 # utils library directory
 FLIBDIR = /home/joao/Software/fortranlib

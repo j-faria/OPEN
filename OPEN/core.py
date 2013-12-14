@@ -7,7 +7,7 @@
 
 # standard library imports
 import warnings
-from datetime import datetime
+import datetime, time
 import subprocess
 import sys, os
 
@@ -24,6 +24,8 @@ from logger import clogger, logging
 from ext.get_rv import get_rv
 from galileo import *
 from shell_colors import yellow, red, blue
+
+timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 
 def do_fit(system, verbose):
 	try:
@@ -138,7 +140,7 @@ def do_genetic(system):
 	#minimum values the genes can take
 	p.chromoMinValues = [5, 0, 0, 0, 2451000]    
 	#maximum values the genes can take
-	p.chromoMaxValues = [10000, 100, 0.9, 6.28, 2451500]
+	p.chromoMaxValues = [100, 100, 0.9, 6.28, 2451500]
 	#use integers instead of floats
 	p.useInteger = 0
 	#always crossover
@@ -161,7 +163,7 @@ def do_genetic(system):
 	#variables above, but before actually running the GA!
 	p.prepPopulation()
 
-	for i in range(500):
+	for i in range(700):
 	  #evaluate each chromosomes
 	  p.evaluate()
 	  #apply selection
@@ -218,15 +220,15 @@ def do_multinest(system):
 
 	# write data to file to be read by MultiNest
 	nest_filename = 'input.rv'
-	nest_header = 'file automatically generated for MultiNest analysis, ' + str(datetime.now())
+	nest_header = 'file automatically generated for MultiNest analysis, ' + timestamp
+	nest_header += '\n' + str(len(system.time))
 	savetxt(nest_filename, zip(system.time, system.vrad, system.error),
-		    #header=nest_header,
-		    fmt=['%12.4f', '%6.1f', '%6.2f'])
-
+		    header=nest_header,
+		    fmt=['%12.6f', '%7.5f', '%7.5f'])
 
 	msg = blue('INFO: ') + 'Starting MultiNest...'
 	clogger.info(msg)
-
+	
 	cmd = 'mpirun -np 2 ./OPEN/multinest/gaussian'
 	subprocess.call(cmd, shell=True)
 	# os.system(cmd)

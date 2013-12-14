@@ -116,7 +116,7 @@ module params
 	
     !feedback on the sampling progress?
     logical nest_fb 
-    parameter(nest_fb=.false.)
+    parameter(nest_fb=.true.)
 
 
 end module params
