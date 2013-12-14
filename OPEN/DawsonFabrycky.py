@@ -18,11 +18,11 @@ import random
 from ext import periodogram_DF
 
 
-ofac = 2.0
-plow = 0.9
+
 
 def do_Dawson_Fabrycky(system):
 	time, rv, err = system.time, system.vrad, system.error
+	ofac = 2.0
 	# Make permutations for indices of length n
 
 	def permutate(n):
