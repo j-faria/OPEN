@@ -10,18 +10,23 @@ import warnings
 import datetime, time
 import subprocess
 import sys, os
+import random	
 
 # other imports
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
+import numpy as np
+from matplotlib.pylab import errorbar, plot, show
+from deap import base, creator, tools, algorithms
 
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
-from matplotlib.pylab import *
+# from matplotlib.pylab import *
 from scipy.optimize import leastsq
 from scipy.stats.stats import spearmanr, pearsonr
+from scipy.stats import nanmean, nanstd
 
 # intra-package imports
 from logger import clogger, logging
-from ext.get_rv import get_rv
+from ext.get_rvN import get_rvn
 from ext.periodogram_DF import periodogram_DF
 from galileo import *
 from shell_colors import yellow, red, blue
@@ -123,79 +128,136 @@ def do_restrict(system, quantity, *args):
 
 
 def do_genetic(system):
+	msg = blue('INFO: ') + 'Initializing genetic algorithm...'
+	clogger.info(msg)
+
 	vel = zeros_like(system.time)
 
-	def chi2_1(params):
-		P = params[0]
-		K = params[1]
-		ecc = params[2]
-		omega = params[3]
-		t0 = params[4]
-		get_rv(system.time, P, K, ecc, omega, t0, vel)
-		return 1./sum(((system.vrad - vel)/system.error)**2)
+	def chi2_1(individual):
+		""" Fitness function for 1 planet model """
+		#print individual
+		P, K, ecc, omega, T0, gam = individual 
+		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
+		chi2 = sum(((system.vrad - vel)/system.error)**2)
+		#print chi2
+		return chi2,
 
-    #create an initial population of 10 chromosomes
-	p = Population(10)
-	#use fitness (above) as our evaluation function
-	p.evalFunc = chi2_1
-	#minimum values the genes can take
-	p.chromoMinValues = [5, 0, 0, 0, 2451000]    
-	#maximum values the genes can take
-	p.chromoMaxValues = [100, 100, 0.9, 6.28, 2451500]
-	#use integers instead of floats
-	p.useInteger = 0
-	#always crossover
-	p.crossoverRate = 1.0
-	#mutate, but not very often
-	p.mutationRate = 0.05
-	#use roulette (monte carlo) selection
-	p.selectFunc = p.select_Roulette
-	#use a full replacement size
-	p.replacementSize = p.numChromosomes
-	#use one point crossover
-	p.crossoverFunc = p.crossover_OnePoint
-	#use the default mutation routines
-	p.mutateFunc = p.mutate_Default
-	#use steady-state replacement with no duplication
-	p.replaceFunc = p.replace_SteadyStateNoDuplicates
-	#p.replaceFunc = p.replace_Generational
+	## create the required types -- the fitness and the individual.
+	creator.create("FitnessMin", base.Fitness, weights=(-1.0,)) # minimization of a single objective
+	creator.create("Individual", list, fitness=creator.FitnessMin) 
 
-	#finish initializing the population. THIS MUST BE CALLED after settings the
-	#variables above, but before actually running the GA!
-	p.prepPopulation()
+	## create parameters by sampling from their priors
+	def P_prior():
+		return random.uniform(1000, 2000)
+	def K_prior():
+		return random.uniform(1, 150)
+	def ecc_prior():
+		return random.uniform(0, 0.99)
+	def om_prior():
+		return random.uniform(0, 360)
+	def t0_prior():
+		return random.uniform(2351372, 2551372)
+	def gamma_prior():
+		return random.uniform(-10, 10)
+	priors = [P_prior, K_prior, ecc_prior, om_prior, t0_prior, gamma_prior]
 
-	for i in range(700):
-	  #evaluate each chromosomes
-	  p.evaluate()
-	  #apply selection
-	  p.select()
-	  #apply crossover
-	  p.crossover()
-	  #apply mutation
-	  p.mutate()
-	  #apply replacement
-	  p.replace()
-	  #print info
-	#  print p.minFitness, p.maxFitness, p.avgFitness, p.sumFitness
-	print 'Genetic:', p.bestFitIndividual, p.bestFitIndividual.fitness
-	lm = do_lm(system, p.bestFitIndividual.genes)
+	toolbox = base.Toolbox()
+	toolbox.register("individual", tools.initCycle, creator.Individual, priors, n=1)
+	toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+
+	def mutPrior(individual, indpb):
+		for i, fcn in enumerate(zip(individual, priors)):
+			if random.random() < indpb:
+				individual[i] = fcn[1]()
+		return individual,
+
+	toolbox.register("evaluate", chi2_1)
+	toolbox.register("mate", tools.cxTwoPoints)
+	toolbox.register("mutate", mutPrior, indpb=0.10)
+	toolbox.register("select", tools.selTournament, tournsize=3)
+
+	npop = 250
+	ngen = 120
+	## build the population
+	pop = toolbox.population(n=npop)
+	## helper functions
+	hof = tools.HallOfFame(1)
+	stats = tools.Statistics(lambda ind: ind.fitness.values)
+	stats.register("avg", nanmean)
+	# stats.register("std", nanstd)
+	stats.register("min", np.nanmin)
+	# stats.register("max", np.nanmax)
+	# stats.register("total", sigma3)
+	stats.register("red", lambda v: min(v)/(len(system.time)-6.) )
+
+	msg = blue('INFO: ') + 'Created population with N=%d. Going to evolve for %d generations...' % (npop,ngen)
+	clogger.info(msg)
+
+	## run the genetic algorithm
+	algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, ngen=ngen, stats=stats, halloffame=hof, verbose=True)
+	
+	## output results information
+	msg = yellow('RESULT: ') + 'Best individual is'
+	clogger.info(msg)
+	## loop over planets
+	print("%3s %12s %10s %10s %10s %15s %9s" % \
+		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+	for planet in ('a'):
+		P, K, ecc, omega, T0, gam = hof[0]
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f\n" % (planet, P, K, ecc, omega, T0, gam) )
+	
+	msg = yellow('RESULT: ') + 'Best fitness value: %s' % (hof[0].fitness)
+	clogger.info(msg)
+
+	msg = blue('INFO: ') + 'Calling LM to improve result...'
+	clogger.info(msg)	
+
+
+	## call levenberg markardt fit
+	lm = do_lm(system, hof[0])
 	lm_par = lm[0]
-	print 'LM:', lm_par
 
-	# get best solution curve
-	new_time = system.get_time_to_plot()
-	vel = zeros_like(new_time)
+	## loop over planets
+	msg = yellow('RESULT: ') + 'Best fit is'
+	clogger.info(msg)
+	print("%3s %12s %10s %10s %10s %15s %9s" % \
+		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+	for planet in ('a'):
+		P, K, ecc, omega, T0, gam = lm_par
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f\n" % (planet, P, K, ecc, omega, T0, gam) )
 
-	P, K, ecc, omega, t0 = p.bestFitIndividual.genes
-	get_rv(new_time, P, K, ecc, omega, t0, vel)
-	# plot RV with time
-	plot(system.time, system.vrad, 'o')
-	plot(new_time, vel, '-')
+	chi2 = chi2_1(lm_par)[0]
+	msg = yellow('RESULT: ') + 'Best fitness value: %f, %f' % (chi2, chi2/(len(system.time)-6.))
+	clogger.info(msg)
 
-	P, K, ecc, omega, t0 = lm_par
-	get_rv(new_time, P, K, ecc, omega, t0, vel)
-	plot(new_time, vel, 'r-')
+	tt = np.linspace(system.time.min(), system.time.max(), 300)
+	final = zeros_like(tt)
+	get_rvn(tt, P, K, ecc, omega, T0, gam, final)
+
+	errorbar(system.time, system.vrad, yerr=system.error, fmt='ro')
+	plot(tt, final, 'k-')
 	show()
+
+	# #  print p.minFitness, p.maxFitness, p.avgFitness, p.sumFitness
+	# print 'Genetic:', p.bestFitIndividual, p.bestFitIndividual.fitness
+	# lm = do_lm(system, p.bestFitIndividual.genes)
+	# lm_par = lm[0]
+	# print 'LM:', lm_par
+
+	# # get best solution curve
+	# new_time = system.get_time_to_plot()
+	# vel = zeros_like(new_time)
+
+	# P, K, ecc, omega, t0 = p.bestFitIndividual.genes
+	# get_rv(new_time, P, K, ecc, omega, t0, vel)
+	# # plot RV with time
+	# plot(system.time, system.vrad, 'o')
+	# plot(new_time, vel, '-')
+
+	# P, K, ecc, omega, t0 = lm_par
+	# get_rv(new_time, P, K, ecc, omega, t0, vel)
+	# plot(new_time, vel, 'r-')
+	# show()
 
 	return
 
@@ -204,12 +266,8 @@ def do_lm(system, x0):
 	vel = zeros_like(system.time)
 
 	def chi2_2(params):
-		P = params[0]
-		K = params[1]
-		ecc = params[2]
-		omega = params[3]
-		t0 = params[4]
-		get_rv(system.time, P, K, ecc, omega, t0, vel)
+		P, K, ecc, omega, T0, gam = params
+		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
 		return system.vrad - vel
 
 	return leastsq(chi2_2, x0, full_output=0)

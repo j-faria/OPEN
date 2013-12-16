@@ -13,7 +13,7 @@ FPYFLAGS += --f90exec="/opt/mesasdk/bin/gfortran" --opt="-O3 -Ofast"
 FPYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 
 # --- targets
-all: glombscargle.so blombscargle.so get_rv.so
+all: glombscargle.so blombscargle.so get_rv.so get_rvN.so
 	@echo "\n Done!"
 
 
@@ -25,9 +25,12 @@ blombscargle.so: lombscargle_bayes.f90
 glombscargle.so: lombscargle_generalized.f90
 	@$(FPY) -m glombscargle -c $< $(FPYFLAGS)
 
-## compile radial velocity curve builder
+## compile radial velocity curve builders
 get_rv.so: get_rv.f90
 	@$(FPY) -m get_rv -c $< $(FPYFLAGS)
+
+get_rvN.so: get_rvN.f90
+	@$(FPY) -m get_rvN -c $< $(FPYFLAGS)
 
 
 ## compile Dawson-Fabrycky special periodogram
