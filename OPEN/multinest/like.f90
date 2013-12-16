@@ -18,6 +18,7 @@ contains
 		allocate(ss(N), alpha(N), tau(N))
 		allocate(observ(N))
 		allocate(times(N), rvs(N), errors(N))
+		allocate(vel(N), dist(N))
 		allocate(covmat(N,N), inv_covmat(N,N))
 
 	end subroutine likelihood_init
@@ -32,10 +33,8 @@ contains
 	      
 		real(kind=8), intent(in) :: Cube(nest_nPar)
 		real(kind=8), intent(out) :: slhood
-		real(kind=8), dimension(119) :: vel
-		real(kind=8) :: dist(119)
 		real(kind=8) :: lhood, lhood_test(1,1), det
-		integer :: i
+		integer :: i, n
 
 		! times, rvs and errors are defined in params and initialized/read in main
 		! Cube(1:nest_nPar) = P, K, ecc, omega, t0, Vsys
@@ -45,18 +44,19 @@ contains
  		alpha = 1.d0
  		tau = 1.d0
 
+ 		n = size(times)
  		slhood=-huge(1.d0)*epsilon(1.d0)
 
  		! get the radial velocity model with these parameters (in vel)
     	call get_rvN(times, &
     	           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
-    	           Cube(6), vel, 119, 1)
+    	           Cube(6), vel, n, 1)
 
 	    dist = rvs - vel
 	    call get_covmat(times, errors, observ, ss, alpha, tau, covmat, det, inv_covmat)
 
-	    lhood_test = -0.5d0 * matmul(matmul(reshape(dist, (/1,119/)), covmat), reshape(dist, (/119,1/)))
-	    lhood = lhood_test(1,1) - 0.5d0*log(twopi**119 * det)
+	    lhood_test = -0.5d0 * matmul(matmul(reshape(dist, (/1,n/)), covmat), reshape(dist, (/n,1/)))
+	    lhood = lhood_test(1,1) - 0.5d0*log(twopi**n * det)
 
 ! 		call likelihood(times, rvs, errors, &
 !                       Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &

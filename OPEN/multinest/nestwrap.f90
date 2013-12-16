@@ -59,7 +59,7 @@ contains
 		omega = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
 		t0 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
 
-		K = UniformPrior(Cube(2), 50d0, 100d0) ! for now
+		K = UniformPrior(Cube(2), 1d0, 50d0) ! for now
 		Vsys = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
 
 		Cube(1:nPar) = (/P, K, ecc, omega, t0, Vsys/)

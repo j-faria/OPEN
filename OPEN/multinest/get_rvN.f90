@@ -58,9 +58,8 @@ contains
   elemental real(dp) function true_anom(M, ecc) result(nu)
     real(dp), intent(in) :: M, ecc
     real(dp) :: E
-!    write(*,*) 'M=', M, 'ecc=', ecc 
+
     E = ecc_anom(M, ecc)
-!    write(*,*) 'E=', E
     nu = atan2(sqrt(1._dp-ecc*ecc)*sin(E),cos(E)-ecc)
   
   end function true_anom
@@ -72,19 +71,22 @@ contains
     real(dp), parameter :: derror = 1.0d-3
     real(dp) :: EA_new, EA_old
     
-!        write(*,*) 'M=', M, 'ecc=', ecc 
-
     EA_old = 0.5_dp * pi 
-    EA_new = newton(EA_old, ecc, M)
-    do while (abs(EA_old - EA_new) >= derror)
-      EA_old = EA_new
+    if (ecc < 0.9d0) then
       EA_new = newton(EA_old, ecc, M)
-    end do
-    
-!    write(*,*) 'E=',EA_new
+      do while (abs(EA_old - EA_new) >= derror)
+        EA_old = EA_new
+        EA_new = newton(EA_old, ecc, M)
+      end do
+    else
+      EA_new = strict_iteration(EA_old, ecc, M)
+      do while (abs(EA_old - EA_new) >= derror)
+        EA_old = EA_new
+        EA_new = strict_iteration(EA_old, ecc, M)
+      end do    
+    endif  
     E = EA_new
 
-    
   end function ecc_anom
         
         
@@ -110,6 +112,11 @@ contains
 
   end function halley
         
+  elemental real(dp) function strict_iteration(EA, e, M) result(EA_new)
+  ! Solve kepler's equation by a simple iteration scheme
+    real(dp), intent(in) :: EA, e, M
+    EA_new = M+e*sin(EA)
+  end function strict_iteration
         
   elemental real(dp) function newton(EA, e, M) result(EA_new)
   ! The following routine is used to solve kepler's equation using

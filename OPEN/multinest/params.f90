@@ -19,6 +19,7 @@ module params
     ! nuisance parameters and auxiliary variables
     integer, allocatable, dimension(:) :: observ
     real(kind=8), allocatable, dimension(:) :: ss, alpha, tau
+    real(kind=8), allocatable, dimension(:) :: vel, dist
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
 
     !real(kind=8), dimension(3,119) :: context
