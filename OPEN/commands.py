@@ -114,10 +114,11 @@ restrict_usage = \
 Usage:
     restrict [(err <maxerr>)]
     restrict [(jd <minjd> <maxjd>)]
+    restrict [(year <yr>)]
+    restrict [(years <yr1> <yr2>)]
     restrict --gui
 Options:
     --gui         Restrict data using a graphical interface (experimental)
-    -h --help     Show this help message
 """
 
     
@@ -454,7 +455,6 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-
     @needs_local_scope
     @line_magic
     def restrict(self, parameter_s='', local_ns=None):
@@ -463,11 +463,13 @@ class EmbeddedMagics(Magics):
         """
         from shell_colors import yellow, blue, red
         args = parse_arg_string('restrict', parameter_s)
+
         if args == DocoptExit:
             msg = yellow('Warning: ') + "I'm not doing anything. See restrict -h"
             clogger.fatal(msg)
             return
 
+        if args == 1: return
         print args
 
         # use default system or user defined
@@ -564,7 +566,7 @@ def parse_arg_string(command, arg_string):
         try:
             args = docopt(restrict_usage, splitted)
         except (SystemExit, DocoptExit) as e:
-            return e
+            return 1
 
     if command is 'wf':
         try:
