@@ -501,6 +501,24 @@ class EmbeddedMagics(Magics):
                 return
             core.do_restrict(system, 'date', minjd, maxjd)
 
+        if args['year']:
+            try:
+                yr = int(args['<yr>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'yr shoud be a number!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'year', yr)
+
+        if args['years']:
+            try:
+                yr1 = int(args['<yr1>'])
+                yr2 = int(args['<yr2>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'yr1 and yr2 shoud be numbers!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'years', yr1, yr2)
 
         if args['--gui']:
             selectable_plot([1,2,3], [4, 16, 32], 'ro')

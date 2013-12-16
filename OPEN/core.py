@@ -10,7 +10,7 @@ import warnings
 import datetime, time
 import subprocess
 import sys, os
-import random	
+import random
 
 # other imports
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
@@ -30,6 +30,7 @@ from ext.get_rvN import get_rvn
 from ext.periodogram_DF import periodogram_DF
 from galileo import *
 from shell_colors import yellow, red, blue
+from .utils import julian_day_to_date
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -50,6 +51,7 @@ def do_fit(system, verbose):
 
 
 def do_restrict(system, quantity, *args):
+	## restrict by uncertainty value
 	if quantity == 'error':
 		msg = blue('INFO: ') + 'Removing data with uncertainty higher than %f km/s' % args[0]
 		clogger.info(msg)
@@ -91,6 +93,7 @@ def do_restrict(system, quantity, *args):
 		# system.vrad = system.vrad_full[vals]
 		# system.error = system.error_full[vals]
 
+	## restrict by date (JD)
 	if quantity == 'date':
 		msg = blue('INFO: ') + 'Retaining data between %i and %i JD' % (args[0], args[1])
 		clogger.info(msg)
@@ -125,6 +128,67 @@ def do_restrict(system, quantity, *args):
 		system.time = system.time_full[keepers]
 		system.vrad = system.vrad_full[keepers]
 		system.error = system.error_full[keepers]	
+
+	## restrict to values from one year
+	if quantity == 'year':
+		msg = blue('INFO: ') + 'Retaining data from %i' % args[0]
+		clogger.info(msg)
+		yr = args[0]
+
+		# we have to keep a record of how many values come out of each file
+		time = system.time_full # temporaries
+		for i, (fname, [n1, n2]) in enumerate(sorted(system.provenance.iteritems())):
+			years = np.array([julian_day_to_date(t)[0] for t in time[:n1]])
+			keepers = years == yr
+			nout = (keepers == True).sum()
+			# system.provenance keeps the record
+			if nout >= n1: 
+				system.provenance[fname][1] = n1
+			else:
+				system.provenance[fname][1] = n1 - nout
+			time = time[n1:]
+
+		# build the full boolean vector
+		years = np.array([julian_day_to_date(t)[0] for t in system.time_full])
+		keepers = years == yr
+
+		# and pop out the values from time, vrad, and error
+		# leaving all *_full vectors intact
+		system.time = system.time_full[keepers]
+		system.vrad = system.vrad_full[keepers]
+		system.error = system.error_full[keepers]			
+
+	## restrict to values from a year range
+	if quantity == 'years':
+		msg = blue('INFO: ') + 'Retaining data between %i and %i' % (args[0], args[1])
+		clogger.info(msg)
+		yr1, yr2 = args[0], args[1]
+
+		# we have to keep a record of how many values come out of each file
+		time = system.time_full # temporaries
+		for i, (fname, [n1, n2]) in enumerate(sorted(system.provenance.iteritems())):
+			years = np.array([julian_day_to_date(t)[0] for t in time[:n1]])
+			keepers = (years >= yr1) & (years <= yr2)
+			nout = (keepers == True).sum()
+			# system.provenance keeps the record
+			if nout >= n1: 
+				system.provenance[fname][1] = n1
+			else:
+				system.provenance[fname][1] = n1 - nout
+			time = time[n1:]
+
+
+		# now build the full boolean vector 
+		years = np.array([julian_day_to_date(t)[0] for t in system.time_full])
+		keepers = (years >= yr1) & (years <= yr2)
+
+		# and pop out the values from time, vrad, and error
+		# leaving all *_full vectors intact
+		system.time = system.time_full[keepers]
+		system.vrad = system.vrad_full[keepers]
+		system.error = system.error_full[keepers]	
+
+	return
 
 
 def do_genetic(system):
