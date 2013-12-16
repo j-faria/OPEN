@@ -8,7 +8,7 @@
 Utility functions or snippets for all sorts of things
 """
 
-from math import sqrt
+from math import sqrt, ceil
 from sys import stdout
 
 
@@ -77,3 +77,17 @@ def selectable_plot(*args, **kwargs):
                                            spancoords='pixels')
     plt.connect('key_press_event', toggle_selector)
     plt.show()
+
+def julian_day_to_date(J):
+    """ Returns the date corresponding to a julian day number"""
+    J = int(ceil(J))  # i think we need to do this...
+    y=4716; v=3; j=1401; u=5; m=2; s=153; n=12; w=2; r=4; B=274277; p=1461; C=-38
+    if len(str(int(J))) < 7: J = J+2400000
+    f = J + j + (((4 * J + B)/146097) * 3)/4 + C
+    e = r * f + v
+    g = (e % p)/r
+    h = u * g + w
+    D = (h % s)/u + 1
+    M = ((h/s + m) % n) + 1
+    Y = e/p - y + (n + m - M)/n
+    return (Y, M, D)
