@@ -7,44 +7,30 @@
 
 """
 Provides a custom embedded IPython shell with its own magics.
-
-Author: João Faria
-
-Notes
------
 """
 
-from __future__ import with_statement
-
+# standard library imports
 import sys
 import warnings
 
+# ipython imports
 # We need to use nested to support python 2.6, once we move to >=2.7, we can
 # use the with keyword's new builtin support for nested managers
 try:
     from contextlib import nested
 except:
     from IPython.utils.nested_context import nested
-
 from IPython.config.loader import Config
-
 from IPython.core import ultratb
 from IPython.core.magic import Magics, magics_class, line_magic
-from IPython.frontend.terminal.interactiveshell import TerminalInteractiveShell
-from IPython.frontend.terminal.ipapp import load_default_config
-
+from IPython.terminal.interactiveshell import TerminalInteractiveShell
+from IPython.terminal.ipapp import load_default_config
 from IPython.utils.traitlets import Bool, CBool, Unicode
 from IPython.utils.io import ask_yes_no
 
-## test:
-from _version import __version__
-from commands import EmbeddedMagics
-#-----------------------------------------------------------------------------
-# Classes and functions
-#-----------------------------------------------------------------------------
+# intra-package imports
+from .commands import EmbeddedMagics
 
-
-        
 
 class EmbedShell(TerminalInteractiveShell):
 

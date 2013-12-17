@@ -6,7 +6,7 @@ import codecs
 import os
 import sys
 
-import sandman
+from OPEN import _OPENversion
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -19,7 +19,7 @@ def read(*filenames, **kwargs):
             buf.append(f.read())
     return sep.join(buf)
 
-long_description = read('README.txt', 'CHANGES.txt')
+long_description = read('README.md')
 
 class PyTest(TestCommand):
     def finalize_options(self):
@@ -33,35 +33,30 @@ class PyTest(TestCommand):
         sys.exit(errcode)
 
 setup(
-    name='sandman',
-    version=sandman.__version__,
-    url='http://github.com/jeffknupp/sandman/',
-    license='Apache Software License',
-    author='Jeff Knupp',
-    tests_require=['pytest'],
-    install_requires=['Flask>=0.10.1',
-                    'Flask-SQLAlchemy>=1.0',
-                    'SQLAlchemy==0.8.2',
-                    ],
+    name='OPEN',
+    version=_OPENversion.__version__,
+    url='http://j-faria.github.io/OPEN/',
+    license='MIT License',
+    author=u'João Faria',
+    tests_require=[],
+    install_requires=[],
     cmdclass={'test': PyTest},
-    author_email='jeff@jeffknupp.com',
-    description='Automated REST APIs for existing database-driven systems',
+    author_email='joao.faria@astro.up.pt',
+    description='Tools for exoplanet detection',
     long_description=long_description,
-    packages=['sandman'],
+    packages=['OPEN'],
     include_package_data=True,
     platforms='any',
-    test_suite='sandman.test.test_sandman',
+    test_suite='',
     classifiers = [
         'Programming Language :: Python',
-        'Development Status :: 4 - Beta',
+        'Development Status :: 2 - Pre-Alpha',
         'Natural Language :: English',
-        'Environment :: Web Environment',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: Apache Software License',
+        'Environment :: Console',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'Topic :: Software Development :: Libraries :: Application Frameworks',
-        'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
+        'Topic :: Scientific/Engineering :: Astronomy',
         ],
     extras_require={
         'testing': ['pytest'],

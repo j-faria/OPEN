@@ -7,18 +7,23 @@
 """
 This module defines the commands that are used as magics in OPEN. 
 """
-from __future__ import absolute_import
+# standard library imports
+import glob
+from itertools import chain
+
+# IPython imports
 from IPython.core.magic import (Magics, magics_class, line_magic, 
                                 needs_local_scope)
 from IPython.core.magic_arguments import argument
 from IPython.utils.io import ask_yes_no
 
-from docopt import docopt, DocoptExit
-from classes import rvSeries
+# intra-package imports
+from .docopt import docopt, DocoptExit
+from .classes import rvSeries
+from .utils import stdout_write, selectable_plot
+from .logger import clogger, logging
 import core
 import periodograms
-from utils import stdout_write
-from logger import clogger, logging
 
 ################################################################################
 ################################################################################
@@ -27,9 +32,11 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... -d
+    read <file>... [-d] [--skip=<sn>] [--format=<form>]
+    read -h | --help
 Options:
-    -d 
+    --skip=<sn>  How many header lines to skip [default: 0]
+    -h --help     Show this help message
 """
 
 plot_usage = \
@@ -37,6 +44,7 @@ plot_usage = \
 Usage:
     plot [obs]
     plot [obs] -n SYSTEM
+    plot [fwhm] [rhk] [s] [bis] [contrast]
 Options:
     -n SYSTEM       Specify name of system (else use default)
 """
@@ -46,11 +54,15 @@ per_usage = \
 Usage:
     per [obs]
     per [obs] -n SYSTEM
+    per [obs] [--gls|--bayes|--fast]
     per [obs] -v
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
     -v --verbose  Verbose statistical output 
+    --gls         Calculate the Generalized Lomb-Scargle periodogram (default)
+    --bayes       Calculate the Bayesian periodogram
+    --fast        Calculate the Lomb-Scargle periodogram with fast algorithm
     -h --help     Show this help message
 """
 
@@ -68,6 +80,16 @@ Options:
     -h --help     Show this help message
 """
 
+dawfab_usage = \
+"""
+Usage:
+    dawfab 
+    dawfab -n SYSTEM
+    dawfab -h | --help
+Options:
+    -n SYSTEM     Specify name of system (else use default)
+    -h --help     Show this help message
+"""
 
 fit_usage = \
 """
@@ -78,12 +100,25 @@ Options:
 """
 
 
+correlate_usage = \
+"""
+Usage:
+    correlate <var1> <var2> [-v] 
+Options:
+    -v --verbose  Verbose statistical output 
+"""
+
+
 restrict_usage = \
 """
 Usage:
     restrict [(err <maxerr>)]
+    restrict [(jd <minjd> <maxjd>)]
+    restrict [(year <yr>)]
+    restrict [(years <yr1> <yr2>)]
+    restrict --gui
 Options:
-    -h --help     Show this help message
+    --gui         Restrict data using a graphical interface (experimental)
 """
 
     
@@ -130,15 +165,18 @@ class EmbeddedMagics(Magics):
         Type 'read -h' for more help """
 
         args = parse_arg_string('read', parameter_s)
-        filenames = args['<file>']
+        # take care of glob expansions
+        globs = [glob.glob(f) for f in args['<file>']]
+        filenames = list(chain.from_iterable(globs)) # not very pythonic...
 
         # if 'default' system is already set, return the rvSeries class
         # this is useful when working with various systems simultaneously so 
         # that we can do, e.g., HDXXXX = %read file1 file2
         if local_ns.has_key('default') and not args['-d']:
-            return rvSeries(*filenames)
+            return rvSeries(*filenames, skip=args['--skip'])
         else:
-            local_ns['default'] = rvSeries(*filenames)
+            local_ns['default'] = rvSeries(*filenames, skip=args['--skip'],
+                                                       format=args['--format'])
 
     @needs_local_scope
     @line_magic
@@ -163,8 +201,25 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
         
+        # plot the observed radial velocities
         if args['obs']:
             system.do_plot_obs()
+
+        # plot other quantities
+        extras_available = ['fwhm', 'contrast', 'bis_span', 'noise', 
+                          's_mw', 'sig_s', 'rhk', 'sig_rhk', 
+                          'sn_CaII', 'sn10', 'sn50', 'sn60']
+        extras_mapping = ['fwhm', 'contrast', 'bis', 'noise',
+                          's', 's', 'rhk', 'rhk',
+                          'sn', 'sn', 'sn', 'sn']
+        for i, e in enumerate(extras_available):
+            try:
+                if args[extras_mapping[i]]: 
+                    system.do_plot_extras(e)
+                    return
+            except KeyError:
+                pass
+
 
     @needs_local_scope
     @line_magic
@@ -191,15 +246,36 @@ class EmbeddedMagics(Magics):
             return
         
         verb = True if args['--verbose'] else False
+        # which periodogram should be calculated?
+        per_fcn = None
+        if args['--bayes']: 
+            per_fcn = periodograms.bls
+            name = 'Bayesian Lomb-Scargle'
+        if args['--fast']: 
+            per_fcn = periodograms.LombScargle
+            name = 'Lomb Scargle'
+        if args['--gls']: 
+            per_fcn = periodograms.gls
+            name ='Generalized Lomb-Scargle'
+        # this is the default if user did not specify arguments
+        if per_fcn is None: 
+            per_fcn = periodograms.gls
+            name ='Generalized Lomb-Scargle'
+
         if args['obs']:
             try: 
-                system.per
-                system.per._output(verbose=verb)
+                # it was calculated already?
+                system.per 
+                # the same periodogram?
+                if system.per.name != name:
+                    raise AttributeError
+                # system.per._output(verbose=verb)  # not ready
                 system.per._plot()
             except AttributeError:
-                system.per = periodograms.gls(system, hifac=5)
-                system.per._output(verbose=verb)
+                system.per = per_fcn(system)
+                # system.per._output(verbose=verb)  # not ready
                 system.per._plot()
+                print system.per.name
 
     @needs_local_scope
     @line_magic
@@ -238,6 +314,35 @@ class EmbeddedMagics(Magics):
             system.wf._plot()
         except AttributeError:
             system.wf = periodograms.SpectralWindow(system.per.freq, system.time)
+
+
+    @needs_local_scope
+    @line_magic
+    def dawfab(self, parameter_s='', local_ns=None):
+        """ Run the Dawson Fabrycky algorithm to search for aliases.
+        Type 'dawfab -h' for more help. """
+
+        args = parse_arg_string('dawfab', parameter_s)
+        if args == 1: return
+        print args
+        
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default') and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['-n']
+                system = local_ns[system_name]
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+        
+        core.do_Dawson_Fabrycky(system)
+        return
+
 
     @line_magic
     def listcommands(self, parameter_s=''):
@@ -302,12 +407,48 @@ class EmbeddedMagics(Magics):
 
     @needs_local_scope
     @line_magic
+    def correlate(self, parameter_s='', local_ns=None):
+        from shell_colors import red
+        args = parse_arg_string('correlate', parameter_s)
+        if args == 1: return
+        print args
+
+        verb = True if args['--verbose'] else False
+
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+            var1 = args['<var1>']
+            var2 = args['<var2>']
+            result = core.do_correlate(system, vars=(var1, var2), verbose=verb)
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+    @needs_local_scope
+    @line_magic
     def gen(self, parameter_s='', local_ns=None):
+        """ Run the genetic algorithm minimization - stub """
+        from shell_colors import red
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+            core.do_genetic(system)
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+    @needs_local_scope
+    @line_magic
+    def nest(self, parameter_s='', local_ns=None):
+        """ Start the MultiNest analysis and handle data interaction and IO """
         from shell_colors import red
 
         if local_ns.has_key('default'):
             system = local_ns['default']
-            core.do_genetic(system)
+            core.do_multinest(system)
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
@@ -322,18 +463,22 @@ class EmbeddedMagics(Magics):
         """
         from shell_colors import yellow, blue, red
         args = parse_arg_string('restrict', parameter_s)
+
         if args == DocoptExit:
             msg = yellow('Warning: ') + "I'm not doing anything. See restrict -h"
             clogger.fatal(msg)
             return
 
+        if args == 1: return
         print args
 
         # use default system or user defined
         if local_ns.has_key('default'):
             system = local_ns['default']
         else:
-            print 'No default!'  # handle this!
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
             return
 
 
@@ -345,6 +490,38 @@ class EmbeddedMagics(Magics):
                 clogger.fatal(msg)
                 return
             core.do_restrict(system, 'error', maxerr)
+
+        if args['jd']:
+            try:
+                maxjd = int(args['<maxjd>'])
+                minjd = int(args['<minjd>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'minjd and maxjd shoud be numbers!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'date', minjd, maxjd)
+
+        if args['year']:
+            try:
+                yr = int(args['<yr>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'yr shoud be a number!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'year', yr)
+
+        if args['years']:
+            try:
+                yr1 = int(args['<yr1>'])
+                yr2 = int(args['<yr2>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'yr1 and yr2 shoud be numbers!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'years', yr1, yr2)
+
+        if args['--gui']:
+            selectable_plot([1,2,3], [4, 16, 32], 'ro')
 
 
 
@@ -395,17 +572,29 @@ def parse_arg_string(command, arg_string):
         except SystemExit:
             return 1
 
+    if command is 'correlate':
+        try:
+            args = docopt(correlate_usage, splitted)
+        except SystemExit:
+            return 1
+
     if command is 'restrict':
         if arg_string == '': 
             return DocoptExit # restrict needs arguments
         try:
             args = docopt(restrict_usage, splitted)
         except (SystemExit, DocoptExit) as e:
-            return e
+            return 1
 
     if command is 'wf':
         try:
             args = docopt(wf_usage, splitted)
+        except SystemExit:
+            return 1
+
+    if command is 'dawfab':
+        try:
+            args = docopt(dawfab_usage, splitted)
         except SystemExit:
             return 1
 

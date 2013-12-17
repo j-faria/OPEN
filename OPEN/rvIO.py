@@ -4,16 +4,21 @@
 # This file is part of OPEN which is licensed under the MIT license.
 # You should have received a copy of the license along with OPEN. See LICENSE.
 #
-from __future__ import absolute_import
 
-from logger import clogger, logging
-from utils import day2year, rms
-
-from fileinput import input
-from numpy import loadtxt
+# standard library imports
+from fileinput import FileInput
+from itertools import islice, chain
 import os
 
+# other imports
+from numpy import loadtxt
+
+# intra-package imports
+from .logger import clogger, logging
+from .utils import day2year, rms
+
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+
 
 def read_rv(*filenames, **kwargs):
     """
@@ -36,27 +41,55 @@ def read_rv(*filenames, **kwargs):
         Dictionary with name and number of values from each file.
     """
 
-    #optional keyword argument (i don't think we need this!)
-    ##skip = kwargs['skip'] if kwargs.has_key('skip') else 2
     # set logging level
     clogger.setLevel(logging.VERBOSE) \
                 if (kwargs.has_key('verbose') and kwargs['verbose']) \
                 else clogger.setLevel(logging.INFO)
 
+    # how many header lines to skip?
+    if (kwargs.has_key('skip')): header_skip = int(kwargs['skip'])
+    # format of file
+    if (kwargs.has_key('format')): format = kwargs['format']
+    format = 'drs35' if (format is None) else format
+
     dic = {} # will hold how many values per file
     for filename in sorted(filenames):
         if os.path.isfile(filename) and os.access(filename, os.R_OK):
             # this file exists and is readable
-            with open(filename) as f:
-                nlines = len(f.readlines())
+            with rvfile(filename) as f:
+                nlines = len(f.readuncommented())
             dic[filename] = [nlines, 0]
             clogger.info('Reading %d values from file %s' % (nlines, filename))
         else:
             # should raise an error or read from the other files?
             raise IOError("The file '%s' doesn't seem to exist" % filename)
             
+    # black magic to build input from file list while skipping headers
+    finput = [FileInput(f) for f in sorted(filenames)]
+    iterables = [islice(f, header_skip, None) for f in finput]
+    files = chain(*iterables)
+
     # read data
-    t, rv, err = loadtxt(input(sorted(filenames)), unpack=True)
+    if format == 'drs35': # default
+        t, rv, err, \
+        fwhm, contrast, bis_span, noise, s_mw, sig_s, \
+        rhk, sig_rhk, sn_CaII, sn10, sn50, sn60 = loadtxt(files, unpack=True)
+        others = (fwhm, contrast, bis_span, noise, s_mw, sig_s, rhk, sig_rhk, sn_CaII, sn10, sn50, sn60)
+
+    elif format == 'drs34' or format == 'coralie':
+        t, rv, err,
+        fwhm, contrast, bis_span, noise, sn10, sn50, sn60  = loadtxt(files, unpack=True, usecols=(0,1,2))
+        others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
+
+    # elif format == 'coralie':
+    #     t, rv, err, 
+    #     fwhm, contrast, bis_span, noise, sn10, sn50, sn60 = loadtxt(files, unpack=True)
+    #     others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
+
+    elif format == 'basic':
+        t, rv, err = loadtxt(files, unpack=True, usecols=(0,1,2))
+        others = ()
+
     
     # verbose stats about data
     stats = None
@@ -68,7 +101,16 @@ def read_rv(*filenames, **kwargs):
     
     clogger.verbose(stats)
     
-    return t, rv, err, dic
+    return t, rv, err, dic, others
     
     
     
+class rvfile(file):
+    """
+    Subclass of Python's File class that implements specific methods
+    for I/O of files usually used to store radial velocity measurements.
+    """
+    def readuncommented(self):
+        lines = self.readlines()
+        uncommented = [l for l in lines if l.strip()[0].isdigit()]
+        return uncommented

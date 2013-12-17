@@ -7,7 +7,8 @@
 """
 Utility functions or snippets for all sorts of things
 """
-from math import sqrt
+
+from math import sqrt, ceil
 from sys import stdout
 
 
@@ -34,12 +35,59 @@ def rms(array):
     return sqrt(sum(n*n for n in array)/len(array))
     
     
-    
-    
-    
 def stdout_write(msg):
 	""" Print to stdout (without carriage return) and flush right away.
 	Useful to print in the same line """
-
 	stdout.write(msg)
 	stdout.flush()
+
+
+
+### Matplotlib advanced plot interaction stuff
+from matplotlib.widgets import RectangleSelector
+import numpy as np
+import matplotlib.pyplot as plt
+
+def line_select_callback(eclick, erelease):
+    'eclick and erelease are the press and release events'
+    x1, y1 = eclick.xdata, eclick.ydata
+    x2, y2 = erelease.xdata, erelease.ydata
+    print ("(%3.2f, %3.2f) --> (%3.2f, %3.2f)" % (x1, y1, x2, y2))
+    print (" The button you used were: %s %s" % (eclick.button, erelease.button))
+
+def toggle_selector(event):
+    print (' Key pressed.')
+    if event.key in ['Q', 'q'] and toggle_selector.RS.active:
+        print (' RectangleSelector deactivated.')
+        toggle_selector.RS.set_active(False)
+    if event.key in ['A', 'a'] and not toggle_selector.RS.active:
+        print (' RectangleSelector activated.')
+        toggle_selector.RS.set_active(True)
+
+def selectable_plot(*args, **kwargs):
+    fig, current_ax = plt.subplots()                    # make a new plotingrange
+
+    plt.plot(*args, **kwargs)  # plot something
+
+    # drawtype is 'box' or 'line' or 'none'
+    toggle_selector.RS = RectangleSelector(current_ax, line_select_callback,
+                                           drawtype='box', useblit=True,
+                                           button=[1,3], # don't use middle button
+                                           minspanx=5, minspany=5,
+                                           spancoords='pixels')
+    plt.connect('key_press_event', toggle_selector)
+    plt.show()
+
+def julian_day_to_date(J):
+    """ Returns the date corresponding to a julian day number"""
+    J = int(ceil(J))  # i think we need to do this...
+    y=4716; v=3; j=1401; u=5; m=2; s=153; n=12; w=2; r=4; B=274277; p=1461; C=-38
+    if len(str(int(J))) < 7: J = J+2400000
+    f = J + j + (((4 * J + B)/146097) * 3)/4 + C
+    e = r * f + v
+    g = (e % p)/r
+    h = u * g + w
+    D = (h % s)/u + 1
+    M = ((h/s + m) % n) + 1
+    Y = e/p - y + (n + m - M)/n
+    return (Y, M, D)
