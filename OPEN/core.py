@@ -352,7 +352,7 @@ def do_multinest(system):
 	msg = blue('INFO: ') + 'Starting MultiNest...'
 	clogger.info(msg)
 	
-	cmd = 'mpirun -np 2 ./OPEN/multinest/gaussian'
+	cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
 	subprocess.call(cmd, shell=True)
 	# os.system(cmd)
 

@@ -8,12 +8,13 @@ FCC = gfortran
 FFLAGS= -ffree-form -O3
 
 FPY = f2py
-FPYFLAGS = --f77flags="-O3 -Ofast" --quiet
-FPYFLAGS += --f90exec="/opt/mesasdk/bin/gfortran" --opt="-O3 -Ofast"
-FPYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
+FPYFLAGS = --quiet
+FPYFLAGS += --opt="-O3 -Ofast"
+# FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none"
+FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none"
 
 # --- targets
-all: glombscargle.so blombscargle.so get_rv.so get_rvN.so
+all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so
 	@echo "\n Done!"
 
 
@@ -39,4 +40,4 @@ periodogram_DF.so: periodogram_DF.c
 
 # --- remove binary and executable files
 clean:
-	rm -f blombscargle.so get_rv.so
+	rm -f blombscargle.so glombscargle.so get_rv.so get_rvN.so periodogram_DF.so
