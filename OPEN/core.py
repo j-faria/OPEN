@@ -28,7 +28,6 @@ from scipy.stats import nanmean, nanstd
 from logger import clogger, logging
 from ext.get_rvN import get_rvn
 from ext.periodogram_DF import periodogram_DF
-from galileo import *
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date
 
