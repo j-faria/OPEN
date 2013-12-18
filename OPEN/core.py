@@ -11,6 +11,7 @@ import datetime, time
 import subprocess
 import sys, os
 import random
+from collections import namedtuple
 
 # other imports
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
@@ -84,13 +85,6 @@ def do_restrict(system, quantity, *args):
 		system.vrad = system.vrad_full[vals]
 		system.error = system.error_full[vals]
 
-		# vals = system.error_full <= maxval
-		# print 'From a total of ', len(system.error_full), \
-		#       ' we are removing ', (vals == False).sum()
-
-		# system.time = system.time_full[vals]
-		# system.vrad = system.vrad_full[vals]
-		# system.error = system.error_full[vals]
 
 	## restrict by date (JD)
 	if quantity == 'date':
@@ -101,9 +95,6 @@ def do_restrict(system, quantity, *args):
 		# we have to keep a record of how many values come out of each file
 		t, rv, err = system.time_full, system.vrad_full, system.error_full # temporaries
 		for i, (fname, [n1, n2]) in enumerate(sorted(system.provenance.iteritems())):
-			print i, n1, n2
-			# print err[:n1]
-
 			lower = t[:n1] <= minjd
 			higher = t[:n1] <= maxjd
 			nout = (lower == True).sum()
@@ -127,6 +118,12 @@ def do_restrict(system, quantity, *args):
 		system.time = system.time_full[keepers]
 		system.vrad = system.vrad_full[keepers]
 		system.error = system.error_full[keepers]	
+		# also from extras, but this is trickier
+		d = system.extras._asdict() # asdict because namedtuple is immutable
+		for i, field in enumerate(system.extras._fields):
+			d[field] = system.extras_full[i][keepers]
+		extra = namedtuple('Extra', system.extras_names, verbose=False)
+		system.extras = extra(**d)
 
 	## restrict to values from one year
 	if quantity == 'year':
@@ -155,7 +152,13 @@ def do_restrict(system, quantity, *args):
 		# leaving all *_full vectors intact
 		system.time = system.time_full[keepers]
 		system.vrad = system.vrad_full[keepers]
-		system.error = system.error_full[keepers]			
+		system.error = system.error_full[keepers]
+		# also from extras
+		d = system.extras._asdict() # asdict because namedtuple is immutable
+		for i, field in enumerate(system.extras._fields):
+			d[field] = system.extras_full[i][keepers]
+		extra = namedtuple('Extra', system.extras_names, verbose=False)
+		system.extras = extra(**d)	
 
 	## restrict to values from a year range
 	if quantity == 'years':
@@ -186,6 +189,12 @@ def do_restrict(system, quantity, *args):
 		system.time = system.time_full[keepers]
 		system.vrad = system.vrad_full[keepers]
 		system.error = system.error_full[keepers]	
+		# also from extras, but this is trickier
+		d = system.extras._asdict() # asdict because namedtuple is immutable
+		for i, field in enumerate(system.extras._fields):
+			d[field] = system.extras_full[i][keepers]
+		extra = namedtuple('Extra', system.extras_names, verbose=False)
+		system.extras = extra(**d)
 
 	return
 
