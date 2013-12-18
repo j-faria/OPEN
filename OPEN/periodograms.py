@@ -626,7 +626,7 @@ class bls(PeriodogramBase):
       self.error = rv.error
     elif quantity == 'bis':
       self.y = rv.extras.bis_span
-      self.error = ones_like(self.y)
+      self.error = mean(rv.error) * ones_like(self.y)
 
     # time span of observations
     self.Tspan = max(rv.time) - min(rv.time)
