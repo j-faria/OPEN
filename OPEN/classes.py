@@ -81,6 +81,8 @@ class rvSeries:
         self.time_full = self.time
         self.vrad_full = self.vrad
         self.error_full = self.error
+        # same for extras
+        self.extras_full = self.extras
 
     # associated model to be adjusted to the data
     # this will be a dict with the following key:value pairs:
