@@ -267,7 +267,7 @@ class EmbeddedMagics(Magics):
             return
         
         verb = True if args['--verbose'] else False
-        
+
         # which periodogram should be calculated?
         per_fcn = None
         if args['--bayes']: 
@@ -299,8 +299,9 @@ class EmbeddedMagics(Magics):
                 system.per._plot()
                 print system.per.name
 
-        # if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
-        #     bis_per = per_fcn(system, quantity='bis')
+        if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
+            system.bis_per = per_fcn(system, quantity='bis')
+            system.bis_per._plot()
 
     @needs_local_scope
     @line_magic

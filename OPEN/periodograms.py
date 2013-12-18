@@ -343,6 +343,9 @@ class gls(PeriodogramBase):
     freq : array, optional
         Contains the frequencies at which to calculate the periodogram.
         If not given, a frequency array will be automatically generated.
+    quantity : string, optional
+        For which quantity to calculate the periodogram. Possibilities are
+        'bis' or 'fwhm' other than the default 'vrad'.
     norm : string, optional
         The normalization; either "Scargle", "HorneBaliunas", or 
         "Cumming". Default is "HorneBaliunas".
@@ -365,7 +368,8 @@ class gls(PeriodogramBase):
         The normalization used.
   """
 
-  def __init__(self, rv, ofac=6, hifac=1, freq=None, norm="HorneBaliunas", stats=False, ext=True):
+  def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
+               norm="HorneBaliunas", stats=False, ext=True):
     self.name = 'Generalized Lomb-Scargle'
 
     self.power = None
@@ -373,8 +377,12 @@ class gls(PeriodogramBase):
     self.ofac, self.hifac = ofac, hifac
     self.t = rv.time
     self.th = rv.time - min(rv.time)
-    self.y = rv.vrad
-    self.error = rv.error
+    if quantity == 'vrad':
+      self.y = rv.vrad
+      self.error = rv.error
+    elif quantity == 'bis':
+      self.y = rv.extras.bis_span
+      self.error = ones_like(self.y)
     self.norm = norm
     # Check and assign normalization
     self.label = {'title': 'Generalized Lomb Periodogram',\
@@ -591,6 +599,9 @@ class bls(PeriodogramBase):
     freq : array, optional
         Contains the frequencies at which to calculate the periodogram.
         If not given, a frequency array will be automatically generated.
+    quantity : string, optional
+        For which quantity to calculate the periodogram. Possibilities are
+        'bis' or 'fwhm' other than the default 'vrad'.    
     stats : boolean, optional
         Set True to obtain some statistical output (default is False).
   
@@ -602,7 +613,7 @@ class bls(PeriodogramBase):
         The frequency array.
   """
 
-  def __init__(self, rv, ofac=6, hifac=40, freq=None, stats=False):
+  def __init__(self, rv, ofac=6, hifac=40, freq=None, quantity='vrad', stats=False):
     self.name = 'Bayesian Lomb-Scargle'
 
     self.power = None
@@ -610,8 +621,12 @@ class bls(PeriodogramBase):
     self.ofac, self.hifac = ofac, hifac
     self.t = rv.time
     self.th = self.t - min(rv.time)
-    self.y = rv.vrad
-    self.error = rv.error
+    if quantity == 'vrad':
+      self.y = rv.vrad
+      self.error = rv.error
+    elif quantity == 'bis':
+      self.y = rv.extras.bis_span
+      self.error = ones_like(self.y)
 
     # time span of observations
     self.Tspan = max(rv.time) - min(rv.time)
