@@ -303,6 +303,10 @@ class EmbeddedMagics(Magics):
             system.bis_per = per_fcn(system, quantity='bis')
             system.bis_per._plot()
 
+        if args['fwhm']: # periodogram of the CCF's fwhm
+            system.fwhm_per = per_fcn(system, quantity='fwhm')
+            system.fwhm_per._plot()
+
     @needs_local_scope
     @line_magic
     def wf(self, parameter_s='', local_ns=None):

@@ -383,6 +383,9 @@ class gls(PeriodogramBase):
     elif quantity == 'bis':
       self.y = rv.extras.bis_span
       self.error = ones_like(self.y)
+    elif quantity == 'fwhm':
+      self.y = rv.extras.fwhm
+      self.error = ones_like(self.y)
     self.norm = norm
     # Check and assign normalization
     self.label = {'title': 'Generalized Lomb Periodogram',\
@@ -626,6 +629,9 @@ class bls(PeriodogramBase):
       self.error = rv.error
     elif quantity == 'bis':
       self.y = rv.extras.bis_span
+      self.error = mean(rv.error) * ones_like(self.y)
+    elif quantity == 'fwhm':
+      self.y = rv.extras.fwhm
       self.error = mean(rv.error) * ones_like(self.y)
 
     # time span of observations
