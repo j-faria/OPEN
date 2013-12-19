@@ -75,15 +75,18 @@ class rvSeries:
           extras_names = []
         extra = namedtuple('Extra', extras_names, verbose=False)
         self.extras = extra._make(extras)
+        self.extras_names = extras_names
 
         # time, vrad and error can change, 
         # the *_full ones correspond always to the full set
         self.time_full = self.time
         self.vrad_full = self.vrad
         self.error_full = self.error
+        # same for extras
+        self.extras_full = self.extras
 
     # associated model to be adjusted to the data
-    # this will be a dict with the following key:value pairs:
+    # this will be a dictionary with the following key:value pairs:
     #   k : number of keplerians in the model
     #   d : degree of drift in the model
     #   drift : array with parameters from drift fit (the polynomial coefficients)
