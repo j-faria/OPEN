@@ -40,6 +40,12 @@ class rvSeries:
         # don't repeat files
         filenames = unique(filenames)
 
+        # verbose?
+        try:
+          verbose = kwargs.pop('verbose')
+        except KeyError:
+          verbose = False
+          
         # skip header lines? (no by default)
         try:
           skip = kwargs.pop('skip')
@@ -55,7 +61,7 @@ class rvSeries:
         # read data
         try:
           t, rv, err, self.provenance, extras = \
-               rvIO.read_rv(*filenames, verbose=False, skip=skip, format=format)
+               rvIO.read_rv(*filenames, verbose=verbose, skip=skip, format=format)
         except ValueError:
           from shell_colors import red
           msg = red('ERROR: ') + 'If your files have header lines set --skip option.\n'

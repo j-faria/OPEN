@@ -32,13 +32,14 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... [-d] [--skip=<sn>] [--format=<form>]
+    read <file>... [-d] [--skip=<sn>] [--format=<form>] [-v]
     read -h | --help
 Options:
-    -d                  Set this as default system
-    --skip=<sn>         How many header lines to skip [default: 0]
+    -d                  Set this as default system.
+    -v --verbose        Verbose output about data just read.
+    --skip=<sn>         How many header lines to skip [default: 0].
     --format=<form>     File format. One of 'drs35', 'drs34', 'coralie' or 'basic'.
-    -h --help           Show this help message
+    -h --help           Show this help message.
 """
 
 plot_usage = \
@@ -135,8 +136,6 @@ command_list = \
  fit        ...
  restrict   Select data based on date, SNR or RV accuracy.
 """
-
-
     
 # These are additional magics that are exposed (only?) in embedded shells.
 @magics_class
@@ -178,7 +177,7 @@ class EmbeddedMagics(Magics):
 
         # take care of glob expansions
         globs = [glob.glob(f) for f in args['<file>']]
-        filenames = list(chain.from_iterable(globs)) # not very pythonic...
+        filenames = list(chain.from_iterable(globs)) # some magic...
 
         # if 'default' system is already set, return the rvSeries class
         # this is useful when working with various systems simultaneously so 
@@ -186,7 +185,8 @@ class EmbeddedMagics(Magics):
         if local_ns.has_key('default') and not args['-d']:
             return rvSeries(*filenames, skip=args['--skip'])
         else:
-            local_ns['default'] = rvSeries(*filenames, skip=args['--skip'],
+            local_ns['default'] = rvSeries(*filenames, verbose=args['--verbose'],
+                                                       skip=args['--skip'],
                                                        format=args['--format'])
 
     @needs_local_scope
