@@ -40,8 +40,28 @@
       <section>
 <h1>OPEN - tools for exoplanet detection</h1>
 
-<p> The P stands for 'planet' </p>
+<!-- <p> The P stands for 'planet' </p> -->
+<p>Fitting Keplerian curves to radial velocity data: we've been doing this since 1995
+<sup><a href="#fn1" id="ref1">[1]</a></sup> in order to find exoplanets orbiting stars other than the Sun. It should be a solved problem by now. Long story short... it's not. Let's see why.</p>
+
+<h4>Current methods</h4>
+<p>There are a lot of different methods to carry out the fitting and a lot of software packages implementing them. Here is a small compilation of these (in no specific order):</p>
+<ul>
+  <li><a href="http://asterisk.apod.com/viewtopic.php?f=35&t=29908&hilit=radial+velocity">RVLIN</a>: set of IDL routines to fit an arbitrary number of Keplerian curves to RV data. </li>
+  <li><a href="http://asterisk.apod.com/viewtopic.php?f=35&t=29812&hilit=radial+velocity">Systemic Console</a>: graphical tool for fitting RV and transits datasets and a library of routines for non-interactive calculations.</li>
+  <li><a href="http://asterisk.apod.com/viewtopic.php?f=35&t=29034&hilit=radial+velocity">EXOFAST</a>: suite of routines written in IDL designed to fit exoplanetary transits and RV variations simultaneously or separately.</li>
+  <li><a href="http://asterisk.apod.com/viewtopic.php?f=35&t=29389&p=182265&hilit=radial+velocity#p182265">BASE</a>: command-line tool for the Bayesian analysis of astrometric and RV measurements.</li>
+  <li><a href="http://asterisk.apod.com/viewtopic.php?f=35&t=26505&hilit=radial+velocity">ExoFit</a>: orbital parameters of extra-solar planets from RV data using MCMC.</li>
+  <li><a href="http://asterisk.apod.com/viewtopic.php?f=35&t=32499&hilit=radial+velocity">PlanetPack</a>: analysis of RV data for exoplanet detection, characterization, and basic dynamical N-body simulations.</li>
+  <li><a href="http://obswww.unige.ch/~segransa/yorbit/index.html">Yorbit</a>: yorick-based software for analyzing RV data.</li>
+</ul>
+
+<p>Wow! Plenty to choose from, hun? Don't you just love when scientists keep reinventing the wheel? I do, so I did it as well when I created OPEN.</p>
+
 <p> Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec viverra dictum erat, quis pulvinar elit pulvinar non. In dolor mauris, tincidunt id velit sit amet, ullamcorper sollicitudin mauris. Fusce ac libero ultricies, congue elit eget, consectetur quam. Nulla vitae eleifend ipsum. Nullam vitae nibh at massa pharetra laoreet sed vitae dolor. Aenean ac libero vel dolor dapibus ultricies aliquam nec leo. Suspendisse lorem arcu, commodo quis posuere nec, congue vel lorem. Duis faucibus, arcu placerat fringilla condimentum, diam magna bibendum orci, ut iaculis tellus lectus vulputate purus. Maecenas in gravida magna. Nam ut blandit justo.</p>
+
+<p><sup id="fn1">1. Mayor and Queloz, 1995<a href="#ref1" title="Jump back to text."> ↩</a></sup></p>
+
 
         <h2>
             <a name="what-does-it-do" class="anchor" href="#what-does-it-do"><span class="octicon octicon-link"></span></a> <br>What does it do?</h2>

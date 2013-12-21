@@ -25,6 +25,8 @@ time, mark, audio, video {
 
 /* Base text styles */
 
+sup {font-size:xx-small; vertical-align:super;}
+
 body {
   padding:10px 50px 0 0;
   font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
