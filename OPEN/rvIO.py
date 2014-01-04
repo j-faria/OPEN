@@ -100,7 +100,7 @@ def read_rv(*filenames, **kwargs):
         tspan = max(t) - min(t)
         rvspan = max(rv) - min(rv)
         stats = '\n'
-        stats += info + "Timespan : %f days = %f years\n" % (tspan, day2year(tspan))
+        stats += info + "Timespan : %f days = %f years   ---   %fJD, %fJD\n" % (tspan, day2year(tspan), max(t), min(t))
         stats += sinfo + "RV span  : %f km/s = %f m/s\n" % (rvspan, rvspan*1e3)
         stats += sinfo + "RV rms [m/s] : %f\n\n" % rms(rv)
         stats += sinfo + "{:14s} : {:10.3f}\n".format('<RV> [km/s]', mean(rv))

@@ -16,7 +16,7 @@ from collections import namedtuple
 # other imports
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
 import numpy as np
-from matplotlib.pylab import *
+import pylab
 from deap import base, creator, tools, algorithms
 
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
@@ -220,7 +220,7 @@ def do_genetic(system):
 
 	## create parameters by sampling from their priors
 	def P_prior():
-		return random.uniform(1000, 2000)
+		return random.uniform(5, 100)
 	def K_prior():
 		return random.uniform(1, 150)
 	def ecc_prior():
@@ -230,7 +230,7 @@ def do_genetic(system):
 	def t0_prior():
 		return random.uniform(2351372, 2551372)
 	def gamma_prior():
-		return random.uniform(-10, 10)
+		return random.uniform(-100, 100)
 	priors = [P_prior, K_prior, ecc_prior, om_prior, t0_prior, gamma_prior]
 
 	toolbox = base.Toolbox()
@@ -249,7 +249,7 @@ def do_genetic(system):
 	toolbox.register("select", tools.selTournament, tournsize=3)
 
 	npop = 250
-	ngen = 120
+	ngen = 220
 	## build the population
 	pop = toolbox.population(n=npop)
 	## helper functions
@@ -306,9 +306,9 @@ def do_genetic(system):
 	final = zeros_like(tt)
 	get_rvn(tt, P, K, ecc, omega, T0, gam, final)
 
-	errorbar(system.time, system.vrad, yerr=system.error, fmt='ro')
-	plot(tt, final, 'k-')
-	show()
+	pylab.errorbar(system.time, system.vrad, yerr=system.error, fmt='ro')
+	pylab.plot(tt, final, 'k-')
+	pylab.show()
 
 	# #  print p.minFitness, p.maxFitness, p.avgFitness, p.sumFitness
 	# print 'Genetic:', p.bestFitIndividual, p.bestFitIndividual.fitness
@@ -342,7 +342,7 @@ def do_lm(system, x0):
 		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
 		return system.vrad - vel
 
-	return leastsq(chi2_2, x0, full_output=0)
+	return leastsq(chi2_2, x0, full_output=0)#, maxfev=1)
 
 
 def do_multinest(system):
