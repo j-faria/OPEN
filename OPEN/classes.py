@@ -156,7 +156,7 @@ class rvSeries:
         ax1.plot(st, sp, 'y-')
 
         t, rv, err = self.time, self.vrad, self.error # temporaries
-        ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
+        ax2 = plt.subplot(2,1,2, sharex=ax1)
         # plot each file's values minus the drift
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
@@ -166,7 +166,7 @@ class rvSeries:
 
         plt.xlabel('Time [days]')
         plt.ylabel('RV [km/s]')
-        plt.legend()
+        # plt.legend()
         plt.tight_layout()
         plt.show()
 
