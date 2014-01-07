@@ -57,7 +57,7 @@ Options:
 per_usage = \
 """
 Usage:
-    per obs
+    per obs [--force]
     per (bis | fwhm)
     per -n SYSTEM
     per (obs | bis | fwhm) [--gls|--bayes|--fast] [-v]
@@ -67,6 +67,7 @@ Options:
     --gls         Calculate the Generalized Lomb-Scargle periodogram (default)
     --bayes       Calculate the Bayesian periodogram
     --fast        Calculate the Lomb-Scargle periodogram with fast algorithm
+    --force       Force recalculation
     -v --verbose  Verbose statistical output 
     -h --help   Show this help message
 """
@@ -286,6 +287,8 @@ class EmbeddedMagics(Magics):
 
         if args['obs']: # periodogram of the observed RVs
             try: 
+                # are we forced to recalculate it?
+                if args['--force']: raise AttributeError
                 # it was calculated already?
                 system.per 
                 # the same periodogram?
