@@ -72,7 +72,7 @@ contains
     real(dp) :: EA_new, EA_old
     
     EA_old = 0.5_dp * pi 
-    if (ecc < 0.9d0) then
+    if (ecc < 0.8d0) then
       EA_new = newton(EA_old, ecc, M)
       do while (abs(EA_old - EA_new) >= derror)
         EA_old = EA_new
