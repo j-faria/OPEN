@@ -472,6 +472,8 @@ class EmbeddedMagics(Magics):
                                    'name with the -n option'
             clogger.fatal(msg)
             return
+            
+        system.do_plot_fit()
 
     @needs_local_scope
     @line_magic

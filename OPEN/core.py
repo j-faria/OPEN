@@ -200,7 +200,9 @@ def do_restrict(system, quantity, *args):
 	return
 
 
-def do_genetic(system):
+def do_genetic(system, just_gen=False):
+	""" Carry out the fit using a genetic algorithm and if 
+	just_gen=False try to improve it with a run of the LM algorithm """
 	try:
 		degree = system.model['d']
 		keplerians = system.model['k']
@@ -208,6 +210,8 @@ def do_genetic(system):
 		msg = red('Error: ') + 'Need to run mod before gen. '
 		clogger.error(msg)
 		return
+
+	system.fit = {}
 
 	msg = blue('INFO: ') + 'Initializing genetic algorithm...'
 	clogger.info(msg)
@@ -268,8 +272,8 @@ def do_genetic(system):
 	toolbox.register("mutate", mutPrior, indpb=0.10)
 	toolbox.register("select", tools.selTournament, tournsize=3)
 
-	npop = 300
-	ngen = 200
+	npop = 500
+	ngen = 150
 	npar = 5*keplerians+1
 	## build the population
 	pop = toolbox.population(n=npop)
@@ -302,6 +306,12 @@ def do_genetic(system):
 	msg = yellow('RESULT: ') + 'Best fitness value: %s\n' % (hof[0].fitness)
 	clogger.info(msg)
 
+	if just_gen: 
+		# save fit in the system and return, no need for LM
+		system.fit['params'] = hof[0]
+		system.fit['chi2'] = hof[0].fitness/(len(system.time)-npar)
+		return
+
 	msg = blue('INFO: ') + 'Calling LM to improve result...'
 	clogger.info(msg)	
 
@@ -322,13 +332,9 @@ def do_genetic(system):
 	msg = yellow('RESULT: ') + 'Best fitness value: %f, %f' % (chi2, chi2/(len(system.time)-npar))
 	clogger.info(msg)
 
-	tt = np.linspace(system.time.min(), system.time.max(), 300)
-	final = zeros_like(tt)
-	get_rvn(tt, P, K, ecc, omega, T0, gam, final)
-
-	pylab.errorbar(system.time, system.vrad, yerr=system.error, fmt='ro')
-	pylab.plot(tt, final, 'k-')
-	pylab.show()
+	# save fit in the system
+	system.fit['params'] = lm_par
+	system.fit['chi2'] = chi2
 
 	# #  print p.minFitness, p.maxFitness, p.avgFitness, p.sumFitness
 	# print 'Genetic:', p.bestFitIndividual, p.bestFitIndividual.fitness

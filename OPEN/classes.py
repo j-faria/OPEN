@@ -8,12 +8,14 @@
 # other imports
 import numpy
 import matplotlib.pylab as plt
+import matplotlib.gridspec as gridspec
 from collections import namedtuple # this requires Python >= 2.6
 
 # intra-package imports
 import rvIO
 from .utils import unique
 from .logger import clogger, logging
+from ext.get_rvN import get_rvn
 
 
 class rvSeries:
@@ -98,9 +100,15 @@ class rvSeries:
     #   drift : array with parameters from drift fit (the polynomial coefficients)
     model = None
 
+    # associated fit to be carried out with the genetic / LM algorithms
+    # this will be a dictionary with the following key:value pairs:
+    #   params : final parameters (5*model['k']+1)
+    #   chi2 : reduced(!) chi square value of the fit
+    fit = None
+
     def do_plot_obs(self):
         """ Plot the observed radial velocities as a function of time.
-        Data from each file is color coded and labeled.
+        Data from each file are color coded and labeled.
         """
         # import pyqtgraph as pg
 
@@ -133,7 +141,7 @@ class rvSeries:
     def do_plot_drift(self):
         """ Plot the observed radial velocities as a function of time, plus an
         extra drift of specified degree (see *mod*). Lower panel presents RV 
-        minus drift. Data from each file is color coded and labeled.
+        minus drift. Data from each file are color coded and labeled.
         """
         colors = 'rgbmk' # possible colors
         t, rv, err = self.time, self.vrad, self.error # temporaries
@@ -203,6 +211,52 @@ class rvSeries:
         plt.tight_layout()
         plt.show()
         # pg.QtGui.QApplication.exec_()
+
+    def do_plot_fit(self):
+        """ Plot the observed radial velocities together with the 
+        current best fit curve as well as phased RV curves for each 
+        planet considered in the fit. Data from each file are color 
+        coded and labeled. 
+        """
+        if self.fit is None: return # there is no fit yet
+
+        colors = 'rgbmk' # possible colors
+        t, rv, err = self.time, self.vrad, self.error # temporaries
+
+        tt = numpy.linspace(self.time.min()-200, self.time.max()+300, 400)
+        final = numpy.zeros_like(tt)
+        
+        par = self.fit['params']
+        P, K, ecc, omega, T0, gam = [par[j::6] for j in range(6)]
+        gam = gam[0]
+
+        get_rvn(tt, P, K, ecc, omega, T0, gam, final)
+
+        plt.figure()
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
+        ax1 = plt.subplot(gs[0])
+        # plot each file's values
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], \
+                         fmt='o'+colors[i], label=fname)
+            t, rv, err = t[m:], rv[m:], err[m:]
+        ax1.plot(tt, final, 'k-')
+
+        # redo this...
+        t, rv, err = self.time, self.vrad, self.error # temporaries
+        final = numpy.zeros_like(t)
+        get_rvn(t, P, K, ecc, omega, T0, gam, final)
+
+        ax2 = plt.subplot(gs[1], sharex=ax1)
+        # plot residuals
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            ax2.errorbar(t[:m], rv[:m]-final[:m], yerr=err[:m], \
+                       fmt='o'+colors[i], label=fname)
+            t, rv, err, final = t[m:], rv[m:], err[m:], final[m:]
+        ax2.axhline(y=0, xmin=0, xmax=1, ls='--', color='k')
+        plt.show()
 
     def get_nyquist(self, smallest=False):
         """
