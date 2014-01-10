@@ -227,11 +227,13 @@ class rvSeries:
         final = numpy.zeros_like(tt)
         
         par = self.fit['params']
+        keplerians = int(len(par)/6)
         P, K, ecc, omega, T0, gam = [par[j::6] for j in range(6)]
         gam = gam[0]
 
         get_rvn(tt, P, K, ecc, omega, T0, gam, final)
 
+        ### observations + fitted curve + residuals
         plt.figure()
         gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
         ax1 = plt.subplot(gs[0])
@@ -256,6 +258,25 @@ class rvSeries:
                        fmt='o'+colors[i], label=fname)
             t, rv, err, final = t[m:], rv[m:], err[m:], final[m:]
         ax2.axhline(y=0, xmin=0, xmax=1, ls='--', color='k')
+
+        # # redo this...
+        # t, rv, err = self.time-self.time.min(), self.vrad, self.error # temporaries
+        # final = numpy.zeros_like(tt)
+
+        # ### phased RV curves
+        # plt.figure()
+        # gs = gridspec.GridSpec(keplerians, 1)
+        # for i in range(keplerians):
+        #   get_rvn(tt, P[i], K[i], ecc[i], omega[i], T0[i], gam, final)
+        #   ax = plt.subplot(gs[i])
+        #   # plot each file's values
+        #   for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+        #       m = n-nout # how many values are there after restriction
+        #       ax.errorbar(t[:m]/P[i], rv[:m], yerr=err[:m], \
+        #                    fmt='o'+colors[i], label=fname)
+        #       t, rv, err = t[m:], rv[m:], err[m:]
+        #   ax.plot((tt-min(tt))/P[i], final, 'k-')
+
         plt.show()
 
     def get_nyquist(self, smallest=False):
