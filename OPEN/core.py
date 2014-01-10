@@ -211,6 +211,8 @@ def do_genetic(system, just_gen=False):
 		clogger.error(msg)
 		return
 
+	maxP = system.per.get_peaks(output_period=True)[1]
+	size_maxP = 10**(len(str(int(maxP)))-1)
 	system.fit = {}
 
 	msg = blue('INFO: ') + 'Initializing genetic algorithm...'
@@ -245,10 +247,11 @@ def do_genetic(system, just_gen=False):
 	## create parameters by sampling from their priors
 	def P_prior():
 		return random.uniform(5, 1000)
+		# return random.gauss(maxP, size_maxP)
 	def K_prior():
-		return random.uniform(1, 150)
+		return random.uniform(0, 150)
 	def ecc_prior():
-		return random.uniform(0, 0.99)
+		return random.uniform(0, 0.9)
 	def om_prior():
 		return random.uniform(0, 360)
 	def t0_prior():
@@ -263,7 +266,7 @@ def do_genetic(system, just_gen=False):
 
 	def mutPrior(individual, indpb):
 		for i, fcn in enumerate(zip(individual, priors)):
-			if random.random() < indpb:
+			if random.random() < indpb:			
 				individual[i] = fcn[1]()
 		return individual,
 
