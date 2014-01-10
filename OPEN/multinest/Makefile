@@ -41,10 +41,10 @@ test: get_rv1.so get_rvN.so
 	python test.py
 	ndiff test/out_test.txt test/out_normal.txt -relerr 1.0e-5
 
-get_rv1.so: get_rv1.f90
+get_rv1.so: ../ext/get_rv.f90
 	$(FPY) -m get_rv1 -c $^ $(F2PYFLAGS)
 
-get_rvN.so: get_rvN.f90 likelihood.f90
+get_rvN.so: ../ext/get_rvN.f90 likelihood.f90
 	$(FPY) -m get_rvN -c $^ $(F2PYFLAGS)
 
 %.o %.mod: %.f90

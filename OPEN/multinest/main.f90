@@ -52,8 +52,8 @@ program main
 	spriorran(4,1)=0d0
 	spriorran(4,2)=twopi		
 	!! chi, Uniform, 0-1
-	spriorran(5,1)=2.45128604d6
-	spriorran(5,2)=2.45148604d6
+	spriorran(5,1)=2.350000d6
+	spriorran(5,2)=2.550000d6
 	!! systematic velocity, Uniform
 	!! Vmin = -Kmax, Vmax = Kmax
 	spriorran(6,1)= -kmax
