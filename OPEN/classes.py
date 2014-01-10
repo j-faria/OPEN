@@ -8,12 +8,14 @@
 # other imports
 import numpy
 import matplotlib.pylab as plt
+import matplotlib.gridspec as gridspec
 from collections import namedtuple # this requires Python >= 2.6
 
 # intra-package imports
 import rvIO
 from .utils import unique
 from .logger import clogger, logging
+from ext.get_rvN import get_rvn
 
 
 class rvSeries:
@@ -40,6 +42,12 @@ class rvSeries:
         # don't repeat files
         filenames = unique(filenames)
 
+        # verbose?
+        try:
+          verbose = kwargs.pop('verbose')
+        except KeyError:
+          verbose = False
+          
         # skip header lines? (no by default)
         try:
           skip = kwargs.pop('skip')
@@ -55,7 +63,7 @@ class rvSeries:
         # read data
         try:
           t, rv, err, self.provenance, extras = \
-               rvIO.read_rv(*filenames, verbose=False, skip=skip, format=format)
+               rvIO.read_rv(*filenames, verbose=verbose, skip=skip, format=format)
         except ValueError:
           from shell_colors import red
           msg = red('ERROR: ') + 'If your files have header lines set --skip option.\n'
@@ -75,23 +83,32 @@ class rvSeries:
           extras_names = []
         extra = namedtuple('Extra', extras_names, verbose=False)
         self.extras = extra._make(extras)
+        self.extras_names = extras_names
 
         # time, vrad and error can change, 
         # the *_full ones correspond always to the full set
         self.time_full = self.time
         self.vrad_full = self.vrad
         self.error_full = self.error
+        # same for extras
+        self.extras_full = self.extras
 
     # associated model to be adjusted to the data
-    # this will be a dict with the following key:value pairs:
+    # this will be a dictionary with the following key:value pairs:
     #   k : number of keplerians in the model
     #   d : degree of drift in the model
     #   drift : array with parameters from drift fit (the polynomial coefficients)
     model = None
 
+    # associated fit to be carried out with the genetic / LM algorithms
+    # this will be a dictionary with the following key:value pairs:
+    #   params : final parameters (5*model['k']+1)
+    #   chi2 : reduced(!) chi square value of the fit
+    fit = None
+
     def do_plot_obs(self):
         """ Plot the observed radial velocities as a function of time.
-        Data from each file is color coded and labeled.
+        Data from each file are color coded and labeled.
         """
         # import pyqtgraph as pg
 
@@ -124,7 +141,7 @@ class rvSeries:
     def do_plot_drift(self):
         """ Plot the observed radial velocities as a function of time, plus an
         extra drift of specified degree (see *mod*). Lower panel presents RV 
-        minus drift. Data from each file is color coded and labeled.
+        minus drift. Data from each file are color coded and labeled.
         """
         colors = 'rgbmk' # possible colors
         t, rv, err = self.time, self.vrad, self.error # temporaries
@@ -147,7 +164,7 @@ class rvSeries:
         ax1.plot(st, sp, 'y-')
 
         t, rv, err = self.time, self.vrad, self.error # temporaries
-        ax2 = plt.subplot(2,1,2, sharex=ax1, sharey=ax1)
+        ax2 = plt.subplot(2,1,2, sharex=ax1)
         # plot each file's values minus the drift
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
@@ -157,7 +174,7 @@ class rvSeries:
 
         plt.xlabel('Time [days]')
         plt.ylabel('RV [km/s]')
-        plt.legend()
+        # plt.legend()
         plt.tight_layout()
         plt.show()
 
@@ -194,6 +211,73 @@ class rvSeries:
         plt.tight_layout()
         plt.show()
         # pg.QtGui.QApplication.exec_()
+
+    def do_plot_fit(self):
+        """ Plot the observed radial velocities together with the 
+        current best fit curve as well as phased RV curves for each 
+        planet considered in the fit. Data from each file are color 
+        coded and labeled. 
+        """
+        if self.fit is None: return # there is no fit yet
+
+        colors = 'rgbmk' # possible colors
+        t, rv, err = self.time, self.vrad, self.error # temporaries
+
+        tt = numpy.linspace(self.time.min()-200, self.time.max()+300, 400)
+        final = numpy.zeros_like(tt)
+        
+        par = self.fit['params']
+        keplerians = int(len(par)/6)
+        P, K, ecc, omega, T0, gam = [par[j::6] for j in range(6)]
+        gam = gam[0]
+
+        get_rvn(tt, P, K, ecc, omega, T0, gam, final)
+
+        ### observations + fitted curve + residuals
+        plt.figure()
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
+        ax1 = plt.subplot(gs[0])
+        # plot each file's values
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], \
+                         fmt='o'+colors[i], label=fname)
+            t, rv, err = t[m:], rv[m:], err[m:]
+        ax1.plot(tt, final, 'k-')
+
+        # redo this...
+        t, rv, err = self.time, self.vrad, self.error # temporaries
+        final = numpy.zeros_like(t)
+        get_rvn(t, P, K, ecc, omega, T0, gam, final)
+
+        ax2 = plt.subplot(gs[1], sharex=ax1)
+        # plot residuals
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            ax2.errorbar(t[:m], rv[:m]-final[:m], yerr=err[:m], \
+                       fmt='o'+colors[i], label=fname)
+            t, rv, err, final = t[m:], rv[m:], err[m:], final[m:]
+        ax2.axhline(y=0, xmin=0, xmax=1, ls='--', color='k')
+
+        # # redo this...
+        # t, rv, err = self.time-self.time.min(), self.vrad, self.error # temporaries
+        # final = numpy.zeros_like(tt)
+
+        # ### phased RV curves
+        # plt.figure()
+        # gs = gridspec.GridSpec(keplerians, 1)
+        # for i in range(keplerians):
+        #   get_rvn(tt, P[i], K[i], ecc[i], omega[i], T0[i], gam, final)
+        #   ax = plt.subplot(gs[i])
+        #   # plot each file's values
+        #   for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+        #       m = n-nout # how many values are there after restriction
+        #       ax.errorbar(t[:m]/P[i], rv[:m], yerr=err[:m], \
+        #                    fmt='o'+colors[i], label=fname)
+        #       t, rv, err = t[m:], rv[m:], err[m:]
+        #   ax.plot((tt-min(tt))/P[i], final, 'k-')
+
+        plt.show()
 
     def get_nyquist(self, smallest=False):
         """

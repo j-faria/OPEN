@@ -42,7 +42,7 @@ module params
 	
     !max no. of live points
     integer nest_nlive
-	parameter(nest_nlive=300) !300
+	parameter(nest_nlive=100) !300
       
     !total number of parameters, 
     !should be sdim in most cases but if you need to store some 

@@ -32,38 +32,44 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... [-d] [--skip=<sn>] [--format=<form>]
+    read <file>... [-d] [--skip=<sn>] [--format=<form>] [-v]
     read -h | --help
 Options:
-    --skip=<sn>  How many header lines to skip [default: 0]
-    -h --help     Show this help message
+    -d                  Set this as default system.
+    -v --verbose        Verbose output about data just read.
+    --skip=<sn>         How many header lines to skip [default: 0].
+    --format=<form>     File format. One of 'drs35', 'drs34', 'coralie' or 'basic'.
+    -h --help           Show this help message.
 """
 
 plot_usage = \
 """
 Usage:
-    plot [obs]
-    plot [obs] -n SYSTEM
-    plot [fwhm] [rhk] [s] [bis] [contrast]
+    plot obs
+    plot (fwhm | rhk | s | bis | contrast)
+    plot -n SYSTEM
+    plot -h | --help
 Options:
-    -n SYSTEM       Specify name of system (else use default)
+    -n SYSTEM   Specify name of system (else use default)
+    -h --help   Show this help message
 """
 
 per_usage = \
 """
 Usage:
-    per [obs]
-    per [obs] -n SYSTEM
-    per [obs] [--gls|--bayes|--fast]
-    per [obs] -v
+    per obs [--force]
+    per (bis | fwhm)
+    per -n SYSTEM
+    per (obs | bis | fwhm) [--gls|--bayes|--fast] [-v]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
-    -v --verbose  Verbose statistical output 
     --gls         Calculate the Generalized Lomb-Scargle periodogram (default)
     --bayes       Calculate the Bayesian periodogram
     --fast        Calculate the Lomb-Scargle periodogram with fast algorithm
-    -h --help     Show this help message
+    --force       Force recalculation
+    -v --verbose  Verbose statistical output 
+    -h --help   Show this help message
 """
 
 
@@ -131,8 +137,6 @@ command_list = \
  fit        ...
  restrict   Select data based on date, SNR or RV accuracy.
 """
-
-
     
 # These are additional magics that are exposed (only?) in embedded shells.
 @magics_class
@@ -164,10 +168,17 @@ class EmbeddedMagics(Magics):
         """ Read files with RV measurements.
         Type 'read -h' for more help """
 
-        args = parse_arg_string('read', parameter_s)
+        try:
+            args = parse_arg_string('read', parameter_s)
+        except DocoptExit:
+            print read_usage.lstrip()
+            return
+        except SystemExit:
+            return
+
         # take care of glob expansions
         globs = [glob.glob(f) for f in args['<file>']]
-        filenames = list(chain.from_iterable(globs)) # not very pythonic...
+        filenames = list(chain.from_iterable(globs)) # some magic...
 
         # if 'default' system is already set, return the rvSeries class
         # this is useful when working with various systems simultaneously so 
@@ -175,7 +186,8 @@ class EmbeddedMagics(Magics):
         if local_ns.has_key('default') and not args['-d']:
             return rvSeries(*filenames, skip=args['--skip'])
         else:
-            local_ns['default'] = rvSeries(*filenames, skip=args['--skip'],
+            local_ns['default'] = rvSeries(*filenames, verbose=args['--verbose'],
+                                                       skip=args['--skip'],
                                                        format=args['--format'])
 
     @needs_local_scope
@@ -183,9 +195,15 @@ class EmbeddedMagics(Magics):
     def plot(self, parameter_s='', local_ns=None):
         """ Plot various quantities. 
         Type 'plot -h' for more help """
-        args = parse_arg_string('plot', parameter_s)
-        if args == 1: return
-        print args
+
+        try:
+            args = parse_arg_string('plot', parameter_s)
+        except DocoptExit:
+            print plot_usage.lstrip()
+            return
+        except SystemExit:
+            return
+        # print args
 
         # use default system or user defined
         try:
@@ -220,15 +238,19 @@ class EmbeddedMagics(Magics):
             except KeyError:
                 pass
 
-
     @needs_local_scope
     @line_magic
     def per(self, parameter_s='', local_ns=None):
         """ Calculate periodograms of various quantities. 
         Type 'per -h' for more help. """
 
-        args = parse_arg_string('per', parameter_s)
-        if args == 1: return
+        try:
+            args = parse_arg_string('per', parameter_s)
+        except DocoptExit:
+            print per_usage.lstrip()
+            return
+        except SystemExit:
+            return
         print args
         
         # use default system or user defined
@@ -246,6 +268,7 @@ class EmbeddedMagics(Magics):
             return
         
         verb = True if args['--verbose'] else False
+
         # which periodogram should be calculated?
         per_fcn = None
         if args['--bayes']: 
@@ -262,8 +285,10 @@ class EmbeddedMagics(Magics):
             per_fcn = periodograms.gls
             name ='Generalized Lomb-Scargle'
 
-        if args['obs']:
+        if args['obs']: # periodogram of the observed RVs
             try: 
+                # are we forced to recalculate it?
+                if args['--force']: raise AttributeError
                 # it was calculated already?
                 system.per 
                 # the same periodogram?
@@ -276,6 +301,14 @@ class EmbeddedMagics(Magics):
                 # system.per._output(verbose=verb)  # not ready
                 system.per._plot()
                 print system.per.name
+
+        if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
+            system.bis_per = per_fcn(system, quantity='bis')
+            system.bis_per._plot()
+
+        if args['fwhm']: # periodogram of the CCF's fwhm
+            system.fwhm_per = per_fcn(system, quantity='fwhm')
+            system.fwhm_per._plot()
 
     @needs_local_scope
     @line_magic
@@ -439,6 +472,8 @@ class EmbeddedMagics(Magics):
                                    'name with the -n option'
             clogger.fatal(msg)
             return
+            
+        system.do_plot_fit()
 
     @needs_local_scope
     @line_magic
@@ -535,20 +570,13 @@ def parse_arg_string(command, arg_string):
     splitted = str(arg_string).split()
 
     if command is 'read':
-        doc = read_usage
-        args = docopt(doc, splitted)
+        args = docopt(read_usage, splitted)
 
     if command is 'plot':
-        try:
-            args = docopt(plot_usage, splitted)
-        except SystemExit:
-            return 1
+        args = docopt(plot_usage, splitted)
 
     if command is 'per':
-        try:
-            args = docopt(per_usage, splitted)
-        except SystemExit:
-            return 1
+        args = docopt(per_usage, splitted)
 
     # this is a little different
     if command is 'mod':

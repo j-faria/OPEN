@@ -11,15 +11,16 @@ import datetime, time
 import subprocess
 import sys, os
 import random
+from collections import namedtuple
+from string import ascii_lowercase
 
 # other imports
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
 import numpy as np
-from matplotlib.pylab import errorbar, plot, show
+import pylab
 from deap import base, creator, tools, algorithms
 
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
-# from matplotlib.pylab import *
 from scipy.optimize import leastsq
 from scipy.stats.stats import spearmanr, pearsonr
 from scipy.stats import nanmean, nanstd
@@ -28,11 +29,11 @@ from scipy.stats import nanmean, nanstd
 from logger import clogger, logging
 from ext.get_rvN import get_rvn
 from ext.periodogram_DF import periodogram_DF
-from galileo import *
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+pi = np.pi
 
 def do_fit(system, verbose):
 	try:
@@ -85,13 +86,6 @@ def do_restrict(system, quantity, *args):
 		system.vrad = system.vrad_full[vals]
 		system.error = system.error_full[vals]
 
-		# vals = system.error_full <= maxval
-		# print 'From a total of ', len(system.error_full), \
-		#       ' we are removing ', (vals == False).sum()
-
-		# system.time = system.time_full[vals]
-		# system.vrad = system.vrad_full[vals]
-		# system.error = system.error_full[vals]
 
 	## restrict by date (JD)
 	if quantity == 'date':
@@ -102,9 +96,6 @@ def do_restrict(system, quantity, *args):
 		# we have to keep a record of how many values come out of each file
 		t, rv, err = system.time_full, system.vrad_full, system.error_full # temporaries
 		for i, (fname, [n1, n2]) in enumerate(sorted(system.provenance.iteritems())):
-			print i, n1, n2
-			# print err[:n1]
-
 			lower = t[:n1] <= minjd
 			higher = t[:n1] <= maxjd
 			nout = (lower == True).sum()
@@ -128,6 +119,12 @@ def do_restrict(system, quantity, *args):
 		system.time = system.time_full[keepers]
 		system.vrad = system.vrad_full[keepers]
 		system.error = system.error_full[keepers]	
+		# also from extras, but this is trickier
+		d = system.extras._asdict() # asdict because namedtuple is immutable
+		for i, field in enumerate(system.extras._fields):
+			d[field] = system.extras_full[i][keepers]
+		extra = namedtuple('Extra', system.extras_names, verbose=False)
+		system.extras = extra(**d)
 
 	## restrict to values from one year
 	if quantity == 'year':
@@ -156,7 +153,13 @@ def do_restrict(system, quantity, *args):
 		# leaving all *_full vectors intact
 		system.time = system.time_full[keepers]
 		system.vrad = system.vrad_full[keepers]
-		system.error = system.error_full[keepers]			
+		system.error = system.error_full[keepers]
+		# also from extras
+		d = system.extras._asdict() # asdict because namedtuple is immutable
+		for i, field in enumerate(system.extras._fields):
+			d[field] = system.extras_full[i][keepers]
+		extra = namedtuple('Extra', system.extras_names, verbose=False)
+		system.extras = extra(**d)	
 
 	## restrict to values from a year range
 	if quantity == 'years':
@@ -187,21 +190,52 @@ def do_restrict(system, quantity, *args):
 		system.time = system.time_full[keepers]
 		system.vrad = system.vrad_full[keepers]
 		system.error = system.error_full[keepers]	
+		# also from extras, but this is trickier
+		d = system.extras._asdict() # asdict because namedtuple is immutable
+		for i, field in enumerate(system.extras._fields):
+			d[field] = system.extras_full[i][keepers]
+		extra = namedtuple('Extra', system.extras_names, verbose=False)
+		system.extras = extra(**d)
 
 	return
 
 
-def do_genetic(system):
+def do_genetic(system, just_gen=False):
+	""" Carry out the fit using a genetic algorithm and if 
+	just_gen=False try to improve it with a run of the LM algorithm """
+	try:
+		degree = system.model['d']
+		keplerians = system.model['k']
+	except TypeError:
+		msg = red('Error: ') + 'Need to run mod before gen. '
+		clogger.error(msg)
+		return
+
+	maxP = system.per.get_peaks(output_period=True)[1]
+	size_maxP = 10**(len(str(int(maxP)))-1)
+	system.fit = {}
+
 	msg = blue('INFO: ') + 'Initializing genetic algorithm...'
+	clogger.info(msg)
+	msg = blue('    : ') + 'Model is: %d keplerians + %d drift' % (keplerians, degree)
 	clogger.info(msg)
 
 	vel = zeros_like(system.time)
 
 	def chi2_1(individual):
 		""" Fitness function for 1 planet model """
-		#print individual
 		P, K, ecc, omega, T0, gam = individual 
 		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
+		chi2 = sum(((system.vrad - vel)/system.error)**2)
+		#print chi2
+		return chi2,
+
+	def chi2_n(individual):
+		""" Fitness function for N planet model """
+		P, K, ecc, omega, T0, gam = [individual[i::6] for i in range(6)]
+		#print ecc
+		get_rvn(system.time, P, K, ecc, omega, T0, gam[0], vel)
+		#print 'out of get_rvn'
 		chi2 = sum(((system.vrad - vel)/system.error)**2)
 		#print chi2
 		return chi2,
@@ -212,36 +246,38 @@ def do_genetic(system):
 
 	## create parameters by sampling from their priors
 	def P_prior():
-		return random.uniform(1000, 2000)
+		return random.uniform(5, 1000)
+		# return random.gauss(maxP, size_maxP)
 	def K_prior():
-		return random.uniform(1, 150)
+		return random.uniform(0, 150)
 	def ecc_prior():
-		return random.uniform(0, 0.99)
+		return random.uniform(0, 0.9)
 	def om_prior():
 		return random.uniform(0, 360)
 	def t0_prior():
-		return random.uniform(2351372, 2551372)
+		return random.uniform(2350000, 2550000)
 	def gamma_prior():
-		return random.uniform(-10, 10)
+		return random.uniform(-100, 100)
 	priors = [P_prior, K_prior, ecc_prior, om_prior, t0_prior, gamma_prior]
 
 	toolbox = base.Toolbox()
-	toolbox.register("individual", tools.initCycle, creator.Individual, priors, n=1)
+	toolbox.register("individual", tools.initCycle, creator.Individual, priors, n=keplerians)
 	toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 	def mutPrior(individual, indpb):
 		for i, fcn in enumerate(zip(individual, priors)):
-			if random.random() < indpb:
+			if random.random() < indpb:			
 				individual[i] = fcn[1]()
 		return individual,
 
-	toolbox.register("evaluate", chi2_1)
+	toolbox.register("evaluate", chi2_n)
 	toolbox.register("mate", tools.cxTwoPoints)
 	toolbox.register("mutate", mutPrior, indpb=0.10)
 	toolbox.register("select", tools.selTournament, tournsize=3)
 
-	npop = 250
-	ngen = 120
+	npop = 500
+	ngen = 150
+	npar = 5*keplerians+1
 	## build the population
 	pop = toolbox.population(n=npop)
 	## helper functions
@@ -252,7 +288,7 @@ def do_genetic(system):
 	stats.register("min", np.nanmin)
 	# stats.register("max", np.nanmax)
 	# stats.register("total", sigma3)
-	stats.register("red", lambda v: min(v)/(len(system.time)-6.) )
+	stats.register("red", lambda v: min(v)/(len(system.time)-npar) )
 
 	msg = blue('INFO: ') + 'Created population with N=%d. Going to evolve for %d generations...' % (npop,ngen)
 	clogger.info(msg)
@@ -266,41 +302,42 @@ def do_genetic(system):
 	## loop over planets
 	print("%3s %12s %10s %10s %10s %15s %9s" % \
 		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
-	for planet in ('a'):
-		P, K, ecc, omega, T0, gam = hof[0]
-		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f\n" % (planet, P, K, ecc, omega, T0, gam) )
+	for i, planet in enumerate(list(ascii_lowercase)[:keplerians]):
+		P, K, ecc, omega, T0, gam = [hof[0][j::6] for j in range(6)]
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 	
-	msg = yellow('RESULT: ') + 'Best fitness value: %s' % (hof[0].fitness)
+	msg = yellow('RESULT: ') + 'Best fitness value: %s\n' % (hof[0].fitness)
 	clogger.info(msg)
+
+	if just_gen: 
+		# save fit in the system and return, no need for LM
+		system.fit['params'] = hof[0]
+		system.fit['chi2'] = hof[0].fitness/(len(system.time)-npar)
+		return
 
 	msg = blue('INFO: ') + 'Calling LM to improve result...'
 	clogger.info(msg)	
 
-
 	## call levenberg markardt fit
-	lm = do_lm(system, hof[0])
+	lm = do_lm(system, [hof[0][j::6] for j in range(6)])
 	lm_par = lm[0]
-
+	
 	## loop over planets
 	msg = yellow('RESULT: ') + 'Best fit is'
 	clogger.info(msg)
 	print("%3s %12s %10s %10s %10s %15s %9s" % \
 		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
-	for planet in ('a'):
-		P, K, ecc, omega, T0, gam = lm_par
-		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f\n" % (planet, P, K, ecc, omega, T0, gam) )
+	for i, planet in enumerate(list(ascii_lowercase)[:keplerians]):
+		P, K, ecc, omega, T0, gam = [lm_par[j::6] for j in range(6)]
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 
-	chi2 = chi2_1(lm_par)[0]
-	msg = yellow('RESULT: ') + 'Best fitness value: %f, %f' % (chi2, chi2/(len(system.time)-6.))
+	chi2 = chi2_n(lm_par)[0]
+	msg = yellow('RESULT: ') + 'Best fitness value: %f, %f' % (chi2, chi2/(len(system.time)-npar))
 	clogger.info(msg)
 
-	tt = np.linspace(system.time.min(), system.time.max(), 300)
-	final = zeros_like(tt)
-	get_rvn(tt, P, K, ecc, omega, T0, gam, final)
-
-	errorbar(system.time, system.vrad, yerr=system.error, fmt='ro')
-	plot(tt, final, 'k-')
-	show()
+	# save fit in the system
+	system.fit['params'] = lm_par
+	system.fit['chi2'] = chi2
 
 	# #  print p.minFitness, p.maxFitness, p.avgFitness, p.sumFitness
 	# print 'Genetic:', p.bestFitIndividual, p.bestFitIndividual.fitness
@@ -328,13 +365,26 @@ def do_genetic(system):
 def do_lm(system, x0):
 
 	vel = zeros_like(system.time)
+	# print x0
+	# print np.transpose(x0)
+
+	def chi2_n(params):
+		""" Fitness function for N planet model """
+		# print params
+		P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
+		#print ecc
+		if any(e>1 or e<0 for e in ecc): return 1e99
+		get_rvn(system.time, P, K, ecc, omega, T0, gam[0], vel)
+		#print 'out of get_rvn'
+		return system.vrad - vel
 
 	def chi2_2(params):
 		P, K, ecc, omega, T0, gam = params
 		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
 		return system.vrad - vel
 
-	return leastsq(chi2_2, x0, full_output=0)
+	x0 = np.transpose(x0)
+	return leastsq(chi2_n, x0, full_output=0)#, maxfev=10)
 
 
 def do_multinest(system):
@@ -411,43 +461,21 @@ def do_Dawson_Fabrycky(system):
 	def specwindow(freq,time):
 		""" Calculate the spectral window function and its phase angles """
 		n = len(time)
-		W = [sum([exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
-		amp = [sqrt(t.real*t.real + t.imag*t.imag) for t in W]
-		phase = [arctan2(t.imag,t.real) for t in W]
+		W = [sum([np.exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
+		amp = [np.sqrt(t.real*t.real + t.imag*t.imag) for t in W]
+		phase = [np.arctan2(t.imag,t.real) for t in W]
 		return amp,phase
-
-	def fitcirc(per,K,Tc,gam,t):
-		phase = 2*pi*Tc/per
-		omega = 2. * pi / per
-		rv = K * cos(omega * t - phase) + gam
-		return rv
-
-	def fitkep(per,ecc,pomega,K,T0,gam,t):
-		afit = K*cos(pomega/180*pi)
-		bfit = -K*sin(pomega/180*pi)
-		cfit = K*ecc*cos(pomega/180*pi) + gam
-		M=(t-T0)/per*2.*pi
-		sE = 0.
-		sEtemp = 2.
-		while abs(sE - sEtemp) > 0.05:
-			sEtemp = sE
-			EA = ecc * sE + M
-			sE = sin(EA)
-		cE = cos(EA)
-		cosnu = (cE - ecc) / (1. - ecc * cE)
-		sinnu = sqrt(1. - ecc * ecc) * sE / (1. - ecc * cE)
-		rv = afit * cosnu + bfit * sinnu + cfit
-		return rv
 
 	plow = 0.5
 	n = len(err)
 
 	### GET THE REAL PERIODOGRAM
-	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(array(time),array(rv),array(err),ofac,plow)
+	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(time, rv, err, ofac, plow)
+	freq_real, power_real = freq, power 
 	### GET THE WINDOW FUNCTION AT THOSE FREQUENCIES + plot dials
 	amp,phase = specwindow(freq,time)
 
-	figure(num=1,figsize=(11.69,8.27))
+	figure(num=1,figsize=(12,8))
 
 	#### GET 3 Maximum peaks + create fake data
 	nf = len(freq)
@@ -489,9 +517,9 @@ def do_Dawson_Fabrycky(system):
 
 	xdiff = max(time) - min(time)
 
-	rv_fake1 = [a1*cos(fmax1*2.*pi*i) + b1*sin(fmax1*2.*pi*i) + c1 for i in timefake]
-	rv_fake2 = [a2*cos(fmax2*2.*pi*i) + b2*sin(fmax2*2.*pi*i) + c2 for i in timefake]
-	rv_fake3 = [a3*cos(fmax3*2.*pi*i) + b3*sin(fmax3*2.*pi*i) + c3 for i in timefake]
+	rv_fake1 = array([a1*cos(fmax1*2.*pi*i) + b1*sin(fmax1*2.*pi*i) + c1 for i in timefake])
+	rv_fake2 = array([a2*cos(fmax2*2.*pi*i) + b2*sin(fmax2*2.*pi*i) + c2 for i in timefake])
+	rv_fake3 = array([a3*cos(fmax3*2.*pi*i) + b3*sin(fmax3*2.*pi*i) + c3 for i in timefake])
 	#errfake = [0.001 for i in timefake]
 	errfake = err
 
@@ -516,7 +544,7 @@ def do_Dawson_Fabrycky(system):
 
 	### PLOT FAKE PERIODOGRAMS + DIALS
 	#### 1st FAKE
-	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(array(timefake),array(rv_fake1),array(errfake),ofac,plow)
+	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake1, errfake, ofac, plow)
 
 	ind1 = list(freq).index(fmax1)
 	ind2 = list(freq).index(fmax2)
@@ -525,6 +553,7 @@ def do_Dawson_Fabrycky(system):
 	subplot(4,1,2)
 
 	semilogx([1./i for i in freq],power,'k-')
+	fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
 
 	semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
@@ -538,7 +567,7 @@ def do_Dawson_Fabrycky(system):
 	ylim(0.0,max(power)+0.2)
 
 	#### 2nd FAKE
-	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(array(timefake),array(rv_fake2),array(errfake),ofac,plow)
+	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake2, errfake, ofac, plow)
 
 	ind1 = list(freq).index(fmax1)
 	ind2 = list(freq).index(fmax2)
@@ -560,7 +589,7 @@ def do_Dawson_Fabrycky(system):
 	ylim(0.0,max(power)+0.2)
 
 	#### 3rd FAKE
-	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(array(timefake),array(rv_fake3),array(errfake),ofac,plow)
+	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake3, errfake, ofac, plow)
 
 	ind1 = list(freq).index(fmax1)
 	ind2 = list(freq).index(fmax2)

@@ -11,11 +11,12 @@ from itertools import islice, chain
 import os
 
 # other imports
-from numpy import loadtxt
+from numpy import loadtxt, mean
 
 # intra-package imports
 from .logger import clogger, logging
 from .utils import day2year, rms
+from shell_colors import blue
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
@@ -92,13 +93,25 @@ def read_rv(*filenames, **kwargs):
 
     
     # verbose stats about data
+    info = blue('INFO: ') 
+    sinfo = blue('    : ') 
     stats = None
     if (kwargs.has_key('verbose') and kwargs['verbose']):
         tspan = max(t) - min(t)
+        rvspan = max(rv) - min(rv)
         stats = '\n'
-        stats += "Total timespan : %f days = %f years\n" % (tspan, day2year(tspan))
-        stats += "RV rms [m/s] : %f\n etc etc" % rms(rv)
-    
+        stats += info + "Timespan : %f days = %f years   ---   %fJD, %fJD\n" % (tspan, day2year(tspan), max(t), min(t))
+        stats += sinfo + "RV span  : %f km/s = %f m/s\n" % (rvspan, rvspan*1e3)
+        stats += sinfo + "RV rms [m/s] : %f\n\n" % rms(rv)
+        stats += sinfo + "{:14s} : {:10.3f}\n".format('<RV> [km/s]', mean(rv))
+        if format in ('drs35', 'drs34', 'coralie'):
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<fwhm> [km/s]', mean(others[0]))
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<contrast>', mean(others[1]))
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<BIS> [km/s]', mean(others[2]))
+            if format in ('drs35'):
+                stats += sinfo + "{:14s} : {:10.3f}\n".format('<S_index> [MW]', mean(others[4]))
+                stats += sinfo + "{:14s} : {:10.3f}\n".format('<log(rhk)>', mean(others[6]))
+ 
     clogger.verbose(stats)
     
     return t, rv, err, dic, others
