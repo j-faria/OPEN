@@ -15,6 +15,7 @@ from collections import namedtuple # this requires Python >= 2.6
 import rvIO
 from .utils import unique
 from .logger import clogger, logging
+from shell_colors import yellow
 from ext.get_rvN import get_rvn
 
 
@@ -422,7 +423,7 @@ class PeriodogramBase:
       Prob = 1.-(1.-FAPlevel)**(1./self.M)
       return self.probInv(Prob)   
 
-    def _plot(self, doFAP=None):
+    def _plot(self, doFAP=False):
       """
         Create a plot.
       """
@@ -434,19 +435,22 @@ class PeriodogramBase:
       self.ax.set_title("Normalized periodogram")
       self.ax.set_xlabel(xlabel)
       self.ax.set_ylabel(ylabel)
-      self.ax.semilogx(1./self.freq, self.power, 'b-')
+      if self.power.max() < 1e-300:  # apparently, Metplotlib can't plot these small values
+        clogger.warning(yellow('Warning: ')+'Max value < 1e-300, plotting normalized periodogram')
+        self.ax.semilogx(1./self.freq, self.power/self.power.max(), 'b-')
+      else:
+        self.ax.semilogx(1./self.freq, self.power, 'b-')
       # plot FAPs
-      if doFAP is None: 
-        pass
-      elif doFAP is True: # do default FAPs of 10%, 1% and 0.1%
+      if doFAP: # do default FAPs of 10%, 1% and 0.1%
         pmin = 1./self.freq.min()
         pmax = 1./self.freq.max()
         plvl1 = self.powerLevel(0.1) # 10% FAP
         plvl2 = self.powerLevel(0.01) # 1% FAP
         plvl3 = self.powerLevel(0.001) # 0.1% FAP
-        self.ax.semilogx([pmin, pmax],[plvl1, plvl1],'k-')
-        self.ax.semilogx([pmin, pmax],[plvl2, plvl2],'k--')
-        self.ax.semilogx([pmin, pmax],[plvl3, plvl3],'k:')
+        self.ax.axhline(y=plvl1, color='k', ls='-', label='10%')
+        self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
+        self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
+        self.ax.legend(frameon=False)
 
       plt.tight_layout()
       plt.show()

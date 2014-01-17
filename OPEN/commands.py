@@ -57,10 +57,10 @@ Options:
 per_usage = \
 """
 Usage:
-    per obs [--force]
+    per obs
     per (bis | fwhm)
     per -n SYSTEM
-    per (obs | bis | fwhm) [--gls|--bayes|--fast] [-v]
+    per (obs | bis | fwhm) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--fap]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
@@ -68,6 +68,8 @@ Options:
     --bayes       Calculate the Bayesian periodogram
     --fast        Calculate the Lomb-Scargle periodogram with fast algorithm
     --force       Force recalculation
+    --hifac=<hf>  hifac * Nyquist is lowest frequency used [default: 40]
+    --fap         Plot false alarm probabilities
     -v --verbose  Verbose statistical output 
     -h --help   Show this help message
 """
@@ -268,6 +270,7 @@ class EmbeddedMagics(Magics):
             return
         
         verb = True if args['--verbose'] else False
+        hf = float(args.pop('--hifac'))
 
         # which periodogram should be calculated?
         per_fcn = None
@@ -295,11 +298,11 @@ class EmbeddedMagics(Magics):
                 if system.per.name != name:
                     raise AttributeError
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot()
+                system.per._plot(doFAP=args['--fap'])
             except AttributeError:
-                system.per = per_fcn(system)
+                system.per = per_fcn(system, hifac=hf)
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot()
+                system.per._plot(doFAP=args['--fap'])
                 print system.per.name
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
