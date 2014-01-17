@@ -30,7 +30,7 @@ module params
 
     !whether to do use Nested Importance Sampling
 	logical nest_IS
- 	parameter(nest_IS=.true.)
+ 	parameter(nest_IS=.false.)
 	
     !whether to do multimodal sampling
 	logical nest_mmodal 
@@ -42,7 +42,7 @@ module params
 	
     !max no. of live points
     integer nest_nlive
-	parameter(nest_nlive=100) !300
+	parameter(nest_nlive=300) !300
       
     !total number of parameters, 
     !should be sdim in most cases but if you need to store some 
@@ -61,7 +61,7 @@ module params
       
     !enlargement factor reduction parameter
     double precision nest_efr
-    parameter(nest_efr=0.8d0)
+    parameter(nest_efr=0.9d0)
       
     !root for saving posterior files
     character*100 nest_root

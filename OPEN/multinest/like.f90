@@ -38,7 +38,7 @@ contains
 
 		! times, rvs and errors are defined in params and initialized/read in main
 		! Cube(1:nest_nPar) = P, K, ecc, omega, t0, Vsys
- 		!write(*,*) Cube(1)
+		!write(*,*) Cube(3)
  		observ = 1
  		ss = 1.d0
  		alpha = 1.d0

@@ -38,8 +38,8 @@ program main
 	! the mathematical form is only used when rescaling
 
 	!! Period, Jeffreys, 0.2d - 365000d
-	spriorran(1,1)= 10d0 !0.2d0
-	spriorran(1,2)= 2000.d0 !365000.d0
+	spriorran(1,1)= 600d0 !0.2d0
+	spriorran(1,2)= 800d0 !365000.d0
 	!! semi amplitude K, Mod. Jeffreys
 	spriorran(2,1)=0d0
 	! since the upper limit depends on e and P, it can only be set
