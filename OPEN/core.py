@@ -211,9 +211,8 @@ def do_genetic(system, just_gen=False):
 		clogger.error(msg)
 		return
 
-	maxP = system.per.get_peaks(output_period=True)[1]
-	size_maxP = 10**(len(str(int(maxP)))-1)
-	system.fit = {}
+	# maxP = system.per.get_peaks(output_period=True)[1]
+	# size_maxP = 10**(len(str(int(maxP)))-1)
 
 	msg = blue('INFO: ') + 'Initializing genetic algorithm...'
 	clogger.info(msg)
@@ -336,8 +335,9 @@ def do_genetic(system, just_gen=False):
 	clogger.info(msg)
 
 	# save fit in the system
-	system.fit['params'] = lm_par
-	system.fit['chi2'] = chi2
+	system.save_fit(lm_par, chi2)
+	# system.fit['params'] = lm_par
+	# system.fit['chi2'] = chi2
 
 	# #  print p.minFitness, p.maxFitness, p.avgFitness, p.sumFitness
 	# print 'Genetic:', p.bestFitIndividual, p.bestFitIndividual.fitness

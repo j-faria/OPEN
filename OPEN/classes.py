@@ -104,6 +104,7 @@ class rvSeries:
     # associated fit to be carried out with the genetic / LM algorithms
     # this will be a dictionary with the following key:value pairs:
     #   params : final parameters (5*model['k']+1)
+    #   residuals : residuals of the fit
     #   chi2 : reduced(!) chi square value of the fit
     fit = None
 
@@ -279,6 +280,22 @@ class rvSeries:
         #   ax.plot((tt-min(tt))/P[i], final, 'k-')
 
         plt.show()
+
+    def save_fit(self, params, chi2):
+        """ Helper function to save results from a fit to the system """
+        if self.fit is not None: # there is already a fit
+          clogger.warning(yellow('Warning: ')+'Replacing older fit')
+
+        self.fit = {}
+        self.fit['params'] = params
+        self.fit['chi2'] = chi2
+
+        P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
+        gam = gam[0]
+
+        final = numpy.zeros_like(self.time)
+        get_rvn(self.time, P, K, ecc, omega, T0, gam, final)
+        self.fit['residuals'] = self.vrad - final
 
     def get_nyquist(self, smallest=False):
         """

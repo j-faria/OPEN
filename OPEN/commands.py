@@ -60,7 +60,7 @@ Usage:
     per obs
     per (bis | fwhm)
     per -n SYSTEM
-    per (obs | bis | fwhm) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--fap]
+    per (obs | bis | fwhm | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--fap]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
@@ -312,6 +312,10 @@ class EmbeddedMagics(Magics):
         if args['fwhm']: # periodogram of the CCF's fwhm
             system.fwhm_per = per_fcn(system, quantity='fwhm')
             system.fwhm_per._plot()
+
+        if args['resid']: # periodogram of the residuals of the current fit
+            system.resid_per = per_fcn(system, quantity='resid')
+            system.resid_per._plot()
 
     @needs_local_scope
     @line_magic

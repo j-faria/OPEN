@@ -10,6 +10,8 @@ from numpy.fft import *
 import cmath
 import matplotlib.pyplot as plt 
 
+from .logger import clogger, logging
+
 from ext.blombscargle import blombscargle
 from ext.glombscargle import glombscargle
 
@@ -386,6 +388,14 @@ class gls(PeriodogramBase):
     elif quantity == 'fwhm':
       self.y = rv.extras.fwhm
       self.error = ones_like(self.y)
+    elif quantity == 'resid':
+      try:
+        self.y = rv.fit['residuals']
+      except TypeError:
+        clogger.fatal('error!')
+        return 
+      self.error = rv.error
+
     self.norm = norm
     # Check and assign normalization
     self.label = {'title': 'Generalized Lomb Periodogram',\
