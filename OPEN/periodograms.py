@@ -59,6 +59,7 @@ class ls_PressRybicki(PeriodogramBase):
     self.hifac = hifac
     self.t = rv.time
     self.y = rv.vrad
+    self.th = rv.time - min(rv.time)
     self.jmax = self.fap = None
 
     self.__fasper()

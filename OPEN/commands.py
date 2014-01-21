@@ -437,13 +437,14 @@ class EmbeddedMagics(Magics):
                 system.model['drift'] = result
                 if verb: print 'Coeff:', result
                 system.do_plot_drift()
-            else:
-                return
+
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
             clogger.fatal(msg)
             return
+
+        system.do_plot_fit()
 
     @needs_local_scope
     @line_magic

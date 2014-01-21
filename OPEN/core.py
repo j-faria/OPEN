@@ -13,6 +13,7 @@ import sys, os
 import random
 from collections import namedtuple
 from string import ascii_lowercase
+import copy
 
 # other imports
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
@@ -28,6 +29,7 @@ from scipy.stats import nanmean, nanstd
 # intra-package imports
 from logger import clogger, logging
 from ext.get_rvN import get_rvn
+from .periodograms import ls_PressRybicki, gls
 from ext.periodogram_DF import periodogram_DF
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date
@@ -39,16 +41,104 @@ def do_fit(system, verbose):
 	try:
 		degree = system.model['d']
 	except TypeError:
-		msg = red('Error: ') + 'Need to run mod before fit. '
+		msg = yellow('Warning: ') + 'To remove linear trends, run mod before fit.\n'
 		clogger.error(msg)
-		return
-	with warnings.catch_warnings(record=True) as w:
-		p = polyfit(system.time, system.vrad, degree)
-		if len(w):
-			msg = yellow('Warning: ') + 'Polyfit may be poorly conditioned. ' \
-			      + 'Maybe try a lower degree drift?'
+
+	# with warnings.catch_warnings(record=True) as w:
+	# 	p = polyfit(system.time, system.vrad, degree)
+	# 	if len(w):
+	# 		msg = yellow('Warning: ') + 'Polyfit may be poorly conditioned. ' \
+	# 		      + 'Maybe try a lower degree drift?'
+	# 		clogger.info(msg)
+	# return p
+	try:
+		system.per
+	except AttributeError:
+		system.per = ls_PressRybicki(system)  # this periodogram is very fast
+	finally:
+		peak = system.per.get_peaks(output_period=True)
+
+	peak_val = system.per.power.max()
+	peak_fap = system.per.fap
+	if peak_fap < 0.01:
+		msg = blue('INFO: ') + 'Peak found at %f days with FAP ~ %e' % (peak[1], peak_fap)
+		clogger.info(msg)
+	else:
+		msg = yellow('Warning: ') + 'No peaks found with FAP < 1%'
+		clogger.error(msg)
+		return None
+
+	p0 = peak[1] # initial guess period
+	k0 = system.vrad.max()
+	e0 = 0.2
+	om0 = 10
+	t0 = system.time.min()
+	g0 = system.vrad.mean()
+	msg = blue('INFO: ') + 'Setting initial guesses' #, p0, k0, e0, om0, t0, g0
+	initial_guess = [p0, k0, e0, om0, t0, g0]
+	## call levenberg markardt fit
+	lm = do_lm(system, initial_guess)
+	lm_par = lm[0]
+	
+	## loop over planets
+	msg = yellow('RESULT: ') + 'Best fit is'
+	clogger.info(msg)
+	print("%3s %12s %10s %10s %10s %15s %9s" % \
+		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+	for i, planet in enumerate(list(ascii_lowercase)[:1]):
+		P, K, ecc, omega, T0, gam = [lm_par[j::6] for j in range(6)]
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+	
+	# save fit in the system
+	system.save_fit(lm_par, 0.)
+	par1 = lm_par # backup
+
+	j=1
+	while j<4:
+		# is there a relevant peak in the periodogram of the residuals?
+		system.per_resid = gls(system, quantity='resid')
+		# system.per_resid._plot()
+		peak = system.per_resid.get_peaks(output_period=True)
+		peak_val = system.per_resid.power.max()
+		peak_fap = system.per_resid.FAP(peak_val)
+		if peak_fap < 0.01:
+			msg = blue('INFO: ') + 'Peak found at %f days with FAP ~ %e' % (peak[1], peak_fap)
 			clogger.info(msg)
-	return p
+		else:
+			msg = yellow('Warning: ') + 'No peaks found in the periodogram of the residuals with FAP < 1%'
+			clogger.error(msg)
+			return None
+
+		new_system = copy.deepcopy(system)
+		new_system.vrad = new_system.fit['residuals']
+
+		p0 = peak[1] # initial guess period
+		k0 = new_system.vrad.max()
+		e0 = 0.2
+		om0 = 10
+		t0 = new_system.time.min()
+		g0 = new_system.vrad.mean()
+		msg = blue('INFO: ') + 'Setting initial guesses' #, p0, k0, e0, om0, t0, g0
+		initial_guess = [p0, k0, e0, om0, t0, g0]
+		## call levenberg markardt fit
+		lm = do_lm(new_system, initial_guess)
+		lm_par = lm[0]
+		
+		## loop over planets
+		msg = yellow('RESULT: ') + 'Best fit is'
+		clogger.info(msg)
+		print("%3s %12s %10s %10s %10s %15s %9s" % \
+			('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+		for i, planet in enumerate(list(ascii_lowercase)[:1]):
+			P, K, ecc, omega, T0, gam = [lm_par[j::6] for j in range(6)]
+			print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+
+		par_all = np.append(par1, lm_par)
+		# save fit in the system
+		system.save_fit(par_all, 0.)
+		j+=1
+
+	return None
 
 
 def do_restrict(system, quantity, *args):
@@ -370,7 +460,7 @@ def do_lm(system, x0):
 
 	def chi2_n(params):
 		""" Fitness function for N planet model """
-		# print params
+		#print params
 		P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
 		#print ecc
 		if any(e>1 or e<0 for e in ecc): return 1e99
