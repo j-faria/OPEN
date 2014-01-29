@@ -10,6 +10,8 @@ Utility functions or snippets for all sorts of things
 
 from math import sqrt, ceil
 from sys import stdout
+import os
+import subprocess
 
 
 ## this code from 
@@ -91,3 +93,34 @@ def julian_day_to_date(J):
     M = ((h/s + m) % n) + 1
     Y = e/p - y + (n + m - M)/n
     return (Y, M, D)
+
+
+### Yorbit related I/O
+def write_yorbit_macro(system):
+    with open('./OPEN/yorbit.macro.template') as f:
+        template = f.read()
+
+    filenames = []
+    for i,f in enumerate(system.provenance.keys()):
+        cmd = 'cp ' + f + ' ' + '/home/joao/yorbit/data/rv_files/rv_file%d.rdb' % (i+1)
+        filenames.append('rv_file%d.rdb' % (i+1))
+        os.system(cmd)
+        #print cmd
+    #print filenames
+
+    model = ''
+    try:
+        for key, val in system.model.iteritems():
+            if val >0: model += '%s%d ' % (key, val)
+    except AttributeError:
+        model = raw_input('Which model? ')
+
+    with open('/home/joao/yorbit/work/macros/macro1.macro', 'w') as f:
+        print >>f, template % (' '.join(filenames), '', model)
+
+    cmd = ['/home/joao/Software/yorbit/yorbit-1.4.6/src/batch/batch_macro.i']
+    cmd += ['/home/joao/Software/yorbit/yorbit-1.4.6/src']
+    cmd += ['macro1.macro']
+    # print cmd
+    with open('yorbit.log', "w") as outfile:
+        subprocess.call(cmd, stdout=outfile)

@@ -20,7 +20,7 @@ from IPython.utils.io import ask_yes_no
 # intra-package imports
 from .docopt import docopt, DocoptExit
 from .classes import rvSeries
-from .utils import stdout_write, selectable_plot
+from .utils import stdout_write, selectable_plot, write_yorbit_macro
 from .logger import clogger, logging
 import core
 import periodograms
@@ -253,7 +253,7 @@ class EmbeddedMagics(Magics):
             return
         except SystemExit:
             return
-        print args
+        #print args
         
         # use default system or user defined
         try:
@@ -364,7 +364,7 @@ class EmbeddedMagics(Magics):
 
         args = parse_arg_string('dawfab', parameter_s)
         if args == 1: return
-        print args
+        #print args
         
         # use default system or user defined
         try:
@@ -426,7 +426,7 @@ class EmbeddedMagics(Magics):
         from shell_colors import red
         args = parse_arg_string('fit', parameter_s)
         if args == 1: return
-        print args
+        #print args
 
         verb = True if args['--verbose'] else False
 
@@ -452,7 +452,7 @@ class EmbeddedMagics(Magics):
         from shell_colors import red
         args = parse_arg_string('correlate', parameter_s)
         if args == 1: return
-        print args
+        #print args
 
         verb = True if args['--verbose'] else False
 
@@ -474,14 +474,31 @@ class EmbeddedMagics(Magics):
         from shell_colors import red
         if local_ns.has_key('default'):
             system = local_ns['default']
-            core.do_genetic(system)
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.do_genetic(system)
+        system.do_plot_fit()
+
+    @needs_local_scope
+    @line_magic
+    def genyorbit(self, parameter_s='', local_ns=None):
+        """ Run the genetic algorithm minimization - stub """
+        from shell_colors import red
+        if local_ns.has_key('default'):
+            system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
             clogger.fatal(msg)
             return
             
-        system.do_plot_fit()
+        write_yorbit_macro(system)
+        # core.do_genetic(system)
+        # system.do_plot_fit()
 
     @needs_local_scope
     @line_magic
@@ -527,7 +544,7 @@ class EmbeddedMagics(Magics):
 
         if args['err']: 
             try:
-                maxerr = int(args['<maxerr>'])
+                maxerr = float(args['<maxerr>'])
             except ValueError:
                 msg = red('ERROR: ') + 'maxerr shoud be a number!'
                 clogger.fatal(msg)

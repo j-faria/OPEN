@@ -19,6 +19,7 @@ import copy
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
 import numpy as np
 import pylab
+import matplotlib.pyplot as plt
 from deap import base, creator, tools, algorithms
 
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
@@ -535,12 +536,12 @@ def do_correlate(system, vars=(), verbose=False):
 		print blue('[Pearson correlation]') + ' r=%f, p-value=%f' % pr
 		print blue('[Spearman correlation]') + ' r=%f, p-value=%f' % sr
 	# label = 
-	figure()
-	plot(v1, v2, 'o')
-	xlabel(var1)
-	ylabel(var2)
-	tight_layout()
-	show()
+	plt.figure()
+	plt.plot(v1, v2, 'o')
+	plt.ylabel(var2)
+	plt.xlabel(var1)
+	plt.tight_layout()
+	plt.show()
 
 
 
