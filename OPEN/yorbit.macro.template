@@ -1,0 +1,10 @@
+# read the file
+read %s
+# optional commands
+%s
+# set the model
+mod %s
+# run the genetic algorithm
+set tmax 20
+gen
+exit
