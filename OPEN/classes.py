@@ -65,12 +65,14 @@ class rvSeries:
         try:
           t, rv, err, self.provenance, extras = \
                rvIO.read_rv(*filenames, verbose=verbose, skip=skip, format=format)
-        except ValueError:
+        except ValueError as e:
+          print e
           from shell_colors import red
           msg = red('ERROR: ') + 'If your files have header lines set --skip option.\n'
           clogger.fatal(msg)
           return
 
+        
         self.time, self.vrad, self.error = (t, rv, err)
 
         # save the extra quantities as a namedtuple if we read them
@@ -440,7 +442,7 @@ class PeriodogramBase:
       Prob = 1.-(1.-FAPlevel)**(1./self.M)
       return self.probInv(Prob)   
 
-    def _plot(self, doFAP=False):
+    def _plot(self, doFAP=False, verts=None):
       """
         Create a plot.
       """
@@ -468,6 +470,11 @@ class PeriodogramBase:
         self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
         self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
         self.ax.legend(frameon=False)
+
+      # plot vertical lines
+      if verts is not None:
+        for v in verts:
+          self.ax.axvline(x=v, color='k', ls='--', lw=2) 
 
       plt.tight_layout()
       plt.show()
