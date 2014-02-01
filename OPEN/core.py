@@ -188,14 +188,14 @@ def do_restrict(system, quantity, *args):
 		t, rv, err = system.time_full, system.vrad_full, system.error_full # temporaries
 		for i, (fname, [n1, n2]) in enumerate(sorted(system.provenance.iteritems())):
 			lower = t[:n1] <= minjd
-			higher = t[:n1] <= maxjd
-			nout = (lower == True).sum()
-			nout += (higher == True).sum()
+			higher = t[:n1] >= maxjd
+			keep = ~(lower | higher)
+			nout = (keep == False).sum()
 			# system.provenance keeps the record
 			if nout >= n1: 
 				system.provenance[fname][1] = n1
 			else:
-				system.provenance[fname][1] = n1 - nout
+				system.provenance[fname][1] = nout
 
 			t, rv, err = t[n1:], rv[n1:], err[n1:]
 
@@ -204,6 +204,7 @@ def do_restrict(system, quantity, *args):
 		highers = system.time_full >= maxjd
 		# fancy syntax just to negate the intersection of lowers and highers
 		keepers = ~(lowers | highers)
+		print keepers
 
 		# and pop out the values from time, vrad, and error
 		# leaving all *_full vectors intact
@@ -542,6 +543,78 @@ def do_correlate(system, vars=(), verbose=False):
 	plt.xlabel(var1)
 	plt.tight_layout()
 	plt.show()
+
+
+def do_remove_rotation(system, prot=None, nrem=1, fwhm=False):
+	print fwhm
+	try:
+		system.per
+	except AttributeError:
+		if fwhm:
+			system.per = gls(system, quantity='fwhm')
+		else:
+			system.per = gls(system)
+
+	if prot is None:
+		prot = system.per.get_peaks(output_period=True)[1]
+	else:
+		prot = float(prot)
+
+	msg = blue('INFO: ') + 'Removing Prot=%.2f days\n' % prot
+	msg += blue('    : ') + 'plus %d harmonics' % (nrem-1)
+	clogger.info(msg)
+
+	if fwhm: system.vrad = system.extras.fwhm
+	vrad_mean = system.vrad.mean()
+	t, v = system.time, system.vrad - vrad_mean # temporaries
+
+	if nrem == 1:
+		def func(par, *args):
+			As, Ac, P = par
+			# P = args
+			return v - (As*np.sin(2.*pi*t/P) + Ac*np.cos(2.*pi*t/P))
+
+		rot_param = leastsq(func, [0.001, 0.001, prot], maxfev=50000)[0]
+		print rot_param
+
+	elif nrem == 2:	
+		def func2(par, *args):
+			As1, Ac1, As2, Ac2, P = par
+			# P = args
+			Po2 = P/2.
+			return v - (As1*np.sin(2.*pi*t/P) + Ac1*np.cos(2.*pi*t/P)) - (As2*np.sin(2.*pi*t/Po2) + Ac2*np.cos(2.*pi*t/Po2))
+
+		rot_param = leastsq(func2, [0.001, 0.001, 0.01, 0.01, prot], maxfev=100000)[0]
+		print rot_param
+
+	system.per._plot(verts=[rot_param[4]/i for i in [1,2,3]])
+
+	# plt.figure()
+	# plt.subplot(211)
+	# plt.plot(system.time, system.vrad, 'o')
+	# plt.subplot(212)
+	# xx = np.linspace(t.min(), t.max(), 500)
+
+	# As1, Ac1, As2, Ac2 = rot_param
+	# plt.plot(xx, (As1*np.sin(2.*pi*xx/prot) + Ac1*np.cos(2.*pi*xx/prot)) + \
+	# 	         (As2*np.sin(pi*xx/prot) + Ac2*np.cos(pi*xx/prot)), 'o-')
+	# plt.plot(system.time, system.vrad, 'ro')
+
+	# plt.figure()
+	# plt.subplot(111)
+	# plt.plot(system.time, system.vrad, 'o')
+	if nrem == 1: vrad_new = func(rot_param, prot) + vrad_mean
+	elif nrem == 2: vrad_new = func2(rot_param, prot) + vrad_mean
+	# plt.plot(system.time, vrad_new, 'go')
+
+	# plt.show()
+
+	newsystem = copy.copy(system)
+	newsystem.vrad = vrad_new
+	per = gls(newsystem)
+	per._plot()
+
+	system.vrad = newsystem.vrad
 
 
 
