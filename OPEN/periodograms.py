@@ -389,6 +389,9 @@ class gls(PeriodogramBase):
     elif quantity == 'fwhm':
       self.y = rv.extras.fwhm
       self.error = ones_like(self.y)
+    elif quantity == 'rhk':
+      self.y = rv.extras.rhk
+      self.error = rv.extras.sig_rhk
     elif quantity == 'resid':
       try:
         self.y = rv.fit['residuals']
