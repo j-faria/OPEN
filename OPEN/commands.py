@@ -60,7 +60,7 @@ Usage:
     per obs
     per (bis | fwhm)
     per -n SYSTEM
-    per (obs | bis | fwhm | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--fap]
+    per (obs | bis | fwhm | rhk | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--fap]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
@@ -116,6 +116,17 @@ Options:
     -v --verbose  Verbose statistical output 
 """
 
+rrot_usage = \
+"""
+Usage:
+    remove_rotation [fwhm]
+    remove_rotation [fwhm] [--prot=<p>] [--nrem=<nr>]
+    remove_rotation -h | --help
+Options:
+    --prot=<p>
+    --nrem=<nr>  Number of harmonics to remove (including Prot) [default: 1]
+    -h --help    Show this help message
+"""
 
 restrict_usage = \
 """
@@ -313,6 +324,10 @@ class EmbeddedMagics(Magics):
             system.fwhm_per = per_fcn(system, quantity='fwhm')
             system.fwhm_per._plot()
 
+        if args['rhk']: # periodogram of rhk
+            system.rhk_per = per_fcn(system, quantity='rhk')
+            system.rhk_per._plot()
+
         if args['resid']: # periodogram of the residuals of the current fit
             system.resid_per = per_fcn(system, quantity='resid')
             system.resid_per._plot()
@@ -502,6 +517,43 @@ class EmbeddedMagics(Magics):
 
     @needs_local_scope
     @line_magic
+    def remove_rotation(self, parameter_s='', local_ns=None):
+        """ Remove rotation period and harmonics """
+        from shell_colors import red
+        
+        try:
+            args = parse_arg_string('rrot', parameter_s)
+        except DocoptExit:
+            print rrot_usage.lstrip()
+            return
+        except SystemExit:
+            return
+        print args
+        prot = args['--prot']
+        nrem = int(args['--nrem'])
+        fwhm = args['fwhm']
+
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+            
+        core.do_remove_rotation(system, prot=prot, nrem=nrem, fwhm=fwhm)
+        # core.do_genetic(system)
+        # system.do_plot_fit()
+
+    @needs_local_scope
+    @line_magic
+    def killall(slef, parameter_s='', local_ns=None):
+        from matplotlib.pyplot import close
+        close('all')
+
+
+    @needs_local_scope
+    @line_magic
     def nest(self, parameter_s='', local_ns=None):
         """ Start the MultiNest analysis and handle data interaction and IO """
         from shell_colors import red
@@ -650,5 +702,8 @@ def parse_arg_string(command, arg_string):
             args = docopt(dawfab_usage, splitted)
         except SystemExit:
             return 1
+
+    if command is 'rrot':
+        args = docopt(rrot_usage, splitted)
 
     return args
