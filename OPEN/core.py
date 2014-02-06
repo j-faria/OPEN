@@ -545,7 +545,7 @@ def do_correlate(system, vars=(), verbose=False):
 	plt.show()
 
 
-def do_remove_rotation(system, prot=None, nrem=1, fwhm=False):
+def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 	print fwhm
 	try:
 		system.per
@@ -565,6 +565,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False):
 	clogger.info(msg)
 
 	if fwhm: system.vrad = system.extras.fwhm
+
 	vrad_mean = system.vrad.mean()
 	t, v = system.time, system.vrad - vrad_mean # temporaries
 
@@ -614,7 +615,59 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False):
 	per = gls(newsystem)
 	per._plot()
 
-	system.vrad = newsystem.vrad
+	if full:
+		##### do a "global" fit with 1 keplerian plus removing rotation harmonics
+		xx = np.linspace(t.min(), t.max(), 500)
+		vel1 = zeros_like(xx) 
+		vel = zeros_like(system.time)
+
+		def func3(params, return_model=False, times=None):
+			""" Fitness function for 1 planet model plus rotational harmonics """
+			#print params
+			P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, As3, Ac3, Prot = params
+			Po2 = Prot / 2.
+			Po3 = Prot / 3.
+			#print ecc
+			if (ecc>1 or ecc<0): return 1e99
+			# if any(e>1 or e<0 for e in ecc): return 1e99
+			if return_model:
+				get_rvn(times, P, K, ecc, omega, T0, gam, vel1)
+				return vel1 + \
+				        (As1*np.sin(2.*pi*times/Prot) + Ac1*np.cos(2.*pi*times/Prot)) + \
+				        (As2*np.sin(2.*pi*times/Po2) + Ac2*np.cos(2.*pi*times/Po2)) + \
+				        (As3*np.sin(2.*pi*times/Po3) + Ac3*np.cos(2.*pi*times/Po3))
+			else:
+				get_rvn(t, P, K, ecc, omega, T0, gam, vel)
+				return v - vel - \
+				        (As1*np.sin(2.*pi*t/Prot) + Ac1*np.cos(2.*pi*t/Prot)) - \
+				        (As2*np.sin(2.*pi*t/Po2) + Ac2*np.cos(2.*pi*t/Po2)) - \
+				        (As3*np.sin(2.*pi*t/Po3) + Ac3*np.cos(2.*pi*t/Po3))
+
+		# initial parameters [P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, As3, Ac3, Prot]
+		x0 = [18., 0.005, 0.2, 0., t.min(), 0., 0.01, 0.01, 0.005, 0.005, 0.001, 0.001, 25.]
+		best_param = leastsq(func3, x0)[0]
+		print best_param
+
+		plt.figure()
+		plt.subplot(211)
+		# data
+		plt.plot(system.time, system.vrad, 'o')
+		# fit
+		plt.plot(xx, func3(best_param, return_model=True, times=xx), 'g-')
+		plt.ylim([-0.01, 0.015])
+		# keplerian curve only
+		plt.subplot(212)
+		P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, As3, Ac3, Prot = best_param
+		get_rvn(xx, P, K, ecc, omega, T0, gam, vel1)
+		plt.plot(xx, vel1, 'k-')
+		plt.ylim([-0.01, 0.015])
+		plt.show()
+
+		newsystem = copy.copy(system)
+		newsystem.vrad = func3(best_param)
+		per = gls(newsystem)
+		per._plot()
+		# # system.vrad = newsystem.vrad
 
 
 
