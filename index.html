@@ -58,7 +58,6 @@
 
 <p>Wow! Plenty to choose from, hun? Don't you just love when scientists keep reinventing the wheel? I do, so I did it as well when I created OPEN.</p>
 
-<p> Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec viverra dictum erat, quis pulvinar elit pulvinar non. In dolor mauris, tincidunt id velit sit amet, ullamcorper sollicitudin mauris. Fusce ac libero ultricies, congue elit eget, consectetur quam. Nulla vitae eleifend ipsum. Nullam vitae nibh at massa pharetra laoreet sed vitae dolor. Aenean ac libero vel dolor dapibus ultricies aliquam nec leo. Suspendisse lorem arcu, commodo quis posuere nec, congue vel lorem. Duis faucibus, arcu placerat fringilla condimentum, diam magna bibendum orci, ut iaculis tellus lectus vulputate purus. Maecenas in gravida magna. Nam ut blandit justo.</p>
 
 <p><sup id="fn1">1. Mayor and Queloz, 1995<a href="#ref1" title="Jump back to text."> ↩</a></sup></p>
 
@@ -91,9 +90,9 @@
 <!--<!--<!--<!--<!--<!--<!--<!--                        -->-->-->-->-->-->-->-->
                         <li>
                           <span class='command'>
-                            <a href='/commands.html'>READ</a>
+                            <a href='./commands.html'>READ</a>
                             <span class='args'>
-                              [file ...]
+                              &lt;file&gt;... [-d] [--skip=&lt;sn&gt;] [--format=&lt;form&gt;] [-v]
                             </span>
                           </span>
                           <span class='summary'>Read files with RV measurements.</span>
@@ -103,7 +102,7 @@
                           <span class='command'>
                             <a href='/commands/append'>PLOT</a>
                             <span class='args'>
-                              [obs] 
+                              (obs | fwhm | rhk | s | bis | contrast)
                             </span>
                           </span>
                           <span class='summary'>Plot various quantities.</span>
@@ -113,11 +112,31 @@
                           <span class='command'>
                             <a href='/commands/append'>PER</a>
                             <span class='args'>
-                              [file ...]
+                              (obs|bis|fwhm|rhk|resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=&lt;hf&gt;] [--fap]
                             </span>
                           </span>
-                          <span class='summary'>Calculates the periodogram</span>
+                          <span class='summary'>Calculate periodograms of various quantities</span>
                         </li>
+                        <!--  -->
+                        <li>
+                          <span class='command'>
+                            <a href='/commands/append'>RESTRICT</a>
+                            <span class='args'>
+                            [(err &lt;maxerr&gt;)] [(jd &lt;minjd&gt; &lt;maxjd&gt;)] [(year &lt;yr&gt;)] [(years &lt;yr1&gt; &lt;yr2&gt;)] 
+                            </span>
+                          </span>
+                          <span class='summary'>Restrict data</span>
+                        </li>       
+                        <!--  -->
+                        <li>
+                          <span class='command'>
+                            <a href='/commands/append'>MOD</a>
+                            <span class='args'>
+                            [k&lt;n&gt;] [d&lt;n&gt;]
+                            </span>
+                          </span>
+                          <span class='summary'>Set the model to be adjusted</span>
+                        </li>     
                       </ul>
                     </section>
                 </div>
