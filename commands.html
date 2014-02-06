@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>OPEN - Tools for exoplanet detection</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <script src="javascripts/jquery-1.8.3.min.js"></script>
+    <script src="javascripts/list.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!-- font-awesome   -->
+    <link href="//netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css" rel="stylesheet">
+
+    <style type='text/css'> pre {display: inline;} </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+<!--        <p class="header"></p>-->
+
+<!--        <ul>-->
+<!--          <li class="download"><a class="buttons" href="https://github.com/j-faria/OPEN/zipball/master">ZIP</a>-->
+<!--          <li class="download"><a class="buttons" href="https://github.com/j-faria/OPEN/tarball/master">TAR</a></li>-->
+<!--        </ul>-->
+        <ul>
+            <li><a class="buttons github" href="https://github.com/j-faria/OPEN">View On GitHub</a></li>
+        </ul>
+
+
+        <p class="header">This project is maintained by <a class="header name" href="https://github.com/j-faria">j-faria</a></p>
+        <a href="./index.html">BACK</a>
+
+
+      </header>
+      <section>
+<h1>OPEN - tools for exoplanet detection</h1>
+
+<!-- <p> The P stands for 'planet' </p> -->
+<!-- <p> <sup><a href="#fn1" id="ref1">[1]</a></sup> </p> -->
+
+
+<!-- <p><sup id="fn1">1. Mayor and Queloz, 1995<a href="#ref1" title="Jump back to text."> ↩</a></sup></p> -->
+
+        <h2> <a name="commands-section" class="anchor" href="#commands-section"><span class="octicon octicon-link"></span></a><br>Commands</h2>
+
+                <div id="commands-list">
+                    <section id='commands'>
+                      <ul class='list'>
+                        <li>
+                          <span class='command'>
+                            <a href=''>READ</a>
+                            <span class='args'>
+                              &lt;file&gt;... [-d] [--skip=&lt;sn&gt;] [--format=&lt;form&gt;] [-v]
+                            </span>
+                          </span>
+                          <span class='summary'>Read files with RV measurements.</span>
+                          
+                          <br> <br>
+                          Options: <br>
+                          <table style="width:600px">
+                            <tr>
+                            <td>-d</td>
+                            <td>Set this as default system.</td>
+                            </tr>
+                            <tr>
+                            <td>-v --verbose</td>
+                            <td>Verbose output about data.</td>
+                            </tr>
+                            <tr>
+                            <td> --skip=&lt;sn&gt; </td>
+                            <td>How many header lines to skip [default: 0]</td>
+                            </tr>  
+                            <tr>
+                            <td> --format=&lt;form&gt; </td>
+                            <td>File format. One of 'drs35', 'drs34', 'coralie' or 'basic'. Default is 'drs35'.</td>
+                            </tr>   
+                            <tr>
+                            <td>-h --help</td>
+                            <td>Show a help message</td>
+                            </tr>                                                  
+                          </table>
+                          This command can read one or more files containing RV measurements in a column-separated format.
+                          It currently takes care of filename expansions (globs) so that 
+                          <br>
+                          <pre>read *.rdb</pre>
+                          <br>
+                          will read all files ending with '.rdb' in the current folder. <br>
+                          The <pre>-d</pre> option is useful when working with many 'systems' at once. The first time the user
+                          executes the <pre>read</pre> command, OPEN sets the default system. The second time, if <pre>-d</pre> is
+                          not supplied, it instead returns a system as a Python variable. <br>
+
+                          The <pre>--skip</pre> option applies to all files equally. <br>
+                          The <pre>--format</pre> option allows to specify one of the following file formats: <br>
+
+                          <table style="width:800px">
+                            <tr>
+                              <td>basic</td>
+                              <td>
+                              <code>
+jdb        vrad    svrad <br>
+----       ----    -----
+                              </code>
+                            </tr>
+
+                            <tr>
+                              <td>coralie</td>
+                              <td>
+                                <code>
+jdb     vrad    svrad   fwhm    contrast        bis_span        noise   sn10    sn50    sn60 <br>
+---     ----    -----   ----    --------        --------        -----   ----    ----    ----                                 
+                                </code>
+                              </td>
+                            </tr>
+
+                            <tr>
+                              <td>drs35</td>
+                              <td>
+                                <code>
+jdb vrad  svrad fwhm  contrast  bis_span  noise s_mw  sig_s rhk sig_rhk sn_CaII sn10  sn50  sn60 <br>
+--- ----  ----- ----  --------  --------  ----- ----  ----- --- ------- ------- ----  ----  ----                                  
+                                </code>
+                              </td>
+                            </tr>
+
+                            <tr>
+                              <td>drs34</td>
+                              <td>
+                                <code>
+jdb vrad  svrad fwhm  contrast  bis_span  noise sn10  sn50  sn60 <br>
+--- ----  ----- ----  --------  --------  ----- ----  ----  ----                                  
+                                </code>
+                              </td>
+                            </tr>
+
+                          </table>
+
+                          
+                        </li>
+
+                        <li>
+                          <span class='command'>
+                            <a href=''>PLOT</a>
+                            <span class='args'>
+                              (obs | fwhm | rhk | s | bis | contrast)
+                            </span>
+                          </span>
+                          <span class='summary'>Simple plots of one of these quantities as a function of time</span>
+                        </li>
+
+                        <li>
+                          <span class='command'>
+                            <a href='/commands/append'>PER</a>
+                            <span class='args'>
+                              (obs|bis|fwhm|rhk|resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=&lt;hf&gt;] [--fap]
+                            </span>
+                          </span>
+                          <span class='summary'>Calculate periodograms of various quantities</span>
+                        </li>
+
+                        <li>
+                          <span class='command'>
+                            <a href='/commands/append'>RESTRICT</a>
+                            <span class='args'>
+                            [(err &lt;maxerr&gt;)] [(jd &lt;minjd&gt; &lt;maxjd&gt;)] [(year &lt;yr&gt;)] [(years &lt;yr1&gt; &lt;yr2&gt;)] 
+                            </span>
+                          </span>
+                          <span class='summary'>Restrict data</span>
+                        </li>       
+
+                        <li>
+                          <span class='command'>
+                            <a href='/commands/append'>MOD</a>
+                            <span class='args'>
+                            [k&lt;n&gt;] [d&lt;n&gt;]
+                            </span>
+                          </span>
+                          <span class='summary'>Set the model to be adjusted</span>
+                        </li>     
+                      </ul>
+                    </section>
+                </div>
+
+<!--<h3>-->
+<!--<a name="rather-drive-stick" class="anchor" href="#rather-drive-stick"><span class="octicon octicon-link"></span></a>Rather Drive Stick?</h3>-->
+
+<!--<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>-->
+
+<!--<h3>-->
+<!--<a name="authors-and-contributors" class="anchor" href="#authors-and-contributors"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>-->
+
+<!--<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>-->
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+		
+  </body>
+</html>
