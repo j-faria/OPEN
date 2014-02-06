@@ -1,8 +1,10 @@
 from distutils.core import setup, Extension
 import os
+import numpy
 
-python_include_dir = '/home/joao/anaconda/include'
-numpy_include_dir = '/home/joao/anaconda/lib/python2.7/site-packages/numpy/core/include/numpy'
+#python_include_dir = '/home/joao/anaconda/include'
+numpy_include_dir = os.path.dirname(numpy.__file__) + '/core/include/numpy'
+# numpy_include_dir = '/home/joao/anaconda/lib/python2.7/site-packages/numpy/core/include/numpy'
 
 module1 = Extension('periodogram_DF', 
         include_dirs = [python_include_dir, numpy_include_dir],
