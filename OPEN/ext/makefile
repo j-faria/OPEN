@@ -9,7 +9,7 @@ FFLAGS= -ffree-form -O3
 
 FPY = f2py
 FPYFLAGS = --quiet
-FPYFLAGS += --opt="-O3 -Ofast"
+FPYFLAGS += --opt="-O3"
 # FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none"
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none"
 

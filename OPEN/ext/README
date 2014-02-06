@@ -1,0 +1,5 @@
+If you have multiply Python versions you might have to do something like
+
+	make FPY=f2py2.7
+
+if, for example, you're using the python2.7 executable
