@@ -110,7 +110,7 @@ class rvSeries:
     #   chi2 : reduced(!) chi square value of the fit
     fit = None
 
-    def do_plot_obs(self):
+    def do_plot_obs(self, newFig=True, leg=True):
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled.
         """
@@ -119,7 +119,8 @@ class rvSeries:
         colors = 'bgrcmykw' # lets hope for less than 9 data-sets
         t, rv, err = self.time, self.vrad, self.error # temporaries
         
-        plt.figure()
+        if newFig: 
+            plt.figure()
         # p = pg.plot()
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
@@ -137,9 +138,9 @@ class rvSeries:
         
         plt.xlabel('Time [days]')
         plt.ylabel('RV [km/s]')
-        plt.legend()
+        if leg: plt.legend()
         plt.tight_layout()
-        plt.show()
+        # plt.show()
         # pg.QtGui.QApplication.exec_()
 
     def do_plot_drift(self):
@@ -442,15 +443,21 @@ class PeriodogramBase:
       Prob = 1.-(1.-FAPlevel)**(1./self.M)
       return self.probInv(Prob)   
 
-    def _plot(self, doFAP=False, verts=None):
+    def _plot(self, doFAP=False, verts=None, newFig=True, axes=None):
       """
         Create a plot.
       """
       xlabel = 'Period [d]'
       ylabel = 'Power'
 
-      self.fig = plt.figure()
-      self.ax = self.fig.add_subplot(1,1,1)
+      if newFig: 
+        self.fig = plt.figure()
+
+      if axes is None:
+        self.ax = self.fig.add_subplot(1,1,1)
+      else:
+        self.ax = axes
+
       self.ax.set_title("Normalized periodogram")
       self.ax.set_xlabel(xlabel)
       self.ax.set_ylabel(ylabel)
@@ -469,15 +476,16 @@ class PeriodogramBase:
         self.ax.axhline(y=plvl1, color='k', ls='-', label='10%')
         self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
         self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
-        self.ax.legend(frameon=False)
+        # self.ax.legend(frameon=False, bbox_to_anchor=(1.1, 1.05))
 
       # plot vertical lines
       if verts is not None:
         for v in verts:
-          self.ax.axvline(x=v, color='k', ls='--', lw=2) 
+          self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5) 
+
 
       plt.tight_layout()
-      plt.show()
+      # plt.show()
       # p = pg.plot(1./self.freq, self.power, title="Periodogram")
       # p.plotItem.setLogMode(1./self.freq, self.power)
       # pg.QtGui.QApplication.exec_()
