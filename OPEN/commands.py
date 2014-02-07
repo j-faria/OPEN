@@ -484,6 +484,22 @@ class EmbeddedMagics(Magics):
 
     @needs_local_scope
     @line_magic
+    def de(self, parameter_s='', local_ns=None):
+        """ Run the differential evolution algorithm minimization - stub """
+        from shell_colors import red
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.do_diffevol(system)
+        system.do_plot_fit()
+
+    @needs_local_scope
+    @line_magic
     def gen(self, parameter_s='', local_ns=None):
         """ Run the genetic algorithm minimization - stub """
         from shell_colors import red

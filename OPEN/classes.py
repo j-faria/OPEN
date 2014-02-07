@@ -264,23 +264,24 @@ class rvSeries:
             t, rv, err, final = t[m:], rv[m:], err[m:], final[m:]
         ax2.axhline(y=0, xmin=0, xmax=1, ls='--', color='k')
 
-        # # redo this...
-        # t, rv, err = self.time-self.time.min(), self.vrad, self.error # temporaries
-        # final = numpy.zeros_like(tt)
+        # redo this...
+        t, rv, err = self.time-self.time.min(), self.vrad, self.error # temporaries
+        tt = numpy.linspace(self.time.min(), self.time.max(), 400)
+        final = numpy.zeros_like(tt)
 
-        # ### phased RV curves
-        # plt.figure()
-        # gs = gridspec.GridSpec(keplerians, 1)
-        # for i in range(keplerians):
-        #   get_rvn(tt, P[i], K[i], ecc[i], omega[i], T0[i], gam, final)
-        #   ax = plt.subplot(gs[i])
-        #   # plot each file's values
-        #   for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
-        #       m = n-nout # how many values are there after restriction
-        #       ax.errorbar(t[:m]/P[i], rv[:m], yerr=err[:m], \
-        #                    fmt='o'+colors[i], label=fname)
-        #       t, rv, err = t[m:], rv[m:], err[m:]
-        #   ax.plot((tt-min(tt))/P[i], final, 'k-')
+        ### phased RV curves
+        plt.figure()
+        gs = gridspec.GridSpec(keplerians, 1)
+        for i in range(keplerians):
+          get_rvn(tt, P[i], K[i], ecc[i], omega[i], T0[i], gam, final)
+          ax = plt.subplot(gs[i])
+          # plot each file's values
+          for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+              m = n-nout # how many values are there after restriction
+              ax.errorbar(numpy.modf(abs(t[:m]-T0[i])/P[i])[0], rv[:m], yerr=err[:m], \
+                           fmt='o'+colors[i], label=fname)
+              t, rv, err = t[m:], rv[m:], err[m:]
+          ax.plot( numpy.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
 
         plt.show()
 

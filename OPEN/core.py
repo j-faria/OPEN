@@ -291,6 +291,76 @@ def do_restrict(system, quantity, *args):
 
 	return
 
+def do_diffevol(system):
+	""" Carry out the fit using a (experimental) differential evolution
+	algorithm """
+	from pyde.de import DiffEvol
+
+	try:
+		degree = system.model['d']
+		keplerians = system.model['k']
+	except TypeError:
+		msg = red('Error: ') + 'Need to run mod before de. '
+		clogger.error(msg)
+		return	
+
+	msg = blue('INFO: ') + 'Initializing DE algorithm...'
+	clogger.info(msg)
+	msg = blue('    : ') + 'Model is: %d keplerians + %d drift' % (keplerians, degree)
+	clogger.info(msg)
+
+	vel = zeros_like(system.time)
+
+	def chi2_n(individual):
+		""" Fitness function for N planet model """
+		P, K, ecc, omega, T0, gam = [individual[i::6] for i in range(6)]
+		#print ecc
+		get_rvn(system.time, P, K, ecc, omega, T0, gam[0], vel)
+		#print 'out of get_rvn'
+		chi2 = sum(((system.vrad - vel)/system.error)**2)
+		#print chi2
+		return chi2
+
+	par_bounds = []
+	par_bounds.append([5, 1000]) # period
+	par_bounds.append([0, 150]) # semi amplitude
+	par_bounds.append([0, 0.9]) # eccentricity
+	par_bounds.append([0, 360]) # omega
+	par_bounds.append([2350000, 2550000]) # periastron passage
+	par_bounds.append([-100, 100]) # offset
+
+	par_bounds = keplerians*par_bounds
+
+	npop = 500
+	ngen = 100
+	
+	de = DiffEvol(chi2_n, par_bounds, npop)
+
+	msg = blue('INFO: ') + 'Created population with N=%d. Going to evolve for %d generations...' % (npop,ngen)
+	clogger.info(msg)
+
+	res = de.optimize(ngen=ngen)
+	best_param = de.minimum_location
+	best_fitness = de.minimum_value
+
+	## output results information
+	msg = yellow('RESULT: ') + 'Best individual is'
+	clogger.info(msg)
+
+	## loop over planets
+	print("%3s %12s %10s %10s %10s %15s %9s" % \
+		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+	for i, planet in enumerate(list(ascii_lowercase)[:keplerians]):
+		P, K, ecc, omega, T0, gam = [best_param[j::6] for j in range(6)]
+		# print P, K, ecc, omega, T0, gam
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+	
+	msg = yellow('RESULT: ') + 'Best fitness value: %s\n' % (best_fitness)
+	clogger.info(msg)
+
+	# save fit in the system
+	system.save_fit(best_param, best_fitness)
+
 
 def do_genetic(system, just_gen=False):
 	""" Carry out the fit using a genetic algorithm and if 
