@@ -31,7 +31,11 @@ from scipy.stats import nanmean, nanstd
 from logger import clogger, logging
 from ext.get_rvN import get_rvn
 from .periodograms import ls_PressRybicki, gls
-from ext.periodogram_DF import periodogram_DF
+try:
+	from ext.periodogram_DF import periodogram_DF
+	periodogram_DF_available = True
+except ImportError:
+	periodogram_DF_available = False
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date
 
@@ -742,6 +746,12 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 
 
 def do_Dawson_Fabrycky(system):
+	
+	if not periodogram_DF_available:
+		msg = red('ERROR: ') + 'This extension is not available. Something went wrong on install...'
+		clogger.fatal(msg)
+		return
+
 	time, rv, err = system.time, system.vrad, system.error
 	ofac = 2.0
 
