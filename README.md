@@ -21,3 +21,30 @@ at all).
 Then, by creating new magic functions we are basically adding custom commands to the 
 shell. This is **in addition** to everything that is built-in to both Python and IPython
 so that all batteries are included; all the power of Python is there.
+
+
+
+The basics
+----------
+
+When you start OPEN you're presented with the shell prompt
+
+```
+$ python open.py 
+Welcome to OPEN v0.0.2
+Copyright (c) João Faria | joao.faria@astro.up.pt
+
+Type "listcommands" for a list of the available commands
+For help on a specific command, type "command?" or see www.
+OPEN [1]: 
+```
+
+You can follow the instructions and type ```listcommands``` to see the available commands
+(this only lists the tested ones, everything else is still experimental).
+Whenever you type ```command -h``` you will see the usage pattern and options specific to
+that command. 
+
+> > **TIP:** Tab-completion will work on most OPEN commands, although it will automatically
+insert the leading percent sign (which is fine)
+
+Let's start by reading radial velocity measurements from a sample file. 
