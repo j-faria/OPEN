@@ -171,21 +171,21 @@ def write_rv(system, filename, **kwargs):
         head = '\t'.join(header_basic1) + '\n' + '\t'.join(header_basic2)
         fmt = ['%12.6f', '%9.5f', '%7.5f']
         X = zip(system.time, system.vrad, system.error)
-        savetxt('teste.rdb', X, fmt=fmt, \
+        savetxt(filename, X, fmt=fmt, \
                 delimiter='\t', header=head, comments='')
 
     elif len(system.extras) == 7:
         head = '\t'.join(header_drs34_1) + '\n' + '\t'.join(header_drs34_2)
         fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*7
         X = zip(system.time, system.vrad, system.error, *list(system.extras))
-        savetxt('teste.rdb', X, fmt=fmt, \
+        savetxt(filename, X, fmt=fmt, \
                 delimiter='\t', header=head, comments='')
 
     elif len(system.extras) == 12:
         head = '\t'.join(header_drs35_1) + '\n' + '\t'.join(header_drs35_2)
         fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*12
         X = zip(system.time, system.vrad, system.error, *list(system.extras))
-        savetxt('teste.rdb', X, fmt=fmt, \
+        savetxt(filename, X, fmt=fmt, \
                 delimiter='\t', header=head, comments='')
 
 
