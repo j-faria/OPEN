@@ -13,6 +13,8 @@ FPYFLAGS += --opt="-O3" --fcompiler=gnu95
 # FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none"
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none"
 
+PYTHON=/home/joao/anaconda/bin/python
+
 # --- targets
 all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so
 	@echo "\n Done!"
@@ -36,7 +38,7 @@ get_rvN.so: get_rvN.f90
 
 ## compile Dawson-Fabrycky special periodogram
 periodogram_DF.so: periodogram_DF.c
-	@python setup_periodogram_DF.py build_ext --inplace
+	@$(PYTHON) setup_periodogram_DF.py build_ext --inplace
 
 # --- remove binary and executable files
 clean:
