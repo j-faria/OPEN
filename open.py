@@ -36,9 +36,9 @@ if __name__ == "__main__":
         with open('./OPEN/asciiart.txt', 'r') as f: print f.read()
     
     banner =  u'Welcome to ' + version + '\n'
-    banner += u'Copyright (c) João Faria | joao.faria@astro.up.pt\n\n'
+    banner += u'Created by João Faria | joao.faria@astro.up.pt\n\n'
     banner +=  'Type "listcommands" for a list of the available commands\n'
-    banner +=  'For help on a specific command, type "command?" or see www.'
+    banner +=  'For help on a specific command, type "command -h" or see www.'
     ipyshell = EmbedShell(config=cfg, user_global_ns=globals(),
                           banner1 = banner if (not args['--nobanner']) else '',
                           #banner2 = 'This is in banner 2',
