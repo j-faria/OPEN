@@ -40,6 +40,8 @@ def read_rv(*filenames, **kwargs):
         Error in the radial velocity.
     dic: dict
         Dictionary with name and number of values from each file.
+    others: tuple
+        Extra columns present in the file
     """
 
     # set logging level
