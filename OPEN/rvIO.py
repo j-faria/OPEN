@@ -11,12 +11,12 @@ from itertools import islice, chain
 import os
 
 # other imports
-from numpy import loadtxt, mean
+from numpy import loadtxt, savetxt, mean
 
 # intra-package imports
 from .logger import clogger, logging
-from .utils import day2year, rms
-from shell_colors import blue
+from .utils import day2year, rms, ask_yes_no
+from shell_colors import blue, yellow
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
@@ -29,6 +29,12 @@ def read_rv(*filenames, **kwargs):
     ----------
     filenames: string
         One or more files to read.
+
+    Optional kwargs
+    ---------------
+    skip: number of lines to skip in the files' headers
+    format: column-format of the files
+    verbose: verbosity toggle
     
     Returns
     -------
@@ -80,8 +86,8 @@ def read_rv(*filenames, **kwargs):
         others = (fwhm, contrast, bis_span, noise, s_mw, sig_s, rhk, sig_rhk, sn_CaII, sn10, sn50, sn60)
 
     elif format == 'drs34' or format == 'coralie':
-        t, rv, err,
-        fwhm, contrast, bis_span, noise, sn10, sn50, sn60  = loadtxt(files, unpack=True, usecols=(0,1,2))
+        t, rv, err, \
+        fwhm, contrast, bis_span, noise, sn10, sn50, sn60  = loadtxt(files, unpack=True)
         others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
 
     # elif format == 'coralie':
@@ -119,7 +125,71 @@ def read_rv(*filenames, **kwargs):
     return t, rv, err, dic, others
     
     
+
+def write_rv(system, filename, **kwargs):
+    """
+    Write system's RVs (and everything else) to a file.
     
+    Parameters
+    ----------
+    system: instance of rvSeries
+        System for which to save information.
+    filename: string
+        Name of the output file.
+
+    Optional kwargs
+    ---------------
+    
+    Returns
+    -------
+        nothing
+    """
+    print filename
+
+    if os.path.isfile(filename):
+        # this file exists
+        clogger.warning(yellow('Warning: ')+'File already exists. Replace? [y/n]')
+        if ask_yes_no(' '):
+            pass
+        else:
+            clogger.info(blue('INFO: ')+'Aborting.')
+            return
+
+    header_basic1 = ['jdb', 'vrad', 'svrad']
+    header_basic2 = ['-'*len(s) for s in header_basic1]
+
+    header_drs35_1 = ['jdb', 'vrad', 'svrad', 'fwhm', 'contrast', 'bis_span', \
+                     'noise', 's_mw', 'sig_s', 'rhk', 'sig_rhk', 'sn_CaII', \
+                     'sn10', 'sn50', 'sn60']
+    header_drs35_2 = ['-'*len(s) for s in header_drs35_1]
+
+    header_drs34_1 = ['jdb', 'vrad', 'svrad', 'fwhm', 'contrast', 'bis_span', \
+                      'noise', 'sn10', 'sn50', 'sn60']
+    header_drs34_2 = ['-'*len(s) for s in header_drs34_1]
+
+    if len(system.extras) == 0: # basic
+        head = '\t'.join(header_basic1) + '\n' + '\t'.join(header_basic2)
+        fmt = ['%12.6f', '%9.5f', '%7.5f']
+        X = zip(system.time, system.vrad, system.error)
+        savetxt('teste.rdb', X, fmt=fmt, \
+                delimiter='\t', header=head, comments='')
+
+    elif len(system.extras) == 7:
+        head = '\t'.join(header_drs34_1) + '\n' + '\t'.join(header_drs34_2)
+        fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*7
+        X = zip(system.time, system.vrad, system.error, *list(system.extras))
+        savetxt('teste.rdb', X, fmt=fmt, \
+                delimiter='\t', header=head, comments='')
+
+    elif len(system.extras) == 12:
+        head = '\t'.join(header_drs35_1) + '\n' + '\t'.join(header_drs35_2)
+        fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*12
+        X = zip(system.time, system.vrad, system.error, *list(system.extras))
+        savetxt('teste.rdb', X, fmt=fmt, \
+                delimiter='\t', header=head, comments='')
+
+
+
 class rvfile(file):
     """
     Subclass of Python's File class that implements specific methods

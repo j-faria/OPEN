@@ -295,18 +295,20 @@ def do_restrict(system, quantity, *args):
 
 	return
 
-def do_diffevol(system):
+def do_diffevol(system, just_de=False):
 	""" Carry out the fit using a (experimental) differential evolution
 	algorithm """
 	from pyde.de import DiffEvol
 
 	try:
-		degree = system.model['d']
-		keplerians = system.model['k']
-	except TypeError:
+		keplerians, degree = system.model.values()
+	except AttributeError:
 		msg = red('Error: ') + 'Need to run mod before de. '
 		clogger.error(msg)
 		return	
+
+	# should we do it this way?
+	system.vrad = system.vrad_full
 
 	msg = blue('INFO: ') + 'Initializing DE algorithm...'
 	clogger.info(msg)
@@ -314,6 +316,22 @@ def do_diffevol(system):
 	clogger.info(msg)
 
 	vel = zeros_like(system.time)
+
+	## trend removal
+	if degree > 0:
+		z = np.polyfit(system.time, system.vrad, degree)
+		poly = np.poly1d(z)
+		system.vrad = system.vrad - poly(system.time)
+		# save info to system
+		system.model['drift'] = z
+		if keplerians == 0: 
+			## output some information
+			msg = yellow('RESULT: ') + 'Fit of degree %d done! Coefficients:' % degree
+			clogger.info(msg)
+			msg = yellow('      : ') + str(z)
+			clogger.info(msg)
+			return
+
 
 	def chi2_n(individual):
 		""" Fitness function for N planet model """
@@ -327,7 +345,7 @@ def do_diffevol(system):
 
 	par_bounds = []
 	par_bounds.append([5, 1000]) # period
-	par_bounds.append([0, 150]) # semi amplitude
+	par_bounds.append([0.5, 150]) # semi amplitude
 	par_bounds.append([0, 0.9]) # eccentricity
 	par_bounds.append([0, 360]) # omega
 	par_bounds.append([2350000, 2550000]) # periastron passage
@@ -335,8 +353,9 @@ def do_diffevol(system):
 
 	par_bounds = keplerians*par_bounds
 
-	npop = 500
-	ngen = 100
+	npop = 100
+	ngen = 250
+	npar = 5*keplerians+1
 	
 	de = DiffEvol(chi2_n, par_bounds, npop)
 
@@ -358,12 +377,38 @@ def do_diffevol(system):
 		P, K, ecc, omega, T0, gam = [best_param[j::6] for j in range(6)]
 		# print P, K, ecc, omega, T0, gam
 		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+	print #newline
 	
-	msg = yellow('RESULT: ') + 'Best fitness value: %s\n' % (best_fitness)
+	msg = yellow('RESULT: ') + 'Best fitness value: %7.2f  (%6.2f)\n' % (best_fitness, best_fitness/(len(system.time)-npar))
+	clogger.info(msg)
+
+	if just_de:
+		# save fit in the system
+		system.save_fit(best_param, best_fitness)
+		return
+
+	msg = blue('INFO: ') + 'Calling LM to improve result...'
+	clogger.info(msg)	
+	## call levenberg markardt fit
+	lm = do_lm(system, best_param)
+	lm_par = lm[0]
+	
+	## loop over planets
+	msg = yellow('RESULT: ') + 'Best fit is'
+	clogger.info(msg)
+	print("%3s %12s %10s %10s %10s %15s %9s" % \
+		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+	for i, planet in enumerate(list(ascii_lowercase)[:keplerians]):
+		P, K, ecc, omega, T0, gam = [lm_par[j::6] for j in range(6)]
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+	print #newline
+
+	chi2 = chi2_n(lm_par)
+	msg = yellow('RESULT: ') + 'Best fitness value: %7.2f  (%6.2f)\n' % (chi2, chi2/(len(system.time)-npar))
 	clogger.info(msg)
 
 	# save fit in the system
-	system.save_fit(best_param, best_fitness)
+	system.save_fit(lm_par, chi2)
 
 
 def do_genetic(system, just_gen=False):

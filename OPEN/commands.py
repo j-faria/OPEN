@@ -42,6 +42,15 @@ Options:
     -h --help           Show this help message.
 """
 
+saverdb_usage = \
+"""
+Usage:
+    saverdb <file>
+    saverdb -n SYSTEM
+Options:
+    -n SYSTEM   Specify name of system (else use default)
+"""
+
 plot_usage = \
 """
 Usage:
@@ -208,6 +217,35 @@ class EmbeddedMagics(Magics):
             local_ns['default'] = rvSeries(*filenames, verbose=args['--verbose'],
                                                        skip=args['--skip'],
                                                        format=args['--format'])
+
+    @needs_local_scope
+    @line_magic
+    def saverdb(self, parameter_s='', local_ns=None):
+        """ Save current system's RV in a file """
+        try:
+            args = parse_arg_string('saverdb', parameter_s)
+        except DocoptExit:
+            print saverdb_usage.lstrip()
+            return
+        except SystemExit:
+            return
+
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default') and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['-n']
+                system = local_ns[system_name]
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return        
+
+        filename = args['<file>']
+        system.save(filename)
 
     @needs_local_scope
     @line_magic
@@ -501,6 +539,7 @@ class EmbeddedMagics(Magics):
             return
 
         core.do_diffevol(system)
+        system.do_plot_drift()
         system.do_plot_fit()
 
     @needs_local_scope
@@ -669,6 +708,9 @@ def parse_arg_string(command, arg_string):
 
     if command is 'read':
         args = docopt(read_usage, splitted)
+
+    if command is 'saverdb':
+        args = docopt(saverdb_usage, splitted)        
 
     if command is 'plot':
         args = docopt(plot_usage, splitted)

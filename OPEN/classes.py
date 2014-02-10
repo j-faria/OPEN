@@ -111,6 +111,9 @@ class rvSeries:
     #   chi2 : reduced(!) chi square value of the fit
     fit = None
 
+    def save(self, filename):
+        rvIO.write_rv(self, filename)
+
     def do_plot_obs(self, newFig=True, leg=True):
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled.
@@ -150,10 +153,9 @@ class rvSeries:
         minus drift. Data from each file are color coded and labeled.
         """
         colors = 'rgbmk' # possible colors
-        t, rv, err = self.time, self.vrad, self.error # temporaries
+        t, rv, err = self.time, self.vrad_full, self.error # temporaries
         
-        plt.close(1)
-        plt.figure(1)
+        plt.figure()
 
         ax1 = plt.subplot(2,1,1)
         # plot each file's values
@@ -174,7 +176,7 @@ class rvSeries:
         # plot each file's values minus the drift
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
-            ax2.errorbar(t[:m], rv[:m]-p[:m], yerr=err[:m], \
+            ax2.errorbar(t[:m], rv[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
             t, rv, err, p = t[m:], rv[m:], err[m:], p[m:]
 
