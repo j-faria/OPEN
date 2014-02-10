@@ -149,6 +149,7 @@ command_list = \
  mod        Define the model that will be adjusted to the data.
  fit        ...
  restrict   Select data based on date, SNR or RV accuracy.
+ killall    Close all plot windows
 """
     
 # These are additional magics that are exposed (only?) in embedded shells.
