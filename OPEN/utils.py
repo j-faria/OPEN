@@ -124,3 +124,20 @@ def write_yorbit_macro(system):
     # print cmd
     with open('yorbit.log', "w") as outfile:
         subprocess.call(cmd, stdout=outfile)
+
+
+
+
+def ask_yes_no(msg):
+    # raw_input returns the empty string for "enter"
+    yes = set(['yes','y', 'ye', ''])
+    no = set(['no','n'])
+    print msg,
+    choice = raw_input().lower()
+    if choice in yes:
+        return True
+    elif choice in no:
+        return False
+    else:
+        stdout.write("Please respond with 'yes' or 'no'")
+        return False
