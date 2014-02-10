@@ -12,6 +12,7 @@ import matplotlib.gridspec as gridspec
 from collections import namedtuple # this requires Python >= 2.6
 
 # intra-package imports
+import pyqtgraph as pg
 import rvIO
 from .utils import unique
 from .logger import clogger, logging
@@ -486,10 +487,12 @@ class PeriodogramBase:
 
 
       plt.tight_layout()
-      # plt.show()
-      # p = pg.plot(1./self.freq, self.power, title="Periodogram")
-      # p.plotItem.setLogMode(1./self.freq, self.power)
-      # pg.QtGui.QApplication.exec_()
+
+    def _plot_pg(self, doFAP=False, verts=None, newFig=True, axes=None):
+
+      p = pg.plot(1./self.freq, self.power, title="Periodogram")
+      p.plotItem.setLogMode(True, False)
+      pg.QtGui.QApplication.exec_()
 
     def _output(self, verbose=False):
       """

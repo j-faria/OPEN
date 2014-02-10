@@ -197,7 +197,12 @@ class EmbeddedMagics(Magics):
         # this is useful when working with various systems simultaneously so 
         # that we can do, e.g., HDXXXX = %read file1 file2
         if local_ns.has_key('default') and not args['-d']:
-            return rvSeries(*filenames, skip=args['--skip'])
+            try:
+                return rvSeries(*filenames, verbose=args['--verbose'],
+                                            skip=args['--skip'], 
+                                            format=args['--format'])
+            except AttributeError:
+                pass
         else:
             local_ns['default'] = rvSeries(*filenames, verbose=args['--verbose'],
                                                        skip=args['--skip'],
@@ -314,7 +319,6 @@ class EmbeddedMagics(Magics):
                 system.per = per_fcn(system, hifac=hf)
                 # system.per._output(verbose=verb)  # not ready
                 system.per._plot(doFAP=args['--fap'])
-                print system.per.name
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
             system.bis_per = per_fcn(system, quantity='bis')
