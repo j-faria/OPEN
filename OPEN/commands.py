@@ -69,7 +69,7 @@ Usage:
     per obs
     per (bis | fwhm)
     per -n SYSTEM
-    per (obs | bis | fwhm | rhk | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--fap]
+    per (obs | bis | fwhm | rhk | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--ofac=<of>] [--fap]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
@@ -78,6 +78,7 @@ Options:
     --fast        Calculate the Lomb-Scargle periodogram with fast algorithm
     --force       Force recalculation
     --hifac=<hf>  hifac * Nyquist is lowest frequency used [default: 40]
+    --ofac=<of>   Oversampling factor [default: 6]
     --fap         Plot false alarm probabilities
     -v --verbose  Verbose statistical output 
     -h --help   Show this help message
@@ -339,6 +340,8 @@ class EmbeddedMagics(Magics):
         
         verb = True if args['--verbose'] else False
         hf = float(args.pop('--hifac'))
+        of = float(args.pop('--ofac'))
+        print of
 
         # which periodogram should be calculated?
         per_fcn = None
@@ -368,24 +371,24 @@ class EmbeddedMagics(Magics):
                 # system.per._output(verbose=verb)  # not ready
                 system.per._plot(doFAP=args['--fap'])
             except AttributeError:
-                system.per = per_fcn(system, hifac=hf)
+                system.per = per_fcn(system, hifac=hf, ofac=of)
                 # system.per._output(verbose=verb)  # not ready
                 system.per._plot(doFAP=args['--fap'])
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
-            system.bis_per = per_fcn(system, quantity='bis')
+            system.bis_per = per_fcn(system, hifac=hf, ofac=of, quantity='bis')
             system.bis_per._plot()
 
         if args['fwhm']: # periodogram of the CCF's fwhm
-            system.fwhm_per = per_fcn(system, quantity='fwhm')
-            system.fwhm_per._plot_pg()
+            system.fwhm_per = per_fcn(system, hifac=hf, ofac=of, quantity='fwhm')
+            system.fwhm_per._plot()
 
         if args['rhk']: # periodogram of rhk
-            system.rhk_per = per_fcn(system, quantity='rhk')
+            system.rhk_per = per_fcn(system, hifac=hf, ofac=of, quantity='rhk')
             system.rhk_per._plot()
 
         if args['resid']: # periodogram of the residuals of the current fit
-            system.resid_per = per_fcn(system, quantity='resid')
+            system.resid_per = per_fcn(system, hifac=hf, ofac=of, quantity='resid')
             system.resid_per._plot()
 
     @needs_local_scope
