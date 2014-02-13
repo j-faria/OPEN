@@ -19,6 +19,7 @@ from .logger import clogger, logging
 from shell_colors import yellow
 from ext.get_rvN import get_rvn
 
+from tqdm import tqdm
 
 class rvSeries:
     """
@@ -144,6 +145,7 @@ class rvSeries:
         plt.ylabel('RV [km/s]')
         if leg: plt.legend()
         plt.tight_layout()
+        plt.ticklabel_format(useOffset=False)
         # plt.show()
         # pg.QtGui.QApplication.exec_()
 
@@ -152,6 +154,11 @@ class rvSeries:
         extra drift of specified degree (see *mod*). Lower panel presents RV 
         minus drift. Data from each file are color coded and labeled.
         """
+        try:
+            drift = self.model['drift']
+        except KeyError: # there is no drift set
+            return 
+
         colors = 'rgbmk' # possible colors
         t, rv, err = self.time, self.vrad_full, self.error # temporaries
         
@@ -165,7 +172,6 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
-        drift = self.model['drift']
         p = numpy.polyval(drift, self.time) # normal polynomial, for 2nd plot
         st = numpy.sort(self.time) # need this otherwise the plot gets messed up
         sp = numpy.polyval(drift, st) # "sorted" polynomial
@@ -184,12 +190,13 @@ class rvSeries:
         plt.ylabel('RV [km/s]')
         # plt.legend()
         plt.tight_layout()
+        plt.ticklabel_format(useOffset=False)
         plt.show()
 
     def do_plot_extras(self, extra):
         """ Plot other observed quantities as a function of time.
 
-        Parameters
+        Parameterslistcommands
         ----------
         extra: string
           One of the quantities available in system.extras
@@ -252,6 +259,7 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         ax1.plot(tt, final, 'k-')
+        ax1.ticklabel_format(useOffset=False)
 
         # redo this...
         t, rv, err = self.time, self.vrad, self.error # temporaries
@@ -445,7 +453,51 @@ class PeriodogramBase:
             threshold have FAPs smaller than FAPlevel.
       """
       Prob = 1.-(1.-FAPlevel)**(1./self.M)
-      return self.probInv(Prob)   
+      return self.probInv(Prob)  
+
+    def FAP_by_bootstrap(self):
+
+        name = '_' + self.__class__.__name__
+        # access the instance's __calcPeriodogramFast function
+        exec 'calc = self.' + name + '__calcPeriodogramFast'
+
+        # temporaries
+        f = self.freq
+        p = self.power
+
+        perc01 = 0.001 # 0.1% FAP
+        perc1 = 1.  # 1% FAP
+        perm = int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
+
+        maxPowers = []
+        for k in tqdm(range(perm)):
+            permutted = numpy.random.permutation(zip(self.y, self.error))
+            self.y = permutted[:,0]
+            self.error = permutted[:,1]
+
+            calc()
+            # self._plot_pg()
+            powermaxP = self.power.max()
+            maxPowers.append(powermaxP)
+        #print maxPowers
+
+        peaks = numpy.sort(maxPowers)
+        # index01 = int( ((1-perc01/100.0) * len(peaks)) )
+        index1 = int( ((1-perc1/100.0) * len(peaks)) )
+        # powerFAP_01 = peaks[index01]
+        powerFAP_1 = peaks[index1]
+
+
+        plt.semilogx(1./f, p, 'k-')
+        # plt.axhline(powerFAP_01,c='r',ls=':')
+        plt.axhline(powerFAP_1,c='r',ls='--')
+        plt.show()
+#         if orbit == 'circ':
+#             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
+#         if orbit == 'kep':
+#             powermaxP = (periodogram_kep.periodogram_kep(bjd,data_perm,sigma_perm,ofac,plow))[3]
+# #       print k
+#         maxPowers.append(powermaxP)
 
     def _plot(self, doFAP=False, verts=None, newFig=True, axes=None):
       """
@@ -492,7 +544,10 @@ class PeriodogramBase:
 
     def _plot_pg(self, doFAP=False, verts=None, newFig=True, axes=None):
 
-      p = pg.plot(1./self.freq, self.power, title="Periodogram")
+      if self.name == 'Bayesian Lomb-Scargle':
+        p = pg.plot(1./self.freq, self.power/self.power.max(), title="Periodogram")
+      else:
+        p = pg.plot(1./self.freq, self.power, title="Periodogram")
       p.plotItem.setLogMode(True, False)
       pg.QtGui.QApplication.exec_()
 
