@@ -295,14 +295,15 @@ def do_restrict(system, quantity, *args):
 
 	return
 
-def do_diffevol(system, just_de=False):
+def do_diffevol(system, just_de=False, npop=100, ngen=250):
 	""" Carry out the fit using a (experimental) differential evolution
 	algorithm """
 	from pyde.de import DiffEvol
 
 	try:
-		keplerians, degree = system.model.values()
-	except AttributeError:
+		degree = system.model['d']
+		keplerians = system.model['k']
+	except KeyError:
 		msg = red('Error: ') + 'Need to run mod before de. '
 		clogger.error(msg)
 		return	
@@ -332,7 +333,7 @@ def do_diffevol(system, just_de=False):
 			clogger.info(msg)
 			return
 
-
+	## fitness function - N planet model
 	def chi2_n(individual):
 		""" Fitness function for N planet model """
 		P, K, ecc, omega, T0, gam = [individual[i::6] for i in range(6)]
@@ -343,6 +344,8 @@ def do_diffevol(system, just_de=False):
 		#print chi2
 		return chi2
 
+	pars = ['P', 'K', 'ecc', 'w', 'T0', 'gama']
+	## parameter bounds 
 	par_bounds = []
 	par_bounds.append([5, 1000]) # period
 	par_bounds.append([0.5, 150]) # semi amplitude
@@ -351,18 +354,24 @@ def do_diffevol(system, just_de=False):
 	par_bounds.append([2350000, 2550000]) # periastron passage
 	par_bounds.append([-100, 100]) # offset
 
-	par_bounds = keplerians*par_bounds
+	par_bounds = keplerians*par_bounds  # same bounds for each planet
 
-	npop = 100
-	ngen = 250
 	npar = 5*keplerians+1
+	degfree = len(system.time) - npar
 	
-	de = DiffEvol(chi2_n, par_bounds, npop)
+	de = DiffEvol(chi2_n, par_bounds, npop, C=0.1)
 
 	msg = blue('INFO: ') + 'Created population with N=%d. Going to evolve for %d generations...' % (npop,ngen)
 	clogger.info(msg)
 
-	res = de.optimize(ngen=ngen)
+	# res = de.optimize(ngen=ngen)
+	print # newline
+	for niter, res in enumerate(de(ngen=ngen)):
+		if niter % 50 == 0:
+			for i in range(keplerians):
+				print('  ' + '\t'.join('{}: {:8.2f}'.format(*k) for k in zip(pars, de.minimum_location[6*i:6*(i+1)])))
+			print '  Best chi^2: %5.2f \t chi2_red: %5.2f \n' % (de.minimum_value, de.minimum_value/degfree)
+
 	best_param = de.minimum_location
 	best_fitness = de.minimum_value
 
@@ -379,7 +388,7 @@ def do_diffevol(system, just_de=False):
 		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 	print #newline
 	
-	msg = yellow('RESULT: ') + 'Best fitness value: %7.2f  (%6.2f)\n' % (best_fitness, best_fitness/(len(system.time)-npar))
+	msg = yellow('RESULT: ') + 'Best fitness value: %7.2f  (%6.2f)\n' % (best_fitness, best_fitness/degfree)
 	clogger.info(msg)
 
 	if just_de:
@@ -388,7 +397,8 @@ def do_diffevol(system, just_de=False):
 		return
 
 	msg = blue('INFO: ') + 'Calling LM to improve result...'
-	clogger.info(msg)	
+	clogger.info(msg)
+
 	## call levenberg markardt fit
 	lm = do_lm(system, best_param)
 	lm_par = lm[0]
@@ -579,7 +589,7 @@ def do_lm(system, x0):
 	# print x0
 	# print np.transpose(x0)
 
-	def chi2_n(params):
+	def chi2_n_leastsq(params):
 		""" Fitness function for N planet model """
 		#print params
 		P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
@@ -587,15 +597,16 @@ def do_lm(system, x0):
 		if any(e>1 or e<0 for e in ecc): return 1e99
 		get_rvn(system.time, P, K, ecc, omega, T0, gam[0], vel)
 		#print 'out of get_rvn'
-		return system.vrad - vel
+		return (system.vrad - vel) / system.error
 
 	def chi2_2(params):
 		P, K, ecc, omega, T0, gam = params
 		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
 		return system.vrad - vel
 
-	x0 = np.transpose(x0)
-	return leastsq(chi2_n, x0, full_output=0)#, maxfev=10)
+	# x0 = np.transpose(x0)
+	x0 = np.abs(x0)
+	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15)#, maxfev=10)
 
 
 def do_multinest(system):
