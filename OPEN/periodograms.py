@@ -388,7 +388,7 @@ class gls(PeriodogramBase):
       self.error = ones_like(self.y)
     elif quantity == 'fwhm':
       self.y = rv.extras.fwhm
-      self.error = ones_like(self.y)
+      self.error = 2.35 * rv.error #ones_like(self.y)
     elif quantity == 'rhk':
       self.y = rv.extras.rhk
       self.error = rv.extras.sig_rhk
