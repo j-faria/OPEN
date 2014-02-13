@@ -661,7 +661,8 @@ class bls(PeriodogramBase):
 
     # Build frequency array if not present
     if self.freq is None:
-      self.__buildFreq()
+      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      self.__buildFreq(plow=plow)
     # Circular frequencies
     omegas = 2.*pi * self.freq
 
