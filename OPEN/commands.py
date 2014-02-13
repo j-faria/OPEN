@@ -125,6 +125,19 @@ Options:
     -v --verbose  Verbose statistical output 
 """
 
+
+de_usage = \
+"""
+Usage:
+    de [--npop=<pop>] [--ngen=<gen>]
+    de -h | --help
+Options:
+    --npop=<pop>  Number of individuals in population [default: 100]
+    --ngen=<gen>  Number of generations to evolve [default: 250]
+    -h --help     Show this help message
+"""
+
+
 rrot_usage = \
 """
 Usage:
@@ -333,7 +346,7 @@ class EmbeddedMagics(Magics):
             per_fcn = periodograms.bls
             name = 'Bayesian Lomb-Scargle'
         if args['--fast']: 
-            per_fcn = periodograms.LombScargle
+            per_fcn = periodograms.ls_PressRybicki
             name = 'Lomb Scargle'
         if args['--gls']: 
             per_fcn = periodograms.gls
@@ -365,7 +378,7 @@ class EmbeddedMagics(Magics):
 
         if args['fwhm']: # periodogram of the CCF's fwhm
             system.fwhm_per = per_fcn(system, quantity='fwhm')
-            system.fwhm_per._plot()
+            system.fwhm_per._plot_pg()
 
         if args['rhk']: # periodogram of rhk
             system.rhk_per = per_fcn(system, quantity='rhk')
@@ -530,6 +543,19 @@ class EmbeddedMagics(Magics):
     def de(self, parameter_s='', local_ns=None):
         """ Run the differential evolution algorithm minimization - stub """
         from shell_colors import red
+        ## take care of arguments
+        try:
+            args = parse_arg_string('de', parameter_s)
+        except DocoptExit:
+            print de_usage.lstrip()
+            return
+        except SystemExit:
+            return
+        
+        ngen = int(args.pop('--ngen'))
+        npop = int(args.pop('--npop'))
+        
+        # default system?
         if local_ns.has_key('default'):
             system = local_ns['default']
         else:
@@ -538,7 +564,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_diffevol(system)
+        core.do_diffevol(system, npop=npop, ngen=ngen)
         system.do_plot_drift()
         system.do_plot_fit()
 
@@ -768,5 +794,8 @@ def parse_arg_string(command, arg_string):
 
     if command is 'rrot':
         args = docopt(rrot_usage, splitted)
+
+    if command is 'de':
+        args = docopt(de_usage, splitted)
 
     return args
