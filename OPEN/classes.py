@@ -44,8 +44,14 @@ class rvSeries:
     #     return "member of Test"
 
     def __init__(self, *filenames, **kwargs):
+        from shell_colors import red
+        try:
+            assert len(filenames)>=1
+        except AssertionError:
+          msg = red('ERROR: ') + 'Need at least one file to read! (aka, does that file exist?)'
+          clogger.fatal(msg)
+          return
 
-        assert len(filenames)>=1, "Need at least one file to read"
         # don't repeat files
         filenames = unique(filenames)
 
@@ -73,7 +79,6 @@ class rvSeries:
                rvIO.read_rv(*filenames, verbose=verbose, skip=skip, format=format)
         except ValueError as e:
           print e
-          from shell_colors import red
           msg = red('ERROR: ') + 'If your files have header lines set --skip option.\n'
           clogger.fatal(msg)
           return
