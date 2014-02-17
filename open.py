@@ -38,7 +38,7 @@ if __name__ == "__main__":
     banner =  u'Welcome to ' + version + '\n'
     banner += u'Created by João Faria | joao.faria@astro.up.pt\n\n'
     banner +=  'Type "listcommands" for a list of the available commands\n'
-    banner +=  'For help on a specific command, type "command -h" or see www.'
+    banner +=  'For help on a specific command, type "command -h" or see http://j-faria.github.io/OPEN'
     ipyshell = EmbedShell(config=cfg, user_global_ns=globals(),
                           banner1 = banner if (not args['--nobanner']) else '',
                           #banner2 = 'This is in banner 2',

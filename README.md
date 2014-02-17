@@ -32,10 +32,10 @@ When you start OPEN you're presented with the shell prompt
 ```
 $ python open.py 
 Welcome to OPEN v0.0.2
-Copyright (c) João Faria | joao.faria@astro.up.pt
+Created by João Faria | joao.faria@astro.up.pt
 
 Type "listcommands" for a list of the available commands
-For help on a specific command, type "command?" or see www.
+For help on a specific command, type "command-h" or see http://j-faria.github.io/OPEN
 OPEN [1]: 
 ```
 
