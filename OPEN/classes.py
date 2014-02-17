@@ -12,7 +12,11 @@ import matplotlib.gridspec as gridspec
 from collections import namedtuple # this requires Python >= 2.6
 
 # intra-package imports
-import pyqtgraph as pg
+try:
+    import pyqtgraph as pg
+except Exception:
+    print 'pyqtgraph will not be installed'
+
 import rvIO
 from .utils import unique
 from .logger import clogger, logging
@@ -532,12 +536,14 @@ class PeriodogramBase:
         self.ax.axhline(y=plvl1, color='k', ls='-', label='10%')
         self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
         self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
-        # self.ax.legend(frameon=False, bbox_to_anchor=(1.1, 1.05))
+        self.ax.legend(frameon=True)
 
       # plot vertical lines
       if verts is not None:
         for v in verts:
           self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5) 
+          if v==18:
+            self.ax.axvline(x=v, color='r', ls='--', lw=2) 
 
 
       plt.tight_layout()
