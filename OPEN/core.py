@@ -298,7 +298,7 @@ def do_restrict(system, quantity, *args):
 def do_diffevol(system, just_de=False, npop=100, ngen=250):
 	""" Carry out the fit using a (experimental) differential evolution
 	algorithm """
-	from pyde.de import DiffEvol
+	from de import DiffEvol
 
 	try:
 		degree = system.model['d']
