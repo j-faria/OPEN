@@ -170,7 +170,7 @@ command_list = \
  plot       Plot various quantities.
  per        Calculate periodograms.
  mod        Define the model that will be adjusted to the data.
- fit        ...
+ de         Fit the model using a Differential Evolution algorithm (somewhat experimental...)
  restrict   Select data based on date, SNR or RV accuracy.
  killall    Close all plot windows
 """
