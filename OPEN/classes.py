@@ -5,9 +5,12 @@
 # You should have received a copy of the license along with OPEN. See LICENSE.
 #
 
+# standard library imports
+import os
 # other imports
 import numpy
 import matplotlib.pylab as plt
+from matplotlib import rc, rc_params_from_file
 import matplotlib.gridspec as gridspec
 from collections import namedtuple # this requires Python >= 2.6
 
@@ -23,7 +26,11 @@ from .logger import clogger, logging
 from shell_colors import yellow
 from ext.get_rvN import get_rvn
 
-from tqdm import tqdm
+# if the interpreter calls open.py from another directory, matplotlib will not
+# access the matplotlibrc file and will revert to its defaults. This makes sure
+# we use it!
+p = os.path.dirname(os.path.realpath(__file__)) # path to this file (classes.py)
+rc( rc_params_from_file( p+'/../matplotlibrc' ) )
 
 class rvSeries:
     """
