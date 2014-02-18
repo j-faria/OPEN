@@ -13,11 +13,13 @@ FPYFLAGS += --opt="-O3" --fcompiler=gnu95
 # FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none"
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none"
 
-PYTHON=/home/joao/anaconda/bin/python
+### choose your python interpreter here
+# PYTHON=/home/joao/anaconda/bin/python
+PYTHON=python2.7
 
 # --- targets
 all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so
-	@echo "\n Done!"
+	@echo "Done!"
 
 
 ## compile bayesian lomb scargle periodogram
