@@ -1,6 +1,5 @@
 SUBROUTINE BLOMBSCARGLE(T, X, W, P, H2BAR, NT, NW)
-    IMPLICIT NONE
-
+!f2py threadsafe
 !f2py intent(in) T(NT)
 !f2py intent(in) X(NT)
 !f2py intent(in) W(NW)
@@ -8,7 +7,7 @@ SUBROUTINE BLOMBSCARGLE(T, X, W, P, H2BAR, NT, NW)
 !f2py intent(out) H2BAR(NW)
 !f2py intent(hide) NT
 !f2py intent(hide) NW
-
+    IMPLICIT NONE
 !* 
 !*  Input arguments
 !* 
@@ -57,9 +56,9 @@ SUBROUTINE BLOMBSCARGLE(T, X, W, P, H2BAR, NT, NW)
     X = X - Xmean
     Nd2bar = sum(X*X)
 
-    ! compute the lombscargle periodogram
-
     ! step through each frequency 
+    !$OMP PARALLEL PRIVATE(twopif, fourpif, cos4pift, sin4pift, theta, RR,II,CC,SS, difference)
+    !$OMP DO
     do j=1,NW
 
         twopif  = pi2 * W(j)
@@ -100,6 +99,8 @@ SUBROUTINE BLOMBSCARGLE(T, X, W, P, H2BAR, NT, NW)
         p(j) = (1.0/sqrt(CC*SS)) * difference**((2-NT)/2)
     
     end do
+    !$OMP END DO
+    !$OMP END PARALLEL
 
         
         

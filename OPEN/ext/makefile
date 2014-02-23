@@ -8,14 +8,14 @@ FCC = gfortran
 FFLAGS= -ffree-form -O3
 
 FPY = f2py
-FPYFLAGS = --quiet
-FPYFLAGS += --opt="-O3" --fcompiler=gnu95
-# FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none"
-FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none"
+# FPYFLAGS = --quiet
+FPYFLAGS += --opt="-O3" --fcompiler=gnu95 -lgomp
+FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none -fopenmp"
+FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none -fopenmp"
 
 ### choose your python interpreter here
-# PYTHON=/home/joao/anaconda/bin/python
-PYTHON=python2.7
+PYTHON=/home/joao/anaconda/bin/python
+# PYTHON=python2.7
 
 # --- targets
 all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so

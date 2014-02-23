@@ -1,6 +1,5 @@
 SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
-    IMPLICIT NONE
-
+!f2py threadsafe
 !f2py intent(in) T(NT)
 !f2py intent(in) Y(NT)
 !f2py intent(in) SIG(NT)
@@ -9,7 +8,7 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
 !f2py intent(out) M
 !f2py intent(hide) NT
 !f2py intent(hide) NW
-
+    IMPLICIT NONE
 !* 
 !*  Input arguments
 !* 
@@ -77,6 +76,8 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
     b = 0.d0
     off = 0.d0
 
+    !$OMP PARALLEL PRIVATE(x,cosx,sinx,wcosx,wsinx,C,S,YC,YS,CCh,CSh,SSh,CC,SS,CS,D)
+    !$OMP DO
     do I=1,NW
 
       x = W(I) * th
@@ -105,6 +106,8 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
       upow(I) = (SS*YC*YC + CC*YS*YS - 2.d0*CS*YC*YS) / (YYhat*D) ! Eq. (5)
 
     end do
+    !$OMP END DO
+    !$OMP END PARALLEL
 
     ! An ad-hoc estimate of the number of independent frequencies 
     ! see discussion following Eq. (24)

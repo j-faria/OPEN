@@ -488,7 +488,8 @@ class gls(PeriodogramBase):
     #   self._plot()
 
   def __calcPeriodogramFast(self):
-    """ Compute the GLS using the Fortran extension."""
+    """ Compute the GLS using the Fortran extension 
+    which allows speedups of ~6x."""
 
     # Build frequency array if not present
     if self.freq is None:
