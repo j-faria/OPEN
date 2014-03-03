@@ -521,9 +521,11 @@ class gls(PeriodogramBase):
       Build frequency array (`freq` attribute).
     """
     xdif = max(self.th)-min(self.th)
+    # print xdif
     # nout = self.ofac * self.hifac * len(self.th)/2
     nout = int(xdif * self.ofac / plow)
-    #print nout
+    # print nout
+    # sys.exit(0)
     self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
   def prob(self, Pn):
