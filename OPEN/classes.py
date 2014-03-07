@@ -7,12 +7,16 @@
 
 # standard library imports
 import os
-# other imports
-import numpy
-import matplotlib.pylab as plt
-from matplotlib import rc, rc_params_from_file
-import matplotlib.gridspec as gridspec
+import glob
+from fileinput import FileInput
+from itertools import islice, chain
 from collections import namedtuple # this requires Python >= 2.6
+# other imports
+import numpy as np
+import matplotlib.pylab as plt
+import scipy.stats
+# from matplotlib import rc, rc_params_from_file
+import matplotlib.gridspec as gridspec
 
 # intra-package imports
 try:
@@ -23,14 +27,17 @@ except Exception:
 import rvIO
 from .utils import unique
 from .logger import clogger, logging
-from shell_colors import yellow
+from shell_colors import yellow, blue
+from .utils import day2year, rms, ask_yes_no
 from ext.get_rvN import get_rvn
+
 
 # if the interpreter calls open.py from another directory, matplotlib will not
 # access the matplotlibrc file and will revert to its defaults. This makes sure
 # we use it!
-p = os.path.dirname(os.path.realpath(__file__)) # path to this file (classes.py)
-rc( rc_params_from_file( p+'/../matplotlibrc' ) )
+# p = os.path.dirname(os.path.realpath(__file__)) # path to this file (classes.py)
+# rc( rc_params_from_file( p+'/../matplotlibrc' ) )
+plt.ion()
 
 class rvSeries:
     """
@@ -57,16 +64,10 @@ class rvSeries:
         except AssertionError:
           msg = red('ERROR: ') + 'Need at least one file to read! (aka, does that file exist?)'
           clogger.fatal(msg)
-          return
+          raise IOError
 
         # don't repeat files
         filenames = unique(filenames)
-
-        # verbose?
-        try:
-          verbose = kwargs.pop('verbose')
-        except KeyError:
-          verbose = False
           
         # skip header lines? (no by default)
         try:
@@ -74,16 +75,10 @@ class rvSeries:
         except KeyError:
           skip = 0
 
-        # in which format are the files? (drs35 by default)
-        try:
-          format = kwargs.pop('format').lower()
-        except (KeyError, AttributeError): # this way we also catch the default None
-          format = 'drs35'
 
         # read data
         try:
-          t, rv, err, self.provenance, extras = \
-               rvIO.read_rv(*filenames, verbose=verbose, skip=skip, format=format)
+          data, self.provenance = rvIO.read_rv(*filenames, skip=skip)
         except ValueError as e:
           print e
           msg = red('ERROR: ') + 'If your files have header lines set --skip option.\n'
@@ -91,20 +86,12 @@ class rvSeries:
           return
 
         
-        self.time, self.vrad, self.error = (t, rv, err)
+        self.time, self.vrad, self.error = data.pop('jdb'), data.pop('vrad'), data.pop('svrad')
 
         # save the extra quantities as a namedtuple if we read them
-        if format == 'drs35': # default
-          extras_names = ['fwhm', 'contrast', 'bis_span', 'noise', 
-                          's_mw', 'sig_s', 'rhk', 'sig_rhk', 'sn_CaII', 
-                          'sn10', 'sn50', 'sn60']
-        elif format == 'drs34' or format == 'coralie':
-          extras_names = ['fwhm', 'contrast', 'bis_span', 'noise', 'sn10', 'sn50', 'sn60']
-        else:
-          extras_names = []
-        extra = namedtuple('Extra', extras_names, verbose=False)
-        self.extras = extra._make(extras)
-        self.extras_names = extras_names
+        extra = namedtuple('Extra', data.keys(), verbose=False)
+        self.extras = extra(**data)
+        self.extras_names = data.keys()
 
         # time, vrad and error can change, 
         # the *_full ones correspond always to the full set
@@ -113,6 +100,8 @@ class rvSeries:
         self.error_full = self.error
         # same for extras
         self.extras_full = self.extras
+
+        
 
     # associated model to be adjusted to the data
     # this will be a dictionary with the following key:value pairs:
@@ -130,6 +119,32 @@ class rvSeries:
 
     def save(self, filename):
         rvIO.write_rv(self, filename)
+
+
+    def stats(self):
+        # verbose stats about data
+        t, rv = self.time, self.vrad
+        info = blue('INFO: ') 
+        sinfo = blue('    : ') 
+        stats = None
+        tspan = max(t) - min(t)
+        rvspan = max(rv) - min(rv)
+        stats = '\n'
+        stats += info + "Timespan : %f days = %f years   ---   %f JD, %f JD\n" % (tspan, day2year(tspan), min(t), max(t))
+        stats += sinfo + "RV span  : %f km/s = %f m/s\n" % (rvspan, rvspan*1e3)
+        stats += sinfo + "RV rms [m/s] : %f\n\n" % rms(rv*1e3)
+        stats += sinfo + "{:14s} : {:10.3f}\n".format('<RV> [m/s]', np.mean(rv*1e3))
+        if len(self.extras) == 0: 
+            clogger.info(stats)
+            return
+
+        stats += sinfo + "{:14s} : {:10.3f}\n".format('<fwhm> [km/s]', np.mean(self.extras.fwhm))
+        stats += sinfo + "{:14s} : {:10.3f}\n".format('<contrast>', np.mean(self.extras.contrast) )
+        stats += sinfo + "{:14s} : {:10.3f}\n".format('<BIS> [km/s]', np.mean(self.extras.bis_span) )
+        stats += sinfo + "{:14s} : {:10.3f}\n".format('<S_index> [MW]', np.mean(self.extras.s_mw) )
+        stats += sinfo + "{:14s} : {:10.3f}\n".format('<log(rhk)>', np.mean(self.extras.rhk))
+
+        clogger.info(stats)
 
     def do_plot_obs(self, newFig=True, leg=True):
         """ Plot the observed radial velocities as a function of time.
@@ -189,8 +204,8 @@ class rvSeries:
             t, rv, err = t[m:], rv[m:], err[m:]
         
         p = numpy.polyval(drift, self.time) # normal polynomial, for 2nd plot
-        st = numpy.sort(self.time) # need this otherwise the plot gets messed up
-        sp = numpy.polyval(drift, st) # "sorted" polynomial
+        st = np.sort(self.time) # need this otherwise the plot gets messed up
+        sp = np.polyval(drift, st) # "sorted" polynomial
         ax1.plot(st, sp, 'y-')
 
         t, rv, err = self.time, self.vrad, self.error # temporaries
@@ -233,7 +248,10 @@ class rvSeries:
 
         plt.figure()
         # p = pg.plot()
-        plt.plot(t, self.extras[i], 'o', label=extra)
+        if extra == 'rhk':
+            plt.errorbar(t, self.extras.rhk, yerr=self.extras.sig_rhk, fmt='o', label=extra)
+        else:
+            plt.plot(t, self.extras[i], 'o', label=extra)
         
         plt.xlabel('Time [days]')
         plt.ylabel(extra + ' []')
@@ -254,8 +272,8 @@ class rvSeries:
         colors = 'rgbmk' # possible colors
         t, rv, err = self.time, self.vrad, self.error # temporaries
 
-        tt = numpy.linspace(self.time.min()-200, self.time.max()+300, 400)
-        final = numpy.zeros_like(tt)
+        tt = np.linspace(self.time.min()-200, self.time.max()+300, 400)
+        final = np.zeros_like(tt)
         
         par = self.fit['params']
         keplerians = int(len(par)/6)
@@ -279,7 +297,7 @@ class rvSeries:
 
         # redo this...
         t, rv, err = self.time, self.vrad, self.error # temporaries
-        final = numpy.zeros_like(t)
+        final = np.zeros_like(t)
         get_rvn(t, P, K, ecc, omega, T0, gam, final)
 
         ax2 = plt.subplot(gs[1], sharex=ax1)
@@ -293,8 +311,8 @@ class rvSeries:
 
         # redo this...
         t, rv, err = self.time-self.time.min(), self.vrad, self.error # temporaries
-        tt = numpy.linspace(self.time.min(), self.time.max(), 400)
-        final = numpy.zeros_like(tt)
+        tt = np.linspace(self.time.min(), self.time.max(), 400)
+        final = np.zeros_like(tt)
 
         ### phased RV curves
         plt.figure()
@@ -305,10 +323,10 @@ class rvSeries:
           # plot each file's values
           for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
               m = n-nout # how many values are there after restriction
-              ax.errorbar(numpy.modf(abs(t[:m]-T0[i])/P[i])[0], rv[:m], yerr=err[:m], \
+              ax.errorbar(np.modf(abs(t[:m]-T0[i])/P[i])[0], rv[:m], yerr=err[:m], \
                            fmt='o'+colors[i], label=fname)
               t, rv, err = t[m:], rv[m:], err[m:]
-          ax.plot( numpy.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
+          ax.plot( np.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
 
         plt.show()
 
@@ -324,7 +342,7 @@ class rvSeries:
         P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
         gam = gam[0]
 
-        final = numpy.zeros_like(self.time)
+        final = np.zeros_like(self.time)
         get_rvn(self.time, P, K, ecc, omega, T0, gam, final)
         self.fit['residuals'] = self.vrad - final
 
@@ -341,9 +359,9 @@ class rvSeries:
         """
         # this way is about 2 times faster than np.ediff1d
         if smallest:
-            return 0.5*1./numpy.min(self.time[1::]-self.time[0:-1])
+            return 0.5*1./np.min(self.time[1::]-self.time[0:-1])
         else:
-            return 0.5*1./numpy.mean(self.time[1::]-self.time[0:-1])
+            return 0.5*1./np.mean(self.time[1::]-self.time[0:-1])
 
     def get_time_to_plot(self):
         """
@@ -353,7 +371,7 @@ class rvSeries:
         N = len(self.time)
         minim = self.time.min() - 1.*std
         maxim = self.time.max() + 1.*std
-        return numpy.linspace(minim, maxim, 2*N)
+        return np.linspace(minim, maxim, 10*N)
         
         
 class PeriodogramBase:
@@ -487,7 +505,7 @@ class PeriodogramBase:
 
         maxPowers = []
         for k in tqdm(range(perm)):
-            permutted = numpy.random.permutation(zip(self.y, self.error))
+            permutted = np.random.permutation(zip(self.y, self.error))
             self.y = permutted[:,0]
             self.error = permutted[:,1]
 
@@ -497,7 +515,7 @@ class PeriodogramBase:
             maxPowers.append(powermaxP)
         #print maxPowers
 
-        peaks = numpy.sort(maxPowers)
+        peaks = np.sort(maxPowers)
         # index01 = int( ((1-perc01/100.0) * len(peaks)) )
         index1 = int( ((1-perc1/100.0) * len(peaks)) )
         # powerFAP_01 = peaks[index01]
@@ -508,14 +526,14 @@ class PeriodogramBase:
         # plt.axhline(powerFAP_01,c='r',ls=':')
         plt.axhline(powerFAP_1,c='r',ls='--')
         plt.show()
-#         if orbit == 'circ':
-#             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
-#         if orbit == 'kep':
-#             powermaxP = (periodogram_kep.periodogram_kep(bjd,data_perm,sigma_perm,ofac,plow))[3]
-# #       print k
-#         maxPowers.append(powermaxP)
+        #         if orbit == 'circ':
+        #             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
+        #         if orbit == 'kep':
+        #             powermaxP = (periodogram_kep.periodogram_kep(bjd,data_perm,sigma_perm,ofac,plow))[3]
+        # #       print k
+        #         maxPowers.append(powermaxP)
 
-    def _plot(self, doFAP=False, verts=None, newFig=True, axes=None):
+    def _plot(self, doFAP=False, faps=None, verts=None, newFig=True, axes=None, **kwargs):
       """
         Create a plot.
       """
@@ -535,10 +553,12 @@ class PeriodogramBase:
       self.ax.set_ylabel(ylabel)
       if self.power.max() < 1e-300:  # apparently, Metplotlib can't plot these small values
         clogger.warning(yellow('Warning: ')+'Max value < 1e-300, plotting normalized periodogram')
-        self.ax.semilogx(1./self.freq, self.power/self.power.max(), 'b-')
+        self.ax.semilogx(1./self.freq, self.power/self.power.max(), 'b-', **kwargs)
       else:
-        self.ax.semilogx(1./self.freq, self.power, 'b-')
+        self.ax.semilogx(1./self.freq, self.power, 'b-', **kwargs)
       # plot FAPs
+      if doFAP and (faps is None):
+        clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
       if doFAP: # do default FAPs of 10%, 1% and 0.1%
         pmin = 1./self.freq.min()
         pmax = 1./self.freq.max()
@@ -554,8 +574,8 @@ class PeriodogramBase:
       if verts is not None:
         for v in verts:
           self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5) 
-          if v==18:
-            self.ax.axvline(x=v, color='r', ls='--', lw=2) 
+          # if v==18:
+          #   self.ax.axvline(x=v, color='r', ls='--', lw=2) 
 
 
       plt.tight_layout()
@@ -690,3 +710,139 @@ class PeriodogramBase:
 #        print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
 #        print "-----------------------------------"
 
+
+
+class MCMC:
+    def __init__(self, filename_glob, burnin=0):
+        self.chain_filenames = sorted(glob.glob(filename_glob))
+        self.nchains = len(self.chain_filenames)
+
+        self.burnin = burnin
+
+    def read_chains(self):
+        nc = self.nchains
+        # black magic to build input from file list while skipping headers
+        finput = [FileInput(f) for f in sorted(self.chain_filenames)]
+        iterables = [islice(f, self.burnin+1, None) for f in finput]
+        files = chain(*iterables)
+
+        chains = np.loadtxt(files, unpack=True)
+
+        self.nplanets = (chains.shape[0]-3)/5
+        # print 'It appears there are', self.nplanets, 'planet(s)'
+        # sys.exit(0)
+
+        self.chains = np.array(chains)
+        self.chains = np.ma.masked_invalid(self.chains) # remove NaNs
+
+        parameter_names = ['period', 'K', 'ecc', 'omega', 't0']
+        parameter_names = np.array([[par + '_'+str(i) for par in parameter_names] for i in range(self.nplanets)])
+
+        p = namedtuple('parameter', parameter_names.flat)
+
+        # this makes a namedtuple of the ith chain
+        # self.trace = p._make(self.chains[i,2:-1,:])
+
+        # this makes a namedtuple of all the chains together
+        self.trace = p._make(self.chains[2:-1, self.burnin:])
+
+    def kde1d(self, parameter, ind=None, npoints=100):
+        try:
+            trace_dict = self.trace._asdict()
+            t = trace_dict[parameter]
+            gkde = scipy.stats.gaussian_kde(t)
+            if ind is None:
+                ind = np.linspace(min(t), max(t), npoints)
+            return gkde.evaluate(ind)   
+        except KeyError:
+            print 'No parameter named', parameter
+            print 'Try one of these:', self.trace._fields
+
+    def kde2d(self, parameters, ind=None, npoints=100):
+
+
+        """ Perform kernel density estimation on the joint distribution
+        of two parameters.
+
+        parameters: list with two parameters
+        ind, optional: mesh grid on which to evaluate the kde
+        """
+        p = np.atleast_1d(parameters)
+        assert np.shape(p)[0] == 2, 'Give me two parameters!'
+
+        trace_dict = self.trace._asdict()
+        for par in p:
+            try: 
+                t = trace_dict[par]
+            except KeyError:
+                print 'No parameter named', par
+                print 'Try one of these:', self.trace._fields
+                return
+
+        print 'Estimating kde for', p[0], 'and', p[1]
+        t1 = trace_dict[p[0]]
+        t2 = trace_dict[p[1]]
+        gkde = scipy.stats.gaussian_kde([t1, t2])
+        x,y = np.mgrid[min(t1) : max(t1) : (max(t1)-min(t1)) / 20, 
+                       min(t2) : max(t2) : (max(t2)-min(t2)) / 20]
+        z = np.array(gkde.evaluate([x.flatten(),y.flatten()])).reshape(x.shape)
+        return x, y, z
+
+    def do_plot_some_solutions(self, system):
+        """ Plot the observed radial velocities as a function of time together
+        with a random choice of solutions from the MCMC
+        Data from each file are color coded and labeled.
+        """
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        tt = system.get_time_to_plot()
+        vel = np.zeros_like(tt)
+
+        n_solutions = 20
+        # random n_solutions indices from chains array
+        ind = np.random.choice(self.chains[0,:].size, size=n_solutions, replace=False)
+        # parameters corresponding to those random indices
+        par = self.chains[2:, ind]
+
+        ## best solution found
+        best_ind = np.argmax(self.chains[1, :])
+        par_best = self.chains[2:, best_ind]
+
+        newFig=True        
+        if newFig: 
+            plt.figure()
+
+        # plot each solution
+        for i in range(n_solutions):
+            p = par[:,i]
+            args = [tt] + list(p) + [vel]
+            get_rvn(*args)
+            if i == 0:
+                plt.plot(tt, vel, '-k', alpha=0.5, label='random')
+            else:
+                plt.plot(tt, vel, '-k', alpha=0.5)
+
+        # plot best solution
+        args = [tt] + list(par_best) + [vel]
+        get_rvn(*args)
+        plt.plot(tt, vel, '-g', lw=2.5, label='best')
+
+        # plot each files' values
+        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+            plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
+                         fmt='o'+colors[i], label=os.path.basename(fname))
+            t, rv, err = t[m:], rv[m:], err[m:]
+        
+        plt.xlabel('Time [days]')
+        plt.ylabel('RV [km/s]')
+        plt.legend()
+        plt.tight_layout()
+        plt.ticklabel_format(useOffset=False)
