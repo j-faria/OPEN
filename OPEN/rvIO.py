@@ -8,14 +8,12 @@
 # standard library imports
 from fileinput import FileInput
 from itertools import islice, chain
+import StringIO
 import os
-
-# other imports
-from numpy import loadtxt, savetxt, mean
 
 # intra-package imports
 from .logger import clogger, logging
-from .utils import day2year, rms, ask_yes_no
+from .utils import notnan
 from shell_colors import blue, yellow
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
@@ -28,26 +26,19 @@ def read_rv(*filenames, **kwargs):
     Parameters
     ----------
     filenames: string
-        One or more files to read.
+        One or more files to read
 
     Optional kwargs
     ---------------
     skip: number of lines to skip in the files' headers
-    format: column-format of the files
     verbose: verbosity toggle
     
     Returns
     -------
-    t: array
-        Times of observations.
-    rv: array
-        Radial velocity values.
-    err: array
-        Error in the radial velocity.
+    data: dict
+        Data in the files with keys the column names
     dic: dict
-        Dictionary with name and number of values from each file.
-    others: tuple
-        Extra columns present in the file
+        Dictionary with name of file and number of values from each file
     """
 
     # set logging level
@@ -57,9 +48,6 @@ def read_rv(*filenames, **kwargs):
 
     # how many header lines to skip?
     if (kwargs.has_key('skip')): header_skip = int(kwargs['skip'])
-    # format of file
-    if (kwargs.has_key('format')): format = kwargs['format']
-    format = 'drs35' if (format is None) else format
 
     dic = {} # will hold how many values per file
     for filename in sorted(filenames):
@@ -72,57 +60,47 @@ def read_rv(*filenames, **kwargs):
         else:
             # should raise an error or read from the other files?
             raise IOError("The file '%s' doesn't seem to exist" % filename)
-            
-    # black magic to build input from file list while skipping headers
-    finput = [FileInput(f) for f in sorted(filenames)]
-    iterables = [islice(f, header_skip, None) for f in finput]
-    files = chain(*iterables)
+    
+    # black magic to build input from file list while skipping headers 
+    if (header_skip>0): 
+        # the first file's header is needed for genfromtxt names
+        with open(filenames[0]) as f:
+            header = StringIO.StringIO(f.readline())
+    else:
+        # assume only 3 columns if no column names present
+        header = StringIO.StringIO('jdb vrad svrad')
 
-    # read data
-    if format == 'drs35': # default
-        t, rv, err, \
-        fwhm, contrast, bis_span, noise, s_mw, sig_s, \
-        rhk, sig_rhk, sn_CaII, sn10, sn50, sn60 = loadtxt(files, unpack=True)
-        others = (fwhm, contrast, bis_span, noise, s_mw, sig_s, rhk, sig_rhk, sn_CaII, sn10, sn50, sn60)
+    finput = [FileInput(f) for f in sorted(filenames)] # joins files in one list
+    iterables = [islice(f, header_skip, None) for f in finput] # remove each file's first header_skip lines
+    iterables.insert(0, header) # insert header back again
+    files = chain(*iterables) # chains everything in one iterable
 
-    elif format == 'drs34' or format == 'coralie':
-        t, rv, err, \
-        fwhm, contrast, bis_span, noise, sn10, sn50, sn60  = loadtxt(files, unpack=True)
-        others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
+    # # read data
+    # if format == 'drs35': # default
+    #     t, rv, err, \
+    #     fwhm, contrast, bis_span, noise, s_mw, sig_s, \
+    #     rhk, sig_rhk, sn_CaII, sn10, sn50, sn60 = loadtxt(files, unpack=True)
+    #     others = (fwhm, contrast, bis_span, noise, s_mw, sig_s, rhk, sig_rhk, sn_CaII, sn10, sn50, sn60)
 
-    # elif format == 'coralie':
-    #     t, rv, err, 
-    #     fwhm, contrast, bis_span, noise, sn10, sn50, sn60 = loadtxt(files, unpack=True)
+    # elif format == 'drs34' or format == 'coralie':
+    #     t, rv, err, \
+    #     fwhm, contrast, bis_span, noise, sn10, sn50, sn60  = loadtxt(files, unpack=True)
     #     others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
 
-    elif format == 'basic':
-        t, rv, err = loadtxt(files, unpack=True, usecols=(0,1,2))
-        others = ()
+    # # elif format == 'coralie':
+    # #     t, rv, err, 
+    # #     fwhm, contrast, bis_span, noise, sn10, sn50, sn60 = loadtxt(files, unpack=True)
+    # #     others = (fwhm, contrast, bis_span, noise, sn10, sn50, sn60)
 
+    # elif format == 'basic':
+    #     t, rv, err = loadtxt(files, unpack=True, usecols=(0,1,2))
+    #     others = ()
+
+    data = genfromtxt(files, unpack=True, names=True) # this returns a structured array
+    # this casts it into a dictionary because I don't understand structured arrays...
+    data = {field:notnan(data[field]) for field in data.dtype.names}
     
-    # verbose stats about data
-    info = blue('INFO: ') 
-    sinfo = blue('    : ') 
-    stats = None
-    if (kwargs.has_key('verbose') and kwargs['verbose']):
-        tspan = max(t) - min(t)
-        rvspan = max(rv) - min(rv)
-        stats = '\n'
-        stats += info + "Timespan : %f days = %f years   ---   %fJD, %fJD\n" % (tspan, day2year(tspan), max(t), min(t))
-        stats += sinfo + "RV span  : %f km/s = %f m/s\n" % (rvspan, rvspan*1e3)
-        stats += sinfo + "RV rms [m/s] : %f\n\n" % rms(rv)
-        stats += sinfo + "{:14s} : {:10.3f}\n".format('<RV> [km/s]', mean(rv))
-        if format in ('drs35', 'drs34', 'coralie'):
-            stats += sinfo + "{:14s} : {:10.3f}\n".format('<fwhm> [km/s]', mean(others[0]))
-            stats += sinfo + "{:14s} : {:10.3f}\n".format('<contrast>', mean(others[1]))
-            stats += sinfo + "{:14s} : {:10.3f}\n".format('<BIS> [km/s]', mean(others[2]))
-            if format in ('drs35'):
-                stats += sinfo + "{:14s} : {:10.3f}\n".format('<S_index> [MW]', mean(others[4]))
-                stats += sinfo + "{:14s} : {:10.3f}\n".format('<log(rhk)>', mean(others[6]))
- 
-    clogger.verbose(stats)
-    
-    return t, rv, err, dic, others
+    return data, dic
     
     
 
