@@ -28,6 +28,7 @@ from scipy.stats.stats import spearmanr, pearsonr
 from scipy.stats import nanmean, nanstd
 
 # intra-package imports
+from .classes import MCMC
 from logger import clogger, logging
 from ext.get_rvN import get_rvn
 from .periodograms import ls_PressRybicki, gls
@@ -37,7 +38,7 @@ try:
 except ImportError:
 	periodogram_DF_available = False
 from shell_colors import yellow, red, blue
-from .utils import julian_day_to_date
+from .utils import julian_day_to_date, triangle_plot
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 pi = np.pi
@@ -295,6 +296,85 @@ def do_restrict(system, quantity, *args):
 
 	return
 
+def do_demc(system, burnin=500):
+	import demc.dream as dream
+	from time import sleep
+	from re import findall
+
+	try:
+		degree = system.model['d']
+		keplerians = system.model['k']
+	except TypeError:
+		msg = red('Error: ') + 'Need to run mod before de. '
+		clogger.error(msg)
+		return	
+
+	msg = blue('INFO: ') + 'Transfering data to DREAM...'
+	clogger.info(msg)
+	msg = blue('    : ') + 'Model is: %d keplerians + %d drift' % (keplerians, degree)
+	clogger.info(msg)
+
+	# write data to file to be read by DREAM
+	dream_filename = 'input.rv'
+	dream_header = 'file automatically generated for OPEN-DREAM analysis, ' + timestamp
+	dream_header += '\n' + str(len(system.time))
+	savetxt(dream_filename, zip(system.time, system.vrad, system.error),
+		    header=dream_header,
+		    fmt=['%12.6f', '%7.5f', '%7.5f'])
+
+	## get number of chains and generations from namelist
+	with open('OPEN/demc/namelist1') as f:
+		l1 = [line for line in f.readlines() if 'gen_num' in line][0]
+		ngen = int(''.join(findall(r'[0-9]', l1)))
+		f.seek(0)
+		l2 = [line for line in f.readlines() if 'chain_num' in line][0]
+		nc = int(''.join(findall(r'[0-9]', l2)))
+
+	msg = blue('    : ') + 'Going to evolve %d chains for %d generations...' % (nc, ngen)
+	clogger.info(msg)
+
+	# let the user read the previous messages :)
+	sleep(1.5)
+
+	msg = blue('    : ') + 'Starting DREAM...'
+	clogger.info(msg)
+
+	dream.main()
+
+	msg = blue('INFO: ') + 'DREAM: normal end of execution'
+	clogger.info(msg)
+	msg = blue('    : ') + 'Starting analysis of output...'
+	clogger.info(msg)
+
+	results = MCMC('OPEN/demc/problem1_chain*', burnin=burnin)
+	results.read_chains()
+
+	## output best solution
+	best_ind = np.argmax(results.chains[1, :])
+	par_best = results.chains[2:, best_ind]
+	print # newline
+	msg = yellow('RESULT: ') + 'Best solution is'
+	clogger.info(msg)
+	## loop over planets
+	print("%3s %12s %10s %10s %10s %15s %9s" % \
+		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+	for i, planet in enumerate(list(ascii_lowercase)[:keplerians]):
+		P, K, ecc, omega, T0, gam = [par_best[j::6] for j in range(6)]
+		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+	
+	print # newline
+	msg = blue('INFO: ') + 'Estimating kernels...'
+	clogger.info(msg)
+
+	# p = results.kde1d('period_0', npoints=300)
+	# ind = np.linspace(0.2, 5000, 300)
+
+	# triangle_plot(results.chains[2:].T, quantiles=[0.5])
+	results.do_plot_some_solutions(system)
+
+	return results
+
+
 def do_diffevol(system, just_de=False, npop=100, ngen=250):
 	""" Carry out the fit using a (experimental) differential evolution
 	algorithm """
@@ -303,7 +383,7 @@ def do_diffevol(system, just_de=False, npop=100, ngen=250):
 	try:
 		degree = system.model['d']
 		keplerians = system.model['k']
-	except KeyError:
+	except TypeError:
 		msg = red('Error: ') + 'Need to run mod before de. '
 		clogger.error(msg)
 		return	
@@ -419,7 +499,6 @@ def do_diffevol(system, just_de=False, npop=100, ngen=250):
 
 	# save fit in the system
 	system.save_fit(lm_par, chi2)
-
 
 def do_genetic(system, just_gen=False):
 	""" Carry out the fit using a genetic algorithm and if 
@@ -675,13 +754,14 @@ def do_correlate(system, vars=(), verbose=False):
 	plt.show()
 
 
-def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
-	print fwhm
+def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=True, full=False):
 	try:
 		system.per
 	except AttributeError:
 		if fwhm:
 			system.per = gls(system, quantity='fwhm')
+		if rhk:
+			system.per = gls(system, quantity='rhk')
 		else:
 			system.per = gls(system)
 
@@ -690,52 +770,87 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 	else:
 		prot = float(prot)
 
-	msg = blue('INFO: ') + 'Removing Prot=%.2f days\n' % prot
+	quantity = 'RV'
+	if fwhm: 
+		system.vrad = system.extras.fwhm
+		system.error = 2.35 * system.error
+		quantity = 'FWHM'
+	elif rhk:
+		system.vrad = system.extras.rhk
+		system.error = system.extras.sig_rhk
+		quantity = 'RHK'
+
+	if fix_p:
+		msg = blue('INFO: ') + 'Removing Prot=%.2f days (exactly) from %s \n' % (prot, quantity)
+	else:
+		msg = blue('INFO: ') + 'Removing Prot=%.2f days (fitting it) from %s\n' % (prot, quantity)
 	msg += blue('    : ') + 'plus %d harmonics' % (nrem-1)
 	clogger.info(msg)
 
-	if fwhm: system.vrad = system.extras.fwhm
-
 	vrad_mean = system.vrad.mean()
-	t, v = system.time, system.vrad - vrad_mean # temporaries
+	t, v, err = system.time, system.vrad - vrad_mean, system.error # temporaries
 
 	if nrem == 1:
 		def func(par, *args):
-			As, Ac, P = par
+			if fix_p:
+				As, Ac = par
+				P = prot
+			else:
+				As, Ac, P = par
 			# P = args
-			return v - (As*np.sin(2.*pi*t/P) + Ac*np.cos(2.*pi*t/P))
+			return (v - (As*np.sin(2.*pi*t/P) + Ac*np.cos(2.*pi*t/P)) ) / err
 
-		rot_param = leastsq(func, [0.001, 0.001, prot], maxfev=50000)[0]
+		starting_values = [0.001, 0.001]
+		if not fix_p: starting_values = starting_values + [prot]
+		rot_param = leastsq(func, starting_values, maxfev=50000)[0]
 		print rot_param
 
 	elif nrem == 2:	
 		def func2(par, *args):
-			As1, Ac1, As2, Ac2, P = par
-			# P = args
+			if fix_p:
+				As1, Ac1, As2, Ac2 = par
+				P = prot
+			else:
+				As1, Ac1, As2, Ac2, P = par
+			# P = args[0]
 			Po2 = P/2.
-			return v - (As1*np.sin(2.*pi*t/P) + Ac1*np.cos(2.*pi*t/P)) - (As2*np.sin(2.*pi*t/Po2) + Ac2*np.cos(2.*pi*t/Po2))
+			return (v - (As1*np.sin(2.*pi*t/P) + Ac1*np.cos(2.*pi*t/P)) - (As2*np.sin(2.*pi*t/Po2) + Ac2*np.cos(2.*pi*t/Po2)) ) / err
 
-		rot_param = leastsq(func2, [0.001, 0.001, 0.01, 0.01, prot], maxfev=100000)[0]
+		starting_values = [0.1, 0.1, 0.01, 0.01]
+		if not fix_p: starting_values = starting_values + [prot]
+		rot_param = leastsq(func2, starting_values, maxfev=500000)[0]
 		print rot_param
 
-	system.per._plot(verts=[rot_param[4]/i for i in [1,2,3]])
+	if fix_p: 
+		prot_fit = prot
+	else: 
+		prot_fit = rot_param[4] # the period that we ended up removing
 
-	# plt.figure()
-	# plt.subplot(211)
-	# plt.plot(system.time, system.vrad, 'o')
-	# plt.subplot(212)
-	# xx = np.linspace(t.min(), t.max(), 500)
+	print 'Phase = ', np.arctan2(rot_param[1], rot_param[0])
 
-	# As1, Ac1, As2, Ac2 = rot_param
-	# plt.plot(xx, (As1*np.sin(2.*pi*xx/prot) + Ac1*np.cos(2.*pi*xx/prot)) + \
-	# 	         (As2*np.sin(pi*xx/prot) + Ac2*np.cos(pi*xx/prot)), 'o-')
-	# plt.plot(system.time, system.vrad, 'ro')
+	system.per._plot(verts=[prot_fit/i for i in range(1,nrem+1)], doFAP=True)
+
+	plt.figure()
+	plt.subplot(211)
+	plt.plot(system.time, system.vrad, 'o')
+	plt.subplot(212)
+	xx = np.linspace(t.min(), t.max(), 500)
+
+	if fix_p:
+		As1, Ac1, As2, Ac2 = rot_param
+		P = prot
+	else:
+		As1, Ac1, As2, Ac2, P = rot_param
+
+	plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
+		         (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), 'o-')
+	plt.errorbar(system.time, system.vrad - vrad_mean, yerr=err, fmt='ro')
 
 	# plt.figure()
 	# plt.subplot(111)
 	# plt.plot(system.time, system.vrad, 'o')
-	if nrem == 1: vrad_new = func(rot_param, prot) + vrad_mean
-	elif nrem == 2: vrad_new = func2(rot_param, prot) + vrad_mean
+	if nrem == 1: vrad_new = func(rot_param, prot)*err + vrad_mean
+	elif nrem == 2: vrad_new = func2(rot_param, prot)*err + vrad_mean
 	# plt.plot(system.time, vrad_new, 'go')
 
 	# plt.show()
@@ -743,7 +858,23 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 	newsystem = copy.copy(system)
 	newsystem.vrad = vrad_new
 	per = gls(newsystem)
-	per._plot()
+	per._plot(doFAP=True, verts=[prot/i for i in range(1,nrem+1)]+[18])
+
+	msg = blue('INFO: ') + 'Setting new RV array'
+	clogger.info(msg)
+	system.vrad = newsystem.vrad
+
+	# msg = blue('INFO: ') + 'Removing harmonics also from FWHM'
+	# clogger.info(msg)
+
+	# d = system.extras._asdict() # asdict because namedtuple is immutable
+	# field = 'fwhm'
+	# d[field] = system.extras.fwhm - system.extras.fwhm.mean() \
+	#            - (As1*np.sin(2.*pi*t/P) + Ac1*np.cos(2.*pi*t/P)) + (As2*np.sin(4.*pi*t/P) + Ac2*np.cos(4.*pi*t/P))
+
+	# extra = namedtuple('Extra', system.extras_names, verbose=False)
+	# system.extras = extra(**d)
+
 
 	if full:
 		##### do a "global" fit with 1 keplerian plus removing rotation harmonics
@@ -754,9 +885,9 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 		def func3(params, return_model=False, times=None):
 			""" Fitness function for 1 planet model plus rotational harmonics """
 			#print params
-			P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, As3, Ac3, Prot = params
+			P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, Prot = params
 			Po2 = Prot / 2.
-			Po3 = Prot / 3.
+			# Po3 = Prot / 3.
 			#print ecc
 			if (ecc>1 or ecc<0): return 1e99
 			# if any(e>1 or e<0 for e in ecc): return 1e99
@@ -764,17 +895,17 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 				get_rvn(times, P, K, ecc, omega, T0, gam, vel1)
 				return vel1 + \
 				        (As1*np.sin(2.*pi*times/Prot) + Ac1*np.cos(2.*pi*times/Prot)) + \
-				        (As2*np.sin(2.*pi*times/Po2) + Ac2*np.cos(2.*pi*times/Po2)) + \
-				        (As3*np.sin(2.*pi*times/Po3) + Ac3*np.cos(2.*pi*times/Po3))
+				        (As2*np.sin(2.*pi*times/Po2) + Ac2*np.cos(2.*pi*times/Po2)) #+ \
+				        # (As3*np.sin(2.*pi*times/Po3) + Ac3*np.cos(2.*pi*times/Po3))
 			else:
 				get_rvn(t, P, K, ecc, omega, T0, gam, vel)
 				return v - vel - \
 				        (As1*np.sin(2.*pi*t/Prot) + Ac1*np.cos(2.*pi*t/Prot)) - \
-				        (As2*np.sin(2.*pi*t/Po2) + Ac2*np.cos(2.*pi*t/Po2)) - \
-				        (As3*np.sin(2.*pi*t/Po3) + Ac3*np.cos(2.*pi*t/Po3))
+				        (As2*np.sin(2.*pi*t/Po2) + Ac2*np.cos(2.*pi*t/Po2)) #- \
+				        # (As3*np.sin(2.*pi*t/Po3) + Ac3*np.cos(2.*pi*t/Po3))
 
 		# initial parameters [P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, As3, Ac3, Prot]
-		x0 = [18., 0.005, 0.2, 0., t.min(), 0., 0.01, 0.01, 0.005, 0.005, 0.001, 0.001, 25.]
+		x0 = [18., 0.005, 0.2, 0., t.min(), 0., 0.01, 0.01, 0.005, 0.005, prot]
 		best_param = leastsq(func3, x0)[0]
 		print best_param
 
@@ -787,9 +918,10 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 		plt.ylim([-0.01, 0.015])
 		# keplerian curve only
 		plt.subplot(212)
-		P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, As3, Ac3, Prot = best_param
+		P, K, ecc, omega, T0, gam, As1, Ac1, As2, Ac2, Prot = best_param
 		get_rvn(xx, P, K, ecc, omega, T0, gam, vel1)
-		plt.plot(xx, vel1, 'k-')
+		plt.plot(xx, vel1, 'k-', label='keplerian, P='+str(P))
+		plt.legend()
 		plt.ylim([-0.01, 0.015])
 		plt.show()
 
@@ -797,7 +929,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, full=True):
 		newsystem.vrad = func3(best_param)
 		per = gls(newsystem)
 		per._plot()
-		# # system.vrad = newsystem.vrad
+		system.vrad = newsystem.vrad
 
 
 
