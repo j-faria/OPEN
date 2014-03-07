@@ -11,6 +11,9 @@ from itertools import islice, chain
 import StringIO
 import os
 
+# other imports
+from numpy import genfromtxt, savetxt, mean
+
 # intra-package imports
 from .logger import clogger, logging
 from .utils import notnan
