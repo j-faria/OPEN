@@ -9,6 +9,7 @@ This module defines the commands that are used as magics in OPEN.
 """
 # standard library imports
 import glob
+from os.path import expanduser
 from itertools import chain
 
 # IPython imports
@@ -16,6 +17,9 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
                                 needs_local_scope)
 from IPython.core.magic_arguments import argument
 from IPython.utils.io import ask_yes_no
+
+# other imports
+from numpy import sqrt
 
 # intra-package imports
 from .docopt import docopt, DocoptExit
@@ -143,12 +147,25 @@ rrot_usage = \
 """
 Usage:
     remove_rotation [fwhm]
-    remove_rotation [fwhm] [--prot=<p>] [--nrem=<nr>]
+    remove_rotation [-n SYSTEM] [fwhm | rhk] [--prot=<p>] [--nrem=<nr>]
     remove_rotation -h | --help
 Options:
+    -n SYSTEM   Specify name of system (else use default)
     --prot=<p>
     --nrem=<nr>  Number of harmonics to remove (including Prot) [default: 1]
     -h --help    Show this help message
+"""
+
+addnoise_usage = \
+"""
+Usage:
+    add_noise <number>
+    add_noise -n SYSTEM <number>
+    add_noise -h | --help
+Options
+    <number>    Add <number> m/s to the RV uncertainties.
+    -n SYSTEM   Specify name of system (else use default)
+    -h --help   Show this help message
 """
 
 restrict_usage = \
@@ -213,8 +230,8 @@ class EmbeddedMagics(Magics):
         except SystemExit:
             return
 
-        # take care of glob expansions
-        globs = [glob.glob(f) for f in args['<file>']]
+        # take care of glob (and tilde) expansions
+        globs = [glob.glob(expanduser(f)) for f in args['<file>']]
         filenames = list(chain.from_iterable(globs)) # some magic...
 
         # if 'default' system is already set, return the rvSeries class
@@ -222,15 +239,17 @@ class EmbeddedMagics(Magics):
         # that we can do, e.g., HDXXXX = %read file1 file2
         if local_ns.has_key('default') and not args['-d']:
             try:
-                return rvSeries(*filenames, verbose=args['--verbose'],
-                                            skip=args['--skip'], 
-                                            format=args['--format'])
+                return rvSeries(*filenames, skip=args['--skip'])
             except AttributeError:
                 pass
         else:
-            local_ns['default'] = rvSeries(*filenames, verbose=args['--verbose'],
-                                                       skip=args['--skip'],
-                                                       format=args['--format'])
+            try:
+                local_ns['default'] = rvSeries(*filenames, skip=args['--skip'])
+            except IOError:
+                return
+
+        if args['--verbose']:
+            local_ns['default'].stats()
 
     @needs_local_scope
     @line_magic
@@ -341,7 +360,6 @@ class EmbeddedMagics(Magics):
         verb = True if args['--verbose'] else False
         hf = float(args.pop('--hifac'))
         of = float(args.pop('--ofac'))
-        print of
 
         # which periodogram should be calculated?
         per_fcn = None
@@ -573,6 +591,23 @@ class EmbeddedMagics(Magics):
 
     @needs_local_scope
     @line_magic
+    def demc(self, parameter_s='', local_ns=None):
+        """ Run the Differential Evolution MCMC. - stub"""
+        from shell_colors import red
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        results = core.do_demc(system, burnin=500)
+        return results
+        # system.do_plot_fit()
+
+    @needs_local_scope
+    @line_magic
     def gen(self, parameter_s='', local_ns=None):
         """ Run the genetic algorithm minimization - stub """
         from shell_colors import red
@@ -617,10 +652,26 @@ class EmbeddedMagics(Magics):
             return
         except SystemExit:
             return
+
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default') and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['-n']
+                system = local_ns[system_name]
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
         print args
         prot = args['--prot']
         nrem = int(args['--nrem'])
         fwhm = args['fwhm']
+        rhk = args['rhk']
 
         if local_ns.has_key('default'):
             system = local_ns['default']
@@ -630,9 +681,42 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
             
-        core.do_remove_rotation(system, prot=prot, nrem=nrem, fwhm=fwhm)
+        core.do_remove_rotation(system, prot=prot, nrem=nrem, fwhm=fwhm, rhk=rhk)
         # core.do_genetic(system)
         # system.do_plot_fit()
+
+    @needs_local_scope
+    @line_magic
+    def add_noise(self, parameter_s='', local_ns=None):
+        try:
+            args = parse_arg_string('add_noise', parameter_s)
+        except DocoptExit:
+            print addnoise_usage.lstrip()
+            return
+        except SystemExit:
+            return
+
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default') and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['-n']
+                system = local_ns[system_name]
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return 
+
+        print args
+        noise = float(args['<number>'])
+        kms = system.error.mean() < 0.01
+        if kms:
+            system.error = sqrt(system.error**2 + (noise / 1000)**2)
+        else:
+            system.error = sqrt(system.error**2 + noise**2)
 
     @needs_local_scope
     @line_magic
@@ -800,5 +884,8 @@ def parse_arg_string(command, arg_string):
 
     if command is 'de':
         args = docopt(de_usage, splitted)
+
+    if command is 'add_noise':
+        args = docopt(addnoise_usage, splitted)
 
     return args
