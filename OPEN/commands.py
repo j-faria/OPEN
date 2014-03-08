@@ -36,13 +36,12 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... [-d] [--skip=<sn>] [--format=<form>] [-v]
+    read <file>... [-d] [--skip=<sn>] [-v]
     read -h | --help
 Options:
     -d                  Set this as default system.
     -v --verbose        Verbose output about data just read.
     --skip=<sn>         How many header lines to skip [default: 0].
-    --format=<form>     File format. One of 'drs35', 'drs34', 'coralie' or 'basic'.
     -h --help           Show this help message.
 """
 

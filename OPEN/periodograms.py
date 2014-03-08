@@ -334,7 +334,6 @@ class gls(PeriodogramBase):
   (....)
     
   Parameters
-  ----------
     rv : RVSeries
         The radial velocity curve or any object providing the attributes
         time, vrad and error which define the data.
@@ -358,7 +357,6 @@ class gls(PeriodogramBase):
         Use Fortran extension in the calculation (default is True)
   
   Attributes
-  ----------
     power : array
         The normalized power of the GLS.
     freq : array
@@ -535,7 +533,7 @@ class gls(PeriodogramBase):
       Calculate the probability to obtain a power higher than
       `Pn` from the noise, which is assumed to be Gaussian.
       
-      .. note:: Normalization
+      .. note:: This depends on the normalization
         (see [ZK09]_ for further details).
 
         - `Scargle`: 
@@ -551,13 +549,11 @@ class gls(PeriodogramBase):
           \\left(1+2\\times \\frac{Pn}{N-3}\\right)^{-(N-3)/2}
       
       Parameters
-      ----------
-      Pn : float
+        Pn : float
           Power threshold.
       
       Returns
-      -------
-      Probability : float
+        Probability : float
           The probability to obtain a power equal or
           higher than the threshold from the noise.
     """
@@ -567,19 +563,17 @@ class gls(PeriodogramBase):
 
   def probInv(self, Prob):
     """
-      Calculate minimum power for given probability.
+      Calculate minimum power for a given probability.
     
       This function is the inverse of `Prob(Pn)`.
       Returns the minimum power for a given probability threshold Prob.
       
       Parameters
-      ----------
-      Prob : float
+        Prob : float
           Probability threshold.
       
       Returns
-      -------
-      Power threshold : float
+        Power threshold : float
           The minimum power for the given
           false-alarm probability threshold.
     """
@@ -607,7 +601,6 @@ class bls(PeriodogramBase):
   (....)
     
   Parameters
-  ----------
     rv : RVSeries
         The radial velocity curve or any object providing the attributes
         time, vrad and error which define the data.
@@ -626,7 +619,6 @@ class bls(PeriodogramBase):
         Set True to obtain some statistical output (default is False).
   
   Attributes
-  ----------
     power : array
         The normalized power of the GLS.
     freq : array
@@ -712,13 +704,11 @@ class bls(PeriodogramBase):
           \\left(1+2\\times \\frac{Pn}{N-3}\\right)^{-(N-3)/2}
       
       Parameters
-      ----------
-      Pn : float
+        Pn : float
           Power threshold.
       
       Returns
-      -------
-      Probability : float
+        Probability : float
           The probability to obtain a power equal or
           higher than the threshold from the noise.
     """
@@ -734,13 +724,11 @@ class bls(PeriodogramBase):
       Returns the minimum power for a given probability threshold Prob.
       
       Parameters
-      ----------
-      Prob : float
+        Prob : float
           Probability threshold.
       
       Returns
-      -------
-      Power threshold : float
+        Power threshold : float
           The minimum power for the given
           false-alarm probability threshold.
     """
@@ -758,17 +746,15 @@ class SpectralWindow(PeriodogramBase):
   See Eq. (1) of Dawson & Fabrycky (2010).
 
     Parameters
-    ----------
-    freq : float, array
+      freq : float, array
         Frequencies at which to calculate the spectral window.
-    time : float, array
+      time : float, array
         Times of the data points.
     
     Returns
-    -------
-    amp : float, array, len(freq)
+      amp : float, array, len(freq)
         Amplitude of the spectral window function.
-    phase : float, array, len(freq)
+      phase : float, array, len(freq)
         Phase angles of the spectral window function.
   """
 
@@ -830,9 +816,6 @@ class SpectralWindow(PeriodogramBase):
 
     self.fig.tight_layout()
     plt.show()
-    # p = pg.plot(1./self.freq, self.power, title="Periodogram")
-    # p.plotItem.setLogMode(1./self.freq, self.power)
-    # pg.QtGui.QApplication.exec_()
 
 
 

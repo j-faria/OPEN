@@ -315,6 +315,7 @@ def do_demc(system, burnin=500):
 	clogger.info(msg)
 
 	# write data to file to be read by DREAM
+
 	dream_filename = 'input.rv'
 	dream_header = 'file automatically generated for OPEN-DREAM analysis, ' + timestamp
 	dream_header += '\n' + str(len(system.time))
