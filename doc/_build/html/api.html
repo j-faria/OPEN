@@ -1,0 +1,316 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Periodograms &mdash; OPEN 0.0.2 documentation</title>
+    
+    <link rel="stylesheet" href="_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/theme_extras.js"></script>
+    <link rel="top" title="OPEN 0.0.2 documentation" href="index.html" />
+    <link rel="next" title="Commands" href="commands.html" />
+    <link rel="prev" title="Welcome to OPEN’s documentation!" href="index.html" /> 
+  </head>
+  <body>
+      <div class="header"><h1 class="heading"><a href="index.html">
+          <span>OPEN 0.0.2 documentation</span></a></h1>
+        <h2 class="heading"><span>Periodograms</span></h2>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="index.html">Welcome to OPEN&#8217;s documentation!</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="commands.html">Commands</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="module-OPEN.periodograms">
+<span id="periodograms"></span><h1>Periodograms<a class="headerlink" href="#module-OPEN.periodograms" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="module-OPEN.periodograms"></span><div class="section" id="generalized-lomb-scargle">
+<h2>Generalized Lomb-Scargle<a class="headerlink" href="#generalized-lomb-scargle" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="OPEN.periodograms.gls">
+<em class="property">class </em><tt class="descclassname">OPEN.periodograms.</tt><tt class="descname">gls</tt><big>(</big><em>rv</em>, <em>ofac=6</em>, <em>hifac=1</em>, <em>freq=None</em>, <em>quantity='vrad'</em>, <em>norm='HorneBaliunas'</em>, <em>stats=False</em>, <em>ext=True</em><big>)</big><a class="headerlink" href="#OPEN.periodograms.gls" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the Generalized Lomb-Scargle (GLS) periodogram.</p>
+<p>This class implements the error-weighted Lomb-Scargle periodogram as
+developed by [ZK09] using various possible normalizations.</p>
+<p>The constructor takes a RVSeries instance (i.e. a rv curve) as 
+first argument. As the algorithm is slow-ish, an implementation
+in Fortran is available if the keyword &#8216;ext&#8217; is set to True in 
+the constructor or globally. 
+There is an optional <cite>freq</cite> array, that can contain the 
+frequencies on which to calculate the periodogram. If not provided
+(....)</p>
+<dl class="docutils">
+<dt>Parameters</dt>
+<dd><dl class="first last docutils">
+<dt>rv <span class="classifier-delimiter">:</span> <span class="classifier">RVSeries</span></dt>
+<dd>The radial velocity curve or any object providing the attributes
+time, vrad and error which define the data.</dd>
+<dt>ofac <span class="classifier-delimiter">:</span> <span class="classifier">int</span></dt>
+<dd>Oversampling factor (default=6).</dd>
+<dt>hifac <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>hifac * &#8220;average&#8221; Nyquist frequency is highest frequency for 
+which the periodogram will be calculated (default=1).</dd>
+<dt>freq <span class="classifier-delimiter">:</span> <span class="classifier">array, optional</span></dt>
+<dd>Contains the frequencies at which to calculate the periodogram.
+If not given, a frequency array will be automatically generated.</dd>
+<dt>quantity <span class="classifier-delimiter">:</span> <span class="classifier">string, optional</span></dt>
+<dd>For which quantity to calculate the periodogram. Possibilities are
+&#8216;bis&#8217; or &#8216;fwhm&#8217; other than the default &#8216;vrad&#8217;.</dd>
+<dt>norm <span class="classifier-delimiter">:</span> <span class="classifier">string, optional</span></dt>
+<dd>The normalization; either &#8220;Scargle&#8221;, &#8220;HorneBaliunas&#8221;, or 
+&#8220;Cumming&#8221;. Default is &#8220;HorneBaliunas&#8221;.</dd>
+<dt>stats <span class="classifier-delimiter">:</span> <span class="classifier">boolean, optional</span></dt>
+<dd>Set True to obtain some statistical output (default is False).</dd>
+<dt>ext <span class="classifier-delimiter">:</span> <span class="classifier">boolean, optional</span></dt>
+<dd>Use Fortran extension in the calculation (default is True)</dd>
+</dl>
+</dd>
+<dt>Attributes</dt>
+<dd><dl class="first last docutils">
+<dt>power <span class="classifier-delimiter">:</span> <span class="classifier">array</span></dt>
+<dd>The normalized power of the GLS.</dd>
+<dt>freq <span class="classifier-delimiter">:</span> <span class="classifier">array</span></dt>
+<dd>The frequency array.</dd>
+<dt>ofac <span class="classifier-delimiter">:</span> <span class="classifier">int</span></dt>
+<dd>The oversampling factor.</dd>
+<dt>hifac <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>The maximum frequency.</dd>
+<dt>norm <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>The normalization used.</dd>
+</dl>
+</dd>
+</dl>
+<dl class="method">
+<dt id="OPEN.periodograms.gls.prob">
+<tt class="descname">prob</tt><big>(</big><em>Pn</em><big>)</big><a class="headerlink" href="#OPEN.periodograms.gls.prob" title="Permalink to this definition">¶</a></dt>
+<dd><p>Probability of obtaining the given power.</p>
+<p>Calculate the probability to obtain a power higher than
+<cite>Pn</cite> from the noise, which is assumed to be Gaussian.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>This depends on the normalization
+(see [ZK09] for further details).</p>
+<ul class="simple">
+<li><cite>Scargle</cite>:</li>
+</ul>
+<div class="math">
+\[exp(-Pn)\]</div>
+<ul class="simple">
+<li><cite>HorneBaliunas</cite>:</li>
+</ul>
+<div class="math">
+\[\left(1 - 2 \times \frac{Pn}{N-1} \right)^{(N-3)/2}\]</div>
+<ul class="simple">
+<li><cite>Cumming</cite>:</li>
+</ul>
+<div class="last math">
+\[\left(1+2\times \frac{Pn}{N-3}\right)^{-(N-3)/2}\]</div>
+</div>
+<dl class="docutils">
+<dt>Parameters</dt>
+<dd><dl class="first last docutils">
+<dt>Pn <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>Power threshold.</dd>
+</dl>
+</dd>
+<dt>Returns</dt>
+<dd><dl class="first last docutils">
+<dt>Probability <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>The probability to obtain a power equal or
+higher than the threshold from the noise.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="OPEN.periodograms.gls.probInv">
+<tt class="descname">probInv</tt><big>(</big><em>Prob</em><big>)</big><a class="headerlink" href="#OPEN.periodograms.gls.probInv" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate minimum power for a given probability.</p>
+<p>This function is the inverse of <cite>Prob(Pn)</cite>.
+Returns the minimum power for a given probability threshold Prob.</p>
+<dl class="docutils">
+<dt>Parameters</dt>
+<dd><dl class="first last docutils">
+<dt>Prob <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>Probability threshold.</dd>
+</dl>
+</dd>
+<dt>Returns</dt>
+<dd><dl class="first last docutils">
+<dt>Power threshold <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>The minimum power for the given
+false-alarm probability threshold.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="bayesian-lomb-scargle">
+<h2>Bayesian Lomb-Scargle<a class="headerlink" href="#bayesian-lomb-scargle" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="OPEN.periodograms.bls">
+<em class="property">class </em><tt class="descclassname">OPEN.periodograms.</tt><tt class="descname">bls</tt><big>(</big><em>rv</em>, <em>ofac=6</em>, <em>hifac=40</em>, <em>freq=None</em>, <em>quantity='vrad'</em>, <em>stats=False</em><big>)</big><a class="headerlink" href="#OPEN.periodograms.bls" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the Bayesian Lomb-Scargle (BLS) periodogram.</p>
+<p>This class implements the bayesian Lomb-Scargle periodogram as
+developed by Bretthorst (2000, 2001). This corresponds to the 
+bayesian expression for the posterior p(f|D,I).</p>
+<p>The constructor takes a RVSeries instance (i.e. a rv curve) as 
+first argument. The algorithm is slow due to the required frequency
+resolution; currently, only a Fortran implementation is available.
+There is an optional <cite>freq</cite> array, that can contain the 
+frequencies on which to calculate the periodogram. If not provided
+(....)</p>
+<dl class="docutils">
+<dt>Parameters</dt>
+<dd><dl class="first last docutils">
+<dt>rv <span class="classifier-delimiter">:</span> <span class="classifier">RVSeries</span></dt>
+<dd>The radial velocity curve or any object providing the attributes
+time, vrad and error which define the data.</dd>
+<dt>ofac <span class="classifier-delimiter">:</span> <span class="classifier">int</span></dt>
+<dd>Oversampling factor (default=6).</dd>
+<dt>hifac <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>hifac * &#8220;average&#8221; Nyquist frequency is highest frequency for 
+which the periodogram will be calculated (default=40).</dd>
+<dt>freq <span class="classifier-delimiter">:</span> <span class="classifier">array, optional</span></dt>
+<dd>Contains the frequencies at which to calculate the periodogram.
+If not given, a frequency array will be automatically generated.</dd>
+<dt>quantity <span class="classifier-delimiter">:</span> <span class="classifier">string, optional</span></dt>
+<dd>For which quantity to calculate the periodogram. Possibilities are
+&#8216;bis&#8217; or &#8216;fwhm&#8217; other than the default &#8216;vrad&#8217;.</dd>
+<dt>stats <span class="classifier-delimiter">:</span> <span class="classifier">boolean, optional</span></dt>
+<dd>Set True to obtain some statistical output (default is False).</dd>
+</dl>
+</dd>
+<dt>Attributes</dt>
+<dd><dl class="first last docutils">
+<dt>power <span class="classifier-delimiter">:</span> <span class="classifier">array</span></dt>
+<dd>The normalized power of the GLS.</dd>
+<dt>freq <span class="classifier-delimiter">:</span> <span class="classifier">array</span></dt>
+<dd>The frequency array.</dd>
+</dl>
+</dd>
+</dl>
+<dl class="method">
+<dt id="OPEN.periodograms.bls.prob">
+<tt class="descname">prob</tt><big>(</big><em>Pn</em><big>)</big><a class="headerlink" href="#OPEN.periodograms.bls.prob" title="Permalink to this definition">¶</a></dt>
+<dd><p>Probability of obtaining the given power.</p>
+<p>Calculate the probability to obtain a power higher than
+<cite>Pn</cite> from the noise, which is assumed to be Gaussian.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Normalization
+(see [ZK09] for further details).</p>
+<ul class="simple">
+<li><cite>Scargle</cite>:</li>
+</ul>
+<div class="math">
+\[exp(-Pn)\]</div>
+<ul class="simple">
+<li><cite>HorneBaliunas</cite>:</li>
+</ul>
+<div class="math">
+\[\left(1 - 2 \times \frac{Pn}{N-1} \right)^{(N-3)/2}\]</div>
+<ul class="simple">
+<li><cite>Cumming</cite>:</li>
+</ul>
+<div class="last math">
+\[\left(1+2\times \frac{Pn}{N-3}\right)^{-(N-3)/2}\]</div>
+</div>
+<dl class="docutils">
+<dt>Parameters</dt>
+<dd><dl class="first last docutils">
+<dt>Pn <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>Power threshold.</dd>
+</dl>
+</dd>
+<dt>Returns</dt>
+<dd><dl class="first last docutils">
+<dt>Probability <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>The probability to obtain a power equal or
+higher than the threshold from the noise.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="OPEN.periodograms.bls.probInv">
+<tt class="descname">probInv</tt><big>(</big><em>Prob</em><big>)</big><a class="headerlink" href="#OPEN.periodograms.bls.probInv" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate minimum power for given probability.</p>
+<p>This function is the inverse of <cite>Prob(Pn)</cite>.
+Returns the minimum power for a given probability threshold Prob.</p>
+<dl class="docutils">
+<dt>Parameters</dt>
+<dd><dl class="first last docutils">
+<dt>Prob <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>Probability threshold.</dd>
+</dl>
+</dd>
+<dt>Returns</dt>
+<dd><dl class="first last docutils">
+<dt>Power threshold <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>The minimum power for the given
+false-alarm probability threshold.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="index.html">Welcome to OPEN&#8217;s documentation!</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="commands.html">Commands</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer">
+        &copy; Copyright 2014, João Faria.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>
