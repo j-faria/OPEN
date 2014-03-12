@@ -15,6 +15,7 @@ from collections import namedtuple # this requires Python >= 2.6
 import numpy as np
 import matplotlib.pylab as plt
 import scipy.stats
+from scipy.signal import argrelmax
 # from matplotlib import rc, rc_params_from_file
 import matplotlib.gridspec as gridspec
 
@@ -101,8 +102,6 @@ class rvSeries:
         # same for extras
         self.extras_full = self.extras
 
-        
-
     # associated model to be adjusted to the data
     # this will be a dictionary with the following key:value pairs:
     #   k : number of keplerians in the model
@@ -119,7 +118,6 @@ class rvSeries:
 
     def save(self, filename):
         rvIO.write_rv(self, filename)
-
 
     def stats(self):
         # verbose stats about data
@@ -150,14 +148,12 @@ class rvSeries:
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled.
         """
-        # import pyqtgraph as pg
 
         colors = 'bgrcmykw' # lets hope for less than 9 data-sets
         t, rv, err = self.time, self.vrad, self.error # temporaries
         
         if newFig: 
             plt.figure()
-        # p = pg.plot()
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
@@ -177,7 +173,7 @@ class rvSeries:
         if leg: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        # plt.show()
+        plt.show()
         # pg.QtGui.QApplication.exec_()
 
     def do_plot_drift(self):
@@ -400,44 +396,54 @@ class PeriodogramBase:
         nf = len(self.freq)
         if self.name is 'SpectralWindow':
             self.power = self.amp
-        temp = sorted(zip(self.power, self.freq))
 
-        # largest peak
-        fmax1 = (temp[nf-1])[1]
-        if n==1:
-            if output_period: 
-                return fmax1, 1./fmax1
-            else:
-                return fmax1
+        ind = argrelmax(self.power, order=20)[0]
+        indsort = np.argsort(self.power[ind])
 
-        # second largest
-        fmax2 = fmax1
-        i = 1
-        while abs(fmax2 - fmax1) < 0.01:
-            i += 1
-            fmax2 = (temp[nf-i])[1]
+        peaks = np.array([self.freq[ind[indsort[-i]]] for i in range(1,n+1)])
+        if output_period:
+            return [(1/peak, peak) for peak in peaks]
+        else:
+            return peaks
 
-        if n==2:
-            if output_period: 
-                return [(fmax1, 1./fmax1), 
-                        (fmax2, 1./fmax2)]
-            else:
-                return fmax1, fmax2
+        # temp = sorted(zip(self.power, self.freq))
 
-        # third largest
-        fmax3 = fmax2
-        j = i
-        while abs(fmax3 - fmax2) < 0.01 or abs(fmax3 - fmax1) < 0.01:
-            j += 1
-            fmax3 = (temp[nf-j])[1]
+        # # largest peak
+        # fmax1 = (temp[nf-1])[1]
+        # if n==1:
+        #     if output_period: 
+        #         return fmax1, 1./fmax1
+        #     else:
+        #         return fmax1
 
-        if n==3:
-            if output_period: 
-                return [(fmax1, 1./fmax1), 
-                        (fmax2, 1./fmax2), 
-                        (fmax3, 1./fmax3)]
-            else:
-                return fmax1, fmax2, fmax3
+        # # second largest
+        # fmax2 = fmax1
+        # i = 1
+        # while abs(fmax2 - fmax1) < 0.01:
+        #     i += 1
+        #     fmax2 = (temp[nf-i])[1]
+
+        # if n==2:
+        #     if output_period: 
+        #         return [(fmax1, 1./fmax1), 
+        #                 (fmax2, 1./fmax2)]
+        #     else:
+        #         return fmax1, fmax2
+
+        # # third largest
+        # fmax3 = fmax2
+        # j = i
+        # while abs(fmax3 - fmax2) < 0.01 or abs(fmax3 - fmax1) < 0.01:
+        #     j += 1
+        #     fmax3 = (temp[nf-j])[1]
+
+        # if n==3:
+        #     if output_period: 
+        #         return [(fmax1, 1./fmax1), 
+        #                 (fmax2, 1./fmax2), 
+        #                 (fmax3, 1./fmax3)]
+        #     else:
+        #         return fmax1, fmax2, fmax3
 
     def FAP(self, Pn):
       """
