@@ -1,0 +1,14 @@
+\select@language {english}
+\contentsline {chapter}{\numberline {1}Periodograms}{3}{chapter.1}
+\contentsline {section}{\numberline {1.1}Generalized Lomb-Scargle}{3}{section.1.1}
+\contentsline {section}{\numberline {1.2}Bayesian Lomb-Scargle}{4}{section.1.2}
+\contentsline {chapter}{\numberline {2}Commands}{7}{chapter.2}
+\contentsline {section}{\numberline {2.1}read}{7}{section.2.1}
+\contentsline {section}{\numberline {2.2}plot}{7}{section.2.2}
+\contentsline {section}{\numberline {2.3}per}{8}{section.2.3}
+\contentsline {section}{\numberline {2.4}mod}{8}{section.2.4}
+\contentsline {section}{\numberline {2.5}restrict}{8}{section.2.5}
+\contentsline {section}{\numberline {2.6}killall}{8}{section.2.6}
+\contentsline {chapter}{\numberline {3}Indices and tables}{9}{chapter.3}
+\contentsline {chapter}{Python Module Index}{11}{section*.10}
+\contentsline {chapter}{Index}{13}{section*.11}

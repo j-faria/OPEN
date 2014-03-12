@@ -1,0 +1,22 @@
+\begin{theindex}
+\def\bigletter#1{{\Large\sffamily#1}\nopagebreak\vspace{1mm}}
+
+  \bigletter B
+  \item bls (class in OPEN.periodograms), \hyperpage{4}
+
+  \indexspace
+  \bigletter G
+  \item gls (class in OPEN.periodograms), \hyperpage{3}
+
+  \indexspace
+  \bigletter O
+  \item OPEN.periodograms (module), \hyperpage{3}
+
+  \indexspace
+  \bigletter P
+  \item prob() (OPEN.periodograms.bls method), \hyperpage{5}
+  \item prob() (OPEN.periodograms.gls method), \hyperpage{3}
+  \item probInv() (OPEN.periodograms.bls method), \hyperpage{6}
+  \item probInv() (OPEN.periodograms.gls method), \hyperpage{4}
+
+\end{theindex}
