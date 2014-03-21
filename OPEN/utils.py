@@ -134,12 +134,14 @@ def write_yorbit_macro(system):
 
 
 
-def ask_yes_no(msg):
+def ask_yes_no(msg, default):
     # raw_input returns the empty string for "enter"
-    yes = set(['yes','y', 'ye', ''])
-    no = set(['no','n'])
+    yes = set(['yes','y','ye','Y'])
+    no = set(['no','n','NO','N'])
     print msg,
     choice = raw_input().lower()
+    if not choice:
+        return default
     if choice in yes:
         return True
     elif choice in no:
