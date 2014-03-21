@@ -29,7 +29,7 @@ import rvIO
 from .utils import unique
 from .logger import clogger, logging
 from shell_colors import yellow, blue
-from .utils import day2year, rms, ask_yes_no
+from .utils import day2year, rms, ask_yes_no, triangle_plot
 from ext.get_rvN import get_rvn
 
 
@@ -725,6 +725,10 @@ class MCMC:
 
         self.burnin = burnin
 
+    def reset_burnin(self, burnin):
+        self.burnin = burnin
+        self.read_chains()
+
     def read_chains(self):
         nc = self.nchains
         # black magic to build input from file list while skipping headers
@@ -735,8 +739,7 @@ class MCMC:
         chains = np.loadtxt(files, unpack=True)
 
         self.nplanets = (chains.shape[0]-3)/5
-        # print 'It appears there are', self.nplanets, 'planet(s)'
-        # sys.exit(0)
+        self.nsamples = chains.shape[1] / nc  # number of samples per chain
 
         self.chains = np.array(chains)
         self.chains = np.ma.masked_invalid(self.chains) # remove NaNs
@@ -750,7 +753,7 @@ class MCMC:
         # self.trace = p._make(self.chains[i,2:-1,:])
 
         # this makes a namedtuple of all the chains together
-        self.trace = p._make(self.chains[2:-1, self.burnin:])
+        self.trace = p._make(self.chains[2:-1,:])
 
     def kde1d(self, parameter, ind=None, npoints=100):
         try:
@@ -759,7 +762,7 @@ class MCMC:
             gkde = scipy.stats.gaussian_kde(t)
             if ind is None:
                 ind = np.linspace(min(t), max(t), npoints)
-            return gkde.evaluate(ind)   
+            return ind, gkde.evaluate(ind)
         except KeyError:
             print 'No parameter named', parameter
             print 'Try one of these:', self.trace._fields
@@ -852,3 +855,32 @@ class MCMC:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
+
+    def do_plot_trace(self, parameter):
+
+        if parameter not in self.trace._fields:
+            print 'ERROR'
+            return
+
+        i = self.trace._fields.index(parameter)
+        s = self.nsamples
+
+        t = self.trace[i]
+
+        newFig=True        
+        if newFig: 
+            plt.figure()
+
+        for j in range(self.nchains):
+            plt.plot(t[j*s : (j+1)*s])
+
+
+    def do_triangle_plot(self):
+
+        triangle_plot(self.chains[2:].T, quantiles=[0.5])
+
+
+
+
+
+
