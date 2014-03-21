@@ -57,8 +57,7 @@ Options:
 plot_usage = \
 """
 Usage:
-    plot obs
-    plot (fwhm | rhk | s | bis | contrast)
+    plot (obs | fwhm | rhk | s | bis | contrast) [--save=filename]
     plot -n SYSTEM
     plot -h | --help
 Options:
@@ -601,7 +600,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        results = core.do_demc(system, burnin=500)
+        results = core.do_demc(system, burnin=0)
         return results
         # system.do_plot_fit()
 
@@ -807,6 +806,11 @@ class EmbeddedMagics(Magics):
         if args['--gui']:
             selectable_plot([1,2,3], [4, 16, 32], 'ro')
 
+
+    @needs_local_scope
+    @line_magic
+    def create(self, parameter_s='', local_ns=None):
+        core.do_create_planets()
 
 
 
