@@ -187,6 +187,7 @@ command_list = \
  mod        Define the model that will be adjusted to the data.
  de         Fit the model using a Differential Evolution algorithm (somewhat experimental...)
  restrict   Select data based on date, SNR or RV accuracy.
+ create     Generate synthetic RV data.
  killall    Close all plot windows
 """
     
