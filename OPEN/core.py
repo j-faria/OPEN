@@ -14,6 +14,8 @@ import random
 from collections import namedtuple
 from string import ascii_lowercase
 import copy
+import fileinput
+import tempfile
 
 # other imports
 from numpy import polyfit, RankWarning, append, zeros_like, savetxt
@@ -38,7 +40,7 @@ try:
 except ImportError:
 	periodogram_DF_available = False
 from shell_colors import yellow, red, blue
-from .utils import julian_day_to_date, triangle_plot
+from .utils import julian_day_to_date, ask_yes_no
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 pi = np.pi
@@ -314,14 +316,22 @@ def do_demc(system, burnin=500):
 	msg = blue('    : ') + 'Model is: %d keplerians + %d drift' % (keplerians, degree)
 	clogger.info(msg)
 
-	# write data to file to be read by DREAM
-
+	## write data to file to be read by DREAM
 	dream_filename = 'input.rv'
 	dream_header = 'file automatically generated for OPEN-DREAM analysis, ' + timestamp
 	dream_header += '\n' + str(len(system.time))
 	savetxt(dream_filename, zip(system.time, system.vrad, system.error),
 		    header=dream_header,
 		    fmt=['%12.6f', '%7.5f', '%7.5f'])
+
+
+	## automatically fill the necessary parameters in the inlist
+	replacer = '\tpar_num = %d\n' % (5*keplerians+1)
+	for line in fileinput.input('OPEN/demc/namelist1', inplace=True):
+		if 'par_num' in line: 
+			print replacer,
+		else:
+			 print line,
 
 	## get number of chains and generations from namelist
 	with open('OPEN/demc/namelist1') as f:
@@ -370,7 +380,6 @@ def do_demc(system, burnin=500):
 	# p = results.kde1d('period_0', npoints=300)
 	# ind = np.linspace(0.2, 5000, 300)
 
-	# triangle_plot(results.chains[2:].T, quantiles=[0.5])
 	results.do_plot_some_solutions(system)
 
 	return results
@@ -837,14 +846,25 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 	plt.subplot(212)
 	xx = np.linspace(t.min(), t.max(), 500)
 
-	if fix_p:
-		As1, Ac1, As2, Ac2 = rot_param
-		P = prot
-	else:
-		As1, Ac1, As2, Ac2, P = rot_param
+	if nrem==1:
+		if fix_p:
+			As1, Ac1 = rot_param
+			P = prot
+		else:
+			As1, Ac1, P = rot_param
+		
+		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)), 'o-')
 
-	plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
-		         (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), 'o-')
+	if nrem==2:
+		if fix_p:
+			As1, Ac1, As2, Ac2 = rot_param
+			P = prot
+		else:
+			As1, Ac1, As2, Ac2, P = rot_param
+
+		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
+		             (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), 'o-')
+	
 	plt.errorbar(system.time, system.vrad - vrad_mean, yerr=err, fmt='ro')
 
 	# plt.figure()
@@ -1098,3 +1118,143 @@ def do_Dawson_Fabrycky(system):
 
 	# savefig(name+'_DF.ps',orientation = 'Landscape')
 	show()
+
+
+def do_create_planets():
+	msg = blue('INFO: ') + 'Starting the planet creator\n'
+	clogger.info(msg)
+
+	try:
+		nplanets = int(raw_input('How many planets? '))
+	except ValueError:
+		msg = red('ERROR: ') + "I don't know how many planets to make\n"
+		clogger.fatal(msg)
+		return
+	
+
+	if ask_yes_no('Specify the periods (y/N)? ', default=False):
+	    periods = []
+	    for i in range(nplanets):
+	        p = float(raw_input('\tperiod %d:  '%(i+1)))
+	        periods.append(p)
+	else: 
+	    periods = None
+	
+	if ask_yes_no('Specify the eccentricities (y/N)? ', default=False):
+	    eccentricities = []
+	    for i in range(nplanets):
+	        e = float(raw_input('\teccentricity %d:  '%(i+1)))
+	        eccentricities.append(e)
+	else: 
+	    eccentricities = None
+	        
+	if ask_yes_no('Use sampling from file (y/N)? ', default=False):
+		filename = raw_input('Which file? ')
+		with open(filename) as f:
+			nobs = len(f.readlines())
+	else:
+		filename = None
+		obs = raw_input('How many observed RVs? ("r" for random) ')
+		nobs = np.random.randint(30, 220) if obs in ('r','') else int(obs)
+
+	noise = 'wrong_option'
+	while noise not in ('w', '', 'r', 'R', 'wr', 'rw'):
+		noise = raw_input('What type of noise? (W / r / wr) ')
+		if noise in ('w', ''): 
+		    type_noise = 'white'
+		elif noise in ('r', 'R'): 
+		    type_noise = 'correlated'
+		elif noise in ('wr', 'rw'): 
+		    type_noise = 'white + correlated'
+		else: 
+		    print "I don't understand that. Try 'w', 'r' or 'wr'."
+
+	print 
+	msg =  blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
+	if filename is not None:
+		msg += blue('    : ') + '-> sampling from %s\n' % (filename)	
+	else:
+		msg += blue('    : ') + '-> randomly spaced sampling\n'
+	msg += blue('    : ') + '-> %d observations\n' % (nobs)
+	msg += blue('    : ') + '-> %s noise\n' % (type_noise)
+	clogger.info(msg)	
+
+	# get rv curve with random parameters
+	def gen_rv(nplanets, nobs, sampling_file, periods, eccentricities, type_noise, temp):
+	    
+	    if sampling_file is not None: # the sampling is set in the file
+	        times_sampled_from_file = np.loadtxt(sampling_file, usecols=(0,), skiprows=1)
+	        times = times_sampled_from_file
+	        times_full = np.linspace(min(times_sampled_from_file), max(times_sampled_from_file), 1000)
+	    else: # the sampling is random
+	        times_full = np.linspace(2449460, 2452860, 1000)
+	        # sample (N points) randomly from the data to produce unevenly sampled time series
+	        rand_args = [ i for i in sorted(random.sample(xrange(len(times_full)), nobs)) ]
+	        times = times_full[rand_args]
+
+	    vel_full = zeros_like(times_full) # rv at oversampled times
+	    vel_full_each = zeros_like(times_full) # rv at oversampled times for each planet
+	    vel_all = np.zeros((len(times), nplanets)) # rv at sample times for each planet
+	    vel_each = zeros_like(times) # rv at sample times for each planet (temporary)
+	    vel_total = zeros_like(times) # rv at sample times
+
+	    output = '# planet %d with P=%f, K=%f, e=%f, w=%f, t0=%f\n'
+	    for planet in range(nplanets):
+	        if periods is None: 
+	            P = np.random.rand()*998. + 2. # random period, U(2, 998)
+	        else: 
+	            P = periods[planet] # user-provided period
+	        
+	        if eccentricities is None:
+	        	ecc = np.random.beta(0.867, 3.03)  # from Kipping 2013
+	        else:
+	        	ecc = eccentricities[planet] # user-provided eccentricity
+
+	        K = np.random.rand()*50. + 2.
+
+	        omega = np.random.rand()*2.*pi 
+
+	        if type_noise is 'white':
+	            noise = np.random.randn(len(vel_each))*3. # sigma??????
+
+	        # log
+	        temp.write(output % (planet+1, P, K, ecc, omega, 2452000))
+
+	        # get RVs for this planet
+	        get_rvn(times, P, K, ecc, omega, 2452000, 0., vel_each)
+	        vel_each = vel_each + noise # add noise
+
+	        # get RVs for this planet at oversampled times
+	        get_rvn(times_full, P, K, ecc, omega, 2452000, 0., vel_full_each)
+
+	        # store
+	        vel_all[:,planet] = vel_each
+	        vel_total += vel_each
+	        vel_full += vel_full_each
+
+	    
+	    return times_full, vel_full, times, vel_total, vel_all, noise
+
+	# wrapper function that takes care of adding noise and logging to file
+	def generate_planets(nplanets, nobs, sampling_file, type_noise, periods, eccentricities):
+	    # create temporary file to store simulation info
+	    tf = tempfile.NamedTemporaryFile(dir='./')
+	    tf.write('## Planets created on ')
+	    tf.write(time.strftime("%d/%m/%Y - %H:%M:%S\n#\n"))
+	    
+	    times_full, vel_full, times, vel, vel_all, noise = \
+	                gen_rv(nplanets, nobs, sampling_file, periods, eccentricities, type_noise, tf)
+	    
+	    tf.write('#\n## %d observations, %s noise\n#\n'%(nobs, type_noise))
+	    tf.write('# bjd \t vrad(km/s) \t svrad(km/s)\n')
+
+	    for t, v, e in zip(times, vel, noise):
+	        tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*1e-3)))
+	    tf.delete = False
+	    print 'Output to %s' % tf.name
+	    tf.close()
+	        
+	    return times_full, vel_full, times, vel, vel_all
+
+
+	times_full, vel_full, times, vel1, vel2 = generate_planets(nplanets, nobs, filename, type_noise, periods, eccentricities)
