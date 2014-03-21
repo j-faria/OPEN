@@ -2,4 +2,6 @@
 *.sublime*
 *.so
 *.o
+*.a
 *.mod
+*chain*.txt
