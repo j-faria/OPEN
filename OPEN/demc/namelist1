@@ -1,0 +1,61 @@
+&config_size
+
+	! number of simultaneous chains
+    chain_num = 30
+    ! number of crossover values
+    cr_num = 3
+    ! number of generations
+    gen_num = 3000
+    ! number of pairs of chains for crossover
+    pair_num = 6
+
+    ! number of parameters
+	par_num = 6
+
+/
+
+&config_value
+
+    ! the "base" filename to be used for the chain files.  
+    ! If this is the empty string '', then the chain files will not be written.  
+    ! This name should include a string of 0's which will be replaced by the chain 
+    ! indices. For example, "chain000.txt" would work as long as the number of 
+    ! chains was 1000 or less.
+    chain_filename = './OPEN/demc/problem1_chain00.txt'
+
+    ! the name of the file in which values of the Gelman-Rubin statistic will be recorded,
+    ! or '' if this file is not to be written.
+    gr_filename = './OPEN/demc/problem1_gr.txt'
+
+    ! convergence tolerance for the Gelman-Rubin statistic.
+    gr_threshold = 1.2D+00
+
+    ! forces a "long jump" every JUMPSTEP generations.
+    jumpstep = 5
+
+    ! these are hard limits for each parameter. 
+    ! priors are sampled inside these limits.
+    ! also, parameter values will be folded to lie within these
+    limits(1,1) = 2.d0;     limits(2,1) = 5000.d0   ! period
+    limits(1,2) = 0.1d0;    limits(2,2) = 3000.d0   ! semi-amplitude K
+    limits(1,3) = 0.d0;     limits(2,3) = 0.9d0     ! eccentricity
+    limits(1,4) = 0.d0;     limits(2,4) = 6.28318530718d0     ! long. periastron (rad)
+    limits(1,5) = 2.35d6;   limits(2,5) = 2.55d6    ! time periastron passage
+    limits(1,6) = -3000.d0; limits(2,6) = 3000.d0   ! systematic velocity
+
+    ! are the RV values in km/s
+    km_per_second = .false.
+
+    ! interval between generations on which the Gelman-Rubin statistic will be 
+    ! computed and written to a file.
+    printstep = 10
+
+    ! name of the file containing restart information, 
+    ! or '' if this is not a restart run.
+    restart_read_filename = ''
+
+    ! name of the file to be written, containing restart information, 
+    ! or '' if a restart file is not to be written.
+    restart_write_filename = './OPEN/demc/problem1_restart.txt'
+
+/
