@@ -1258,3 +1258,18 @@ def do_create_planets():
 
 
 	times_full, vel_full, times, vel1, vel2 = generate_planets(nplanets, nobs, filename, type_noise, periods, eccentricities)
+
+
+def load_plugin(plugin):
+	from runpy import run_module
+	current_dir = os.path.dirname(__file__)
+
+	if plugin in os.listdir(current_dir+'/plugins'):
+		msg = blue('INFO: ') + 'Loading plugin "%s"\n' % plugin
+		clogger.info(msg)
+
+		relative_module = 'OPEN.plugins.' + plugin + '.run'
+		run_module(relative_module)
+		# module = __import__(relative_module, fromlist=['OPEN.plugins'])
+		# func = getattr(module, plugin)
+		# func()

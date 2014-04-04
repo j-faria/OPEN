@@ -818,6 +818,10 @@ class EmbeddedMagics(Magics):
     def create(self, parameter_s='', local_ns=None):
         core.do_create_planets()
 
+    @needs_local_scope
+    @line_magic
+    def metalpoor(self, parameter_s='', local_ns=None):
+        core.load_plugin('metalpoor')
 
 
 
