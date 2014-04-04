@@ -71,7 +71,7 @@ Usage:
     per obs
     per (bis | fwhm)
     per -n SYSTEM
-    per (obs | bis | fwhm | rhk | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--ofac=<of>] [--fap]
+    per (obs | bis | fwhm | rhk | contrast | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--ofac=<of>] [--fap]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
@@ -403,6 +403,11 @@ class EmbeddedMagics(Magics):
         if args['rhk']: # periodogram of rhk
             system.rhk_per = per_fcn(system, hifac=hf, ofac=of, quantity='rhk')
             system.rhk_per._plot()
+
+        if args['contrast']: # periodogram of contrast
+            system.contrast_per = per_fcn(system, hifac=hf, ofac=of, quantity='contrast')
+            system.contrast_per._plot()
+
 
         if args['resid']: # periodogram of the residuals of the current fit
             system.resid_per = per_fcn(system, hifac=hf, ofac=of, quantity='resid')

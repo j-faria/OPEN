@@ -347,7 +347,7 @@ class gls(PeriodogramBase):
         If not given, a frequency array will be automatically generated.
     quantity : string, optional
         For which quantity to calculate the periodogram. Possibilities are
-        'bis', 'rhk' or 'fwhm' other than the default 'vrad'.
+        'bis', 'rhk', 'contrast' or 'fwhm' other than the default 'vrad'.
     norm : string, optional
         The normalization; either "Scargle", "HorneBaliunas", or 
         "Cumming". Default is "HorneBaliunas".
@@ -390,6 +390,9 @@ class gls(PeriodogramBase):
     elif quantity == 'rhk':
       self.y = rv.extras.rhk
       self.error = rv.extras.sig_rhk
+    elif quantity == 'contrast':
+      self.y = rv.extras.contrast
+      self.error = ones_like(self.y)
     elif quantity == 'resid':
       try:
         self.y = rv.fit['residuals']
@@ -616,7 +619,7 @@ class bls(PeriodogramBase):
         If not given, a frequency array will be automatically generated.
     quantity : string, optional
         For which quantity to calculate the periodogram. Possibilities are
-        'bis', 'rhk' or 'fwhm' other than the default 'vrad'.    
+        'bis', 'rhk', 'contrast' or 'fwhm' other than the default 'vrad'.    
     stats : boolean, optional
         Set True to obtain some statistical output (default is False).
   
@@ -647,7 +650,10 @@ class bls(PeriodogramBase):
     elif quantity == 'rhk':
       self.y = rv.extras.rhk
       self.error = rv.extras.sig_rhk
-
+    elif quantity == 'contrast':
+      self.y = rv.extras.contrast
+      self.error = ones_like(self.y)
+      
     # time span of observations
     self.Tspan = max(rv.time) - min(rv.time)
     # signal to noise ratio
