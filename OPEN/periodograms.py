@@ -347,7 +347,7 @@ class gls(PeriodogramBase):
         If not given, a frequency array will be automatically generated.
     quantity : string, optional
         For which quantity to calculate the periodogram. Possibilities are
-        'bis' or 'fwhm' other than the default 'vrad'.
+        'bis', 'rhk' or 'fwhm' other than the default 'vrad'.
     norm : string, optional
         The normalization; either "Scargle", "HorneBaliunas", or 
         "Cumming". Default is "HorneBaliunas".
@@ -383,7 +383,7 @@ class gls(PeriodogramBase):
       self.error = rv.error
     elif quantity == 'bis':
       self.y = rv.extras.bis_span
-      self.error = ones_like(self.y)
+      self.error = 2. * rv.error #ones_like(self.y)
     elif quantity == 'fwhm':
       self.y = rv.extras.fwhm
       self.error = 2.35 * rv.error #ones_like(self.y)
@@ -423,7 +423,8 @@ class gls(PeriodogramBase):
 
     # Build frequency array if not present
     if self.freq is None:
-      self.__buildFreq()
+      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      self.__buildFreq(plow=plow)
     # Circular frequencies
     omegas = 2.*pi * self.freq
 
@@ -491,7 +492,8 @@ class gls(PeriodogramBase):
 
     # Build frequency array if not present
     if self.freq is None:
-      self.__buildFreq()
+      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      self.__buildFreq(plow=plow)
     # Circular frequencies
     omegas = 2.*pi * self.freq
 
@@ -614,7 +616,7 @@ class bls(PeriodogramBase):
         If not given, a frequency array will be automatically generated.
     quantity : string, optional
         For which quantity to calculate the periodogram. Possibilities are
-        'bis' or 'fwhm' other than the default 'vrad'.    
+        'bis', 'rhk' or 'fwhm' other than the default 'vrad'.    
     stats : boolean, optional
         Set True to obtain some statistical output (default is False).
   
@@ -638,10 +640,13 @@ class bls(PeriodogramBase):
       self.error = rv.error
     elif quantity == 'bis':
       self.y = rv.extras.bis_span
-      self.error = mean(rv.error) * ones_like(self.y)
+      self.error = 2. * rv.error #ones_like(self.y)
     elif quantity == 'fwhm':
       self.y = rv.extras.fwhm
-      self.error = mean(rv.error) * ones_like(self.y)
+      self.error = 2.35 * rv.error #ones_like(self.y)
+    elif quantity == 'rhk':
+      self.y = rv.extras.rhk
+      self.error = rv.extras.sig_rhk
 
     # time span of observations
     self.Tspan = max(rv.time) - min(rv.time)
