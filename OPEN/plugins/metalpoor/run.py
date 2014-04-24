@@ -224,8 +224,8 @@ Data: %d measurements	%s
 
 
 	w1.addWidget(label, row=0, col=0)
-	w1.addWidget(saveBtn, row=1, col=0)
-	w1.addWidget(restoreBtn, row=1, col=1)
+	# w1.addWidget(saveBtn, row=1, col=0)
+	# w1.addWidget(restoreBtn, row=1, col=1)
 	w1.addWidget(tree, row=0, col=2, rowspan=1)
 	d1.addWidget(w1)
 	state = None
@@ -321,4 +321,4 @@ if __name__ == '__main__':
 
 ## Running from inside OPEN
 if __name__ == 'OPEN.plugins.metalpoor.run':
-	metalpoor_widget('HD41248', None)
+	metalpoor_widget('HD190984', None)
