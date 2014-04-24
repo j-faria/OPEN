@@ -45,3 +45,8 @@ periodogram_DF.so: periodogram_DF.c
 # --- remove binary and executable files
 clean:
 	rm -f blombscargle.so glombscargle.so get_rv.so get_rvN.so periodogram_DF.so
+
+
+## compile bayesian lomb scargle periodogram with additional outputs
+blombscargle_stub.so: lombscargle_bayes_stub.f90
+	@$(FPY) -m blombscargle_stub -c $< $(FPYFLAGS)
