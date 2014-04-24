@@ -15,7 +15,8 @@ from OPEN.tqdm import tqdm
 
 
 all_files = glob.glob('/home/joao/phd/data/*mean*')
-# print len(all_files)
+print 'Total: ', len(all_files), ' files'
+
 
 with PdfPages('lp_data.pdf') as pdf:
 	for filename in tqdm(all_files[0:10]):
