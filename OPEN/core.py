@@ -298,10 +298,18 @@ def do_restrict(system, quantity, *args):
 
 	return
 
-def do_demc(system, burnin=500):
+def do_demc(system, zfile, burnin=0):
 	import demc.dream as dream
 	from time import sleep
 	from re import findall
+
+	if zfile is not None:
+		msg = blue('INFO: ') + 'Loading chains from file ' + zfile
+		clogger.info(msg)
+		results = MCMC(zfile, burnin=burnin)
+		results.print_best_solution()
+		results.do_plot_some_solutions(system)
+		return results
 
 	try:
 		degree = system.model['d']
@@ -358,21 +366,10 @@ def do_demc(system, burnin=500):
 	clogger.info(msg)
 
 	results = MCMC('OPEN/demc/problem1_chain*', burnin=burnin)
-	results.read_chains()
 
 	## output best solution
-	best_ind = np.argmax(results.chains[1, :])
-	par_best = results.chains[2:, best_ind]
-	print # newline
-	msg = yellow('RESULT: ') + 'Best solution is'
-	clogger.info(msg)
-	## loop over planets
-	print("%3s %12s %10s %10s %10s %15s %9s" % \
-		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
-	for i, planet in enumerate(list(ascii_lowercase)[:keplerians]):
-		P, K, ecc, omega, T0, gam = [par_best[j::6] for j in range(6)]
-		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
-	
+	results.print_best_solution()
+
 	print # newline
 	msg = blue('INFO: ') + 'Estimating kernels...'
 	clogger.info(msg)
