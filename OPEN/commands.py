@@ -141,6 +141,16 @@ Options:
 """
 
 
+demc_usage = \
+"""
+Usage:
+    demc [<zipfile>]
+    demc -n SYSTEM
+Options:
+    -n SYSTEM   Specify name of system (else use default)
+"""
+
+
 rrot_usage = \
 """
 Usage:
@@ -598,6 +608,15 @@ class EmbeddedMagics(Magics):
     def demc(self, parameter_s='', local_ns=None):
         """ Run the Differential Evolution MCMC. - stub"""
         from shell_colors import red
+        ## take care of arguments
+        try:
+            args = parse_arg_string('demc', parameter_s)
+        except DocoptExit:
+            print demc_usage.lstrip()
+            return
+        except SystemExit:
+            return
+
         if local_ns.has_key('default'):
             system = local_ns['default']
         else:
@@ -606,7 +625,9 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        results = core.do_demc(system, burnin=0)
+        zfile = args.pop('<zipfile>')
+
+        results = core.do_demc(system, zfile=zfile, burnin=0)
         return results
         # system.do_plot_fit()
 
@@ -897,6 +918,9 @@ def parse_arg_string(command, arg_string):
 
     if command is 'de':
         args = docopt(de_usage, splitted)
+
+    if command is 'demc':
+        args = docopt(demc_usage, splitted)        
 
     if command is 'add_noise':
         args = docopt(addnoise_usage, splitted)
