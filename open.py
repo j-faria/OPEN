@@ -43,5 +43,6 @@ if __name__ == "__main__":
                           banner1 = banner if (not args['--nobanner']) else '',
                           #banner2 = 'This is in banner 2',
                           exit_msg = 'Goodbye.')
+    ipyshell.enable_pylab(import_all=False)
     ipyshell()
 
