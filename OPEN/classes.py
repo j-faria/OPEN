@@ -11,12 +11,12 @@ import glob
 from fileinput import FileInput
 from itertools import islice, chain
 from collections import namedtuple # this requires Python >= 2.6
+from string import ascii_lowercase
 # other imports
 import numpy as np
 import matplotlib.pylab as plt
 import scipy.stats
 from scipy.signal import argrelmax
-# from matplotlib import rc, rc_params_from_file
 import matplotlib.gridspec as gridspec
 
 # intra-package imports
@@ -29,7 +29,7 @@ import rvIO
 from .utils import unique
 from .logger import clogger, logging
 from shell_colors import yellow, blue
-from .utils import day2year, rms, ask_yes_no, triangle_plot
+from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
 from ext.get_rvN import get_rvn
 
 
@@ -38,7 +38,7 @@ from ext.get_rvN import get_rvn
 # we use it!
 # p = os.path.dirname(os.path.realpath(__file__)) # path to this file (classes.py)
 # rc( rc_params_from_file( p+'/../matplotlibrc' ) )
-plt.ion()
+# plt.ion()
 
 class rvSeries:
     """
@@ -173,7 +173,7 @@ class rvSeries:
         if leg: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        # plt.show()
         # pg.QtGui.QApplication.exec_()
 
     def do_plot_drift(self):
@@ -199,7 +199,7 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
-        p = numpy.polyval(drift, self.time) # normal polynomial, for 2nd plot
+        p = np.polyval(drift, self.time) # normal polynomial, for 2nd plot
         st = np.sort(self.time) # need this otherwise the plot gets messed up
         sp = np.polyval(drift, st) # "sorted" polynomial
         ax1.plot(st, sp, 'y-')
@@ -717,13 +717,23 @@ class PeriodogramBase:
 #        print "-----------------------------------"
 
 
+from time import strftime
+from zipfile import ZipFile     
 
 class MCMC:
     def __init__(self, filename_glob, burnin=0):
-        self.chain_filenames = sorted(glob.glob(filename_glob))
-        self.nchains = len(self.chain_filenames)
+        if filename_glob.endswith('.zip'):
+            with ZipFile(filename_glob) as zf:
+                self.chain_filenames = [n for n in zf.namelist() if 'chain' in n]
+                zf.extractall()
+            
+        else:
+            self.chain_filenames = sorted(glob.glob(filename_glob))
 
+        self.nchains = len(self.chain_filenames)
         self.burnin = burnin
+
+        self.read_chains()
 
     def reset_burnin(self, burnin):
         self.burnin = burnin
@@ -754,6 +764,40 @@ class MCMC:
 
         # this makes a namedtuple of all the chains together
         self.trace = p._make(self.chains[2:-1,:])
+
+    def compress_chains(self):
+        tstr = strftime("%Y%m%d-%H%M%S")
+        zfilename = 'demc-out-'+tstr+'.zip'
+
+        with ZipFile(zfilename, 'a', compression=8) as zf:
+            for f in self.chain_filenames:
+                zf.write(f)
+            zf.write('OPEN/demc/namelist1')
+
+        print 'done!'
+
+
+    def print_best_solution(self):
+        ## output best solution
+        best_ind = np.argmax(self.chains[1, :])
+        par_best = self.chains[2:, best_ind]
+        print # newline
+        msg = yellow('RESULT: ') + 'Best solution is'
+        clogger.info(msg)
+        ## loop over planets
+        print("%3s %12s %10s %10s %10s %15s %9s" % \
+            ('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+        for i, planet in enumerate(list(ascii_lowercase)[:self.nplanets]):
+            P, K, ecc, omega, T0, gam = [par_best[j::6] for j in range(6)]
+            print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % 
+                                (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+
+
+    def confidence_intervals(self):
+        for i, name in enumerate(self.trace._fields):
+            print '%10s' % name,
+            print '  ', 'mean:', np.mean(self.trace[i]), 'std:', np.std(self.trace[i])
+
 
     def kde1d(self, parameter, ind=None, npoints=100):
         try:
@@ -855,6 +899,7 @@ class MCMC:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
+        plt.show()
 
     def do_plot_trace(self, parameter):
 
@@ -874,13 +919,54 @@ class MCMC:
         for j in range(self.nchains):
             plt.plot(t[j*s : (j+1)*s])
 
+    def do_plot_best(self):
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        tt = system.get_time_to_plot()
+        vel = np.zeros_like(tt)
+
+        ## best solution found
+        best_ind = np.argmax(self.chains[1, :])
+        par_best = self.chains[2:, best_ind]
+
+        newFig=True        
+        if newFig: 
+            plt.figure()
+
+        # plot best solution
+        args = [tt] + list(par_best) + [vel]
+        get_rvn(*args)
+        plt.plot(tt, vel, '-g', lw=2.5, label='best')
+
+        # plot each files' values
+        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+            plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
+                         fmt='o'+colors[i], label=os.path.basename(fname))
+            t, rv, err = t[m:], rv[m:], err[m:]
+        
+        plt.xlabel('Time [days]')
+        plt.ylabel('RV [km/s]')
+        plt.legend()
+        plt.tight_layout()
+        plt.ticklabel_format(useOffset=False)
+        plt.show()
 
     def do_triangle_plot(self):
 
         triangle_plot(self.chains[2:].T, quantiles=[0.5])
 
 
+    def do_triangle_plot_kde(self):
 
+        triangle_plot_kde(self.chains[2:].T)
 
 
 
