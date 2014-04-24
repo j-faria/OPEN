@@ -275,3 +275,134 @@ def triangle_plot(xs, labels=None, extents=None, truths=None, truth_color="#4682
                     ax.yaxis.set_label_coords(-0.3, 0.5)
 
     return fig
+
+
+def triangle_plot_kde(xs, labels=None, extents=None, truths=None, truth_color="#4682b4",
+                  scale_hist=False, quantiles=[], **kwargs):
+    """
+    Make a *sick* corner plot showing the projections of a set of samples
+    drawn in a multi-dimensional space.
+
+    :param xs: ``(nsamples, ndim)``
+        The samples. This should be a 1- or 2-dimensional array. For a 1-D
+        array this results in a simple histogram. For a 2-D array, the zeroth
+        axis is the list of samples and the next axis are the dimensions of
+        the space.
+
+    :param labels: ``ndim`` (optional)
+        A list of names for the dimensions.
+
+    :param truths: ``ndim`` (optional)
+        A list of reference values to indicate on the plots.
+
+    :param truth_color: (optional)
+        A ``matplotlib`` style color for the ``truths`` makers.
+
+    :param quantiles: (optional)
+        A list of fractional quantiles to show on the 1-D histograms as
+        vertical dashed lines.
+
+    :param scale_hist: (optional)
+        Should the 1-D histograms be scaled in such a way that the zero line
+        is visible?
+
+    """
+    import scipy.stats
+
+    # Deal with 1D sample lists.
+    xs = np.atleast_1d(xs)
+    if len(xs.shape) == 1:
+        xs = np.atleast_2d(xs)
+    else:
+        assert len(xs.shape) == 2, "The input sample array must be 1- or 2-D."
+        xs = xs.T
+    assert xs.shape[0] <= xs.shape[1], "I don't believe that you want more " \
+                                       "dimensions than samples!"
+
+    K = len(xs)
+    factor = 2.0           # size of one side of one panel
+    lbdim = 0.5 * factor   # size of left/bottom margin
+    trdim = 0.05 * factor  # size of top/right margin
+    whspace = 0.05         # w/hspace size
+    plotdim = factor * K + factor * (K - 1.) * whspace
+    dim = lbdim + plotdim + trdim
+    fig = pl.figure(figsize=(dim, dim))
+    lb = lbdim / dim
+    tr = (lbdim + plotdim) / dim
+    fig.subplots_adjust(left=lb, bottom=lb, right=tr, top=tr,
+                        wspace=whspace, hspace=whspace)
+
+    if extents is None:
+        extents = [[x.min(), x.max()] for x in xs]
+
+    for i, x in enumerate(xs):
+        # Plot the histograms.
+        ax = fig.add_subplot(K, K, i * (K + 1) + 1)
+
+        gkde = scipy.stats.gaussian_kde(x)
+        ind = np.linspace(min(x), max(x), 100)
+        
+        n, b, p = ax.hist(x, bins=kwargs.get("bins", 50), range=extents[i],
+                histtype="step", color=kwargs.get("color", "k"))
+        bin_width = np.ediff1d(b)[0] 
+
+        ax.plot(ind, gkde.evaluate(ind)*bin_width*len(x), 'r')
+
+        if truths is not None:
+            ax.axvline(truths[i], color=truth_color)
+
+        # Plot quantiles if wanted.
+        if len(quantiles) > 0:
+            xsorted = sorted(x)
+            for q in quantiles:
+                ax.axvline(xsorted[int(q * len(xsorted))], ls="dashed",
+                           color=kwargs.get("color", "k"))
+
+        # Set up the axes.
+        ax.set_xlim(extents[i])
+        if scale_hist:
+            maxn = np.max(n)
+            ax.set_ylim(-0.1 * maxn, 1.1 * maxn)
+        else:
+            ax.set_ylim(0, 1.1 * np.max(n))
+        ax.set_yticklabels([])
+        ax.xaxis.set_major_locator(MaxNLocator(5))
+
+        # Not so DRY.
+        if i < K - 1:
+            ax.set_xticklabels([])
+        else:
+            [l.set_rotation(45) for l in ax.get_xticklabels()]
+            if labels is not None:
+                ax.set_xlabel(labels[i])
+                ax.xaxis.set_label_coords(0.5, -0.3)
+
+        for j, y in enumerate(xs[:i]):
+            ax = fig.add_subplot(K, K, (i * K + j) + 1)
+            pl.plot(y, x, '.')
+
+            if truths is not None:
+                ax.plot(truths[j], truths[i], "s", color=truth_color)
+                ax.axvline(truths[j], color=truth_color)
+                ax.axhline(truths[i], color=truth_color)
+
+            ax.xaxis.set_major_locator(MaxNLocator(5))
+            ax.yaxis.set_major_locator(MaxNLocator(5))
+
+            if i < K - 1:
+                ax.set_xticklabels([])
+            else:
+                [l.set_rotation(45) for l in ax.get_xticklabels()]
+                if labels is not None:
+                    ax.set_xlabel(labels[j])
+                    ax.xaxis.set_label_coords(0.5, -0.3)
+
+            if j > 0:
+                ax.set_yticklabels([])
+            else:
+                [l.set_rotation(45) for l in ax.get_yticklabels()]
+                if labels is not None:
+                    ax.set_ylabel(labels[i])
+                    ax.yaxis.set_label_coords(-0.3, 0.5)
+
+    return fig
