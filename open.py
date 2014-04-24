@@ -26,6 +26,9 @@ from OPEN.ipshell import EmbedShell, cfg
 from OPEN.docopt import docopt
 from OPEN._OPENversion import __version__
 
+import numpy as np
+import scipy as sp
+
 if __name__ == "__main__":
     # version info
     version = 'OPEN v' + __version__    
@@ -39,7 +42,7 @@ if __name__ == "__main__":
     banner += u'Created by João Faria | joao.faria@astro.up.pt\n\n'
     banner +=  'Type "listcommands" for a list of the available commands\n'
     banner +=  'For help on a specific command, type "command -h" or see http://j-faria.github.io/OPEN'
-    ipyshell = EmbedShell(config=cfg, user_global_ns=globals(),
+    ipyshell = EmbedShell(config=cfg, user_global_ns=globals(), user_ns={'np':np, 'sp':sp},
                           banner1 = banner if (not args['--nobanner']) else '',
                           #banner2 = 'This is in banner 2',
                           exit_msg = 'Goodbye.')
