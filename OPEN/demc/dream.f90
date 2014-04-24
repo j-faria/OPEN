@@ -466,17 +466,17 @@ subroutine chain_outliers (chain_num, gen_index, gen_num, par_num, fit, z)
     write (*, '(a)') ' '
     write (*, '(a)') 'CHAIN_OUTLIERS:'
     write (*, '(a,i4,a,i4,a)') &
-      '  At iteration ', gen_index, ' found ', outlier_num, ' outlier chains,'
-    write (*, '(a)') '  whose indices appear below, and for which samples'
-    write (*, '(a)') &
-      '  from the chain with the largest log likelihood function,'
-    write (*, '(a,i4,a)') '  index number ', best, '  will be substituted.'
+      '  At iteration ', gen_index, ' found ', outlier_num, ' outlier chains'
+    !write (*, '(a)') '  whose indices appear below, and for which samples'
+    !write (*, '(a)') &
+    !  '  from the chain with the largest log likelihood function,'
+    !write (*, '(a,i4,a)') '  index number ', best, '  will be substituted.'
 
-    do j = 1, chain_num
-      if (avg(j) < q1 - 2.0D+00 * qr) then 
-        write (*, '(2x,i4)') j
-      end if
-    end do
+    !do j = 1, chain_num
+    !  if (avg(j) < q1 - 2.0D+00 * qr) then 
+    !    write (*, '(2x,i4)') j
+    !  end if
+    !end do
 
   end if
 
@@ -1030,7 +1030,7 @@ subroutine dream_algm (chain_num, cr_num, fit, gen_num, gr, gr_conv, &
         gr, gr_conv, gr_count, gr_num, gr_threshold, par_num, z)
 
       write(*,'(i4)', advance='no') gen_index
-      write(*,'(6f12.2)') z(1:par_num, 1, gen_index)
+      write(*,'(6f14.4)') z(1:par_num, 1, gen_index)
       !if (gr_conv) exit ! this was not here
     end if
 
@@ -1043,7 +1043,7 @@ subroutine dream_algm (chain_num, cr_num, fit, gen_num, gr, gr_conv, &
 
   end do        
 
-!  CALL PGEBUF
+  !  CALL PGEBUF
 
   !  Compute the acceptance rate.
   zp_accept_rate = real (zp_accept, kind = 8) / real (zp_count, kind = 8)

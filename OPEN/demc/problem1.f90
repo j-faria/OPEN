@@ -245,7 +245,7 @@ contains
     allocate(covmat(N,N), inv_covmat(N,N))
 
     read_data = 0
-  end
+  end function
 
   subroutine deallocate_problem()
     deallocate(parameter_limits)
@@ -300,7 +300,7 @@ contains
     sample_likelihood = logSumExp(sample_likelihood, lhood)
     likelihood_calls = likelihood_calls + 1
 
-  end
+  end function
 
   subroutine get_covmat(times, sigma, observ, ss, alpha, tau, covmat, det, inv_covmat)
     ! Calculates the covariance matrix of the observations and returns its 
