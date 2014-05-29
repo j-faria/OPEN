@@ -53,22 +53,22 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
     REAL (KIND=8) sig2(NT), ww(NT), th(NT), yh(NT)
     REAL (KIND=8) upow(NW), a(NW), b(NW), off(NW)
     REAL (KIND=8) pi, pi2, pi4
-    REAL (KIND=8) Y_, YYhat, C, S, YC, YS, CCh, CSh, SSh, CC, SS, CS, D
+    REAL (KIND=8) Y_, YY, C, S, YC, YS, CCh, CSh, SSh, CC, SS, CS, D
     REAL (KIND=8) x(NT), cosx(NT), sinx(NT), wcosx(NT), wsinx(NT)
 
     pi2 = 6.2831853071795862d0
     pi4 = 12.566370614359172d0
             
     !Xmean = sum(X) / max(1,size(X))
-    th = T - minval(T)
+    th = T! - minval(T)
 
     sig2 = sig*sig
-    ww = (1.d0 / sum(1.d0/sig2)) / sig2  ! w of ZK2009
+    ww = (1.d0 / sum(1.d0/sig2)) / sig2  ! w of ZK2009, the normalized weights
 
-    Y_ = sum(ww*Y)               ! Eq. (7)
+    Y_ = sum(ww*Y)              ! Eq. (7)
     yh = Y - Y_                 ! Subtract weighted mean
 
-    YYhat = sum(ww * yh**2)      ! Eq. (10) right
+    YY = sum(ww * yh**2)        ! Eq. (16)
 
     ! Unnormalized power
     upow = 0.d0
@@ -89,8 +89,8 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
       C = sum(wcosx)         ! Eq. (8)
       S = sum(wsinx)         ! Eq. (9)
 
-      YC = sum(yh*wcosx)     ! Eq. (11)
-      YS = sum(yh*wsinx)     ! Eq. (12)
+      YC = sum(yh*wcosx)     ! Eq. (17)
+      YS = sum(yh*wsinx)     ! Eq. (18)
       CCh = sum(wcosx*cosx)  ! Eq. (13)
       CSh = sum(wcosx*sinx)  ! Eq. (15)
       SSh = 1.d0 - CCh
@@ -103,7 +103,7 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
       b(I) = (YS*CC-YC*CS) / D
       off(I) = -a(I)*C - b(I)*S
 
-      upow(I) = (SS*YC*YC + CC*YS*YS - 2.d0*CS*YC*YS) / (YYhat*D) ! Eq. (5)
+      upow(I) = (SS*YC*YC + CC*YS*YS - 2.d0*CS*YC*YS) / (YY*D) ! Eq. (5)
 
     end do
     !$OMP END DO
