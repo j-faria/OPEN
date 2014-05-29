@@ -653,7 +653,7 @@ class bls(PeriodogramBase):
     elif quantity == 'contrast':
       self.y = rv.extras.contrast
       self.error = ones_like(self.y)
-      
+
     # time span of observations
     self.Tspan = max(rv.time) - min(rv.time)
     # signal to noise ratio
@@ -689,7 +689,9 @@ class bls(PeriodogramBase):
     # Eq. (13.4)
     df = 1. / (1.6 * self.SNR * self.Tspan * sqrt(len(self.y)))
     
-    self.nf = int(0.1 * abs( (fhigh - flow) / df ))
+    self.nf = int(0.1 * self.ofac * abs( (fhigh - flow) / df ))
+    if self.nf > 1e6:
+      self.nf = 1e6 # sensible limit to number of frequencies
     self.freq = linspace(flow, fhigh, self.nf) # could this be logspace?
 
   def prob(self, Pn):
@@ -796,7 +798,7 @@ class SpectralWindow(PeriodogramBase):
     # self.ax.set_title("Spectral Window Function")
     self.ax.set_xlabel("Period")
     self.ax.set_ylabel("Power")
-    self.ax.semilogx(1./self.freq, self.amp, 'b-')
+    self.ax.plot(self.freq, self.amp, 'b-')
 
     # Trying to get labels on top representing frequency - does not work!
     # self.ax2 = self.ax.twiny()
