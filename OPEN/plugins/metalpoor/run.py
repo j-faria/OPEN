@@ -32,7 +32,7 @@ import tables as tb
 
 from pyqtgraph.dockarea import *
 
-def metalpoor_widget(star, database, debug=False):
+def metalpoor_widget(star, database, debug=True):
 	# data from database
 	database_file = '/home/joao/phd/data/metal-poor.h5'
 	h5file = tb.open_file(database_file, mode="r")
