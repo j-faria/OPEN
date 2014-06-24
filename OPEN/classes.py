@@ -333,7 +333,6 @@ class rvSeries:
 
         self.fit = {}
         self.fit['params'] = params
-        self.fit['chi2'] = chi2
 
         P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
         gam = gam[0]
@@ -341,6 +340,68 @@ class rvSeries:
         final = np.zeros_like(self.time)
         get_rvn(self.time, P, K, ecc, omega, T0, gam, final)
         self.fit['residuals'] = self.vrad - final
+        self.fit['chi2'] = sum((self.fit['residuals'] / self.error)**2)
+        self.fit['chi2_reduced'] = self.fit['chi2'] / (len(self.time) - len(self.fit['params']))
+
+        self.do_fit_stats()
+
+    def do_fit_stats(self):
+        """ Calculate and print some statistics related to the (current) fit """
+        fit = self.fit
+
+        nobs = len(self.time)
+        try:
+            k_trend = len(self.model['drift'])
+        except (TypeError, KeyError):  # it raises a TypeError because self.model is None
+            k_trend = 0
+        k = len(fit['params']) + k_trend  # number of free parameters
+        r = fit['residuals'] / self.error  # error weighted residuals
+
+        # log-likelihood
+        ll = 0.5 * nobs * np.log(1./2.*np.pi) - 0.5 * np.sum(r**2)
+        aic = -2*ll + 2.*k
+        aicc = aic + (2.*k*(k+1)) / (nobs-k-1.)
+        bic = -2*ll + (k * np.log(nobs))
+
+        self.fit['ll'] = ll
+        self.fit['aic'] = aic
+        self.fit['aicc'] = aicc
+        self.fit['bic'] = bic
+
+# def do_stats(fit, x, y):
+#     def ll_aic_bic(fit):
+#         """
+#         Calculate model log-likelihood, AIC, and BIC information criteria
+#         """
+#         # ll = -(nobs*1/2)*(1+np.log(2*np.pi)) - (nobs/2.)*np.log(np.dot(e,e)/nobs)
+#         # print ll
+#         ll = 0.5 * nobs * np.log(1./2*np.pi) - 0.5 * np.sum(e**2)
+#         k = fit.nvarys
+#         aic = -2*ll + 2.*k
+#         aicc = aic + (2.*k*(k+1)) / (nobs-k-1.)
+#         bic = -2*ll + (fit.nvarys * np.log(nobs))
+#         # print ll, aic, bic
+#         return ll, aic, bic, aicc
+
+#     e = fit.residual
+#     nobs = fit.ndata
+
+#     # durbin watson statistic -- http://en.wikipedia.org/wiki/Durbin%E2%80%93Watson_statistic
+#     fit.DurbinWatson = sum(ediff1d(fit.residual)**2) / sum(fit.residual**2)
+
+#     # r squared, coefficient of determination
+#     fit.R2 = 1 - sum(fit.residual**2) / sum((y - mean(y))**2)
+#     fit.R2adj = 1 - (1-fit.R2)* ((nobs-1)/(nobs-fit.nvarys-1))   # adjusted R-square
+
+#     # log-likelihood, AIC, BIC
+#     fit.ll, fit.aic, fit.bic, fit.aicc = ll_aic_bic(fit)
+
+#     # residual skewness, kurtosis, and JB test for normality
+#     fit.skew = sp.stats.skew(e)
+#     fit.kurtosis = 3. + sp.stats.kurtosis(e)
+#     fit.JB = (e.shape[0] / 6.) * (fit.skew**2 + (1 / 4.) * (fit.kurtosis-3)**2)
+#     fit.JBpv = sp.stats.chi2.sf(fit.JB,2)
+
 
     def get_nyquist(self, smallest=False):
         """
