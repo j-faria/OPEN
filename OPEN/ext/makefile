@@ -8,8 +8,9 @@ FCC = gfortran
 FFLAGS= -ffree-form -O3
 
 FPY = f2py
-# FPYFLAGS = --quiet
-FPYFLAGS += --opt="-O3" --fcompiler=gnu95 -lgomp
+FPYFLAGS = --quiet
+# FPYFLAGS = --verbose
+FPYFLAGS += --opt="-O3 -Ofast" --fcompiler=gnu95 -lgomp
 FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none -fopenmp"
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none -fopenmp"
 
@@ -24,7 +25,7 @@ all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so
 
 ## compile bayesian lomb scargle periodogram
 blombscargle.so: lombscargle_bayes.f90
-	@$(FPY) -m blombscargle -c $< $(FPYFLAGS)
+	$(FPY) -m blombscargle -c $< $(FPYFLAGS)
 
 ## compile generalized lomb scargle periodogram
 glombscargle.so: lombscargle_generalized.f90
