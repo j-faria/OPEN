@@ -225,6 +225,16 @@ class EmbeddedMagics(Magics):
                    "once you exit.")
 
 
+    @line_magic
+    def develop(self, parameter_s=''):
+        # reload(classes)
+        import reimport
+        mod = reimport.modified()
+        reimport.reimport(*mod)
+        reload(periodograms)
+        reload(core)
+
+
     @needs_local_scope
     @line_magic
     def read(self, parameter_s='', local_ns=None):
@@ -624,6 +634,7 @@ class EmbeddedMagics(Magics):
                                    'name with the -n option'
             clogger.fatal(msg)
             return
+        print args
 
         zfile = args.pop('<zipfile>')
 
@@ -837,7 +848,7 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def create(self, parameter_s='', local_ns=None):
-        core.do_create_planets()
+        core.do_create_planets(parameter_s)
 
     @needs_local_scope
     @line_magic
