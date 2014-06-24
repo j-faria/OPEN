@@ -10,7 +10,8 @@ default.per2 = bls(default)  # calculate BLS and store it in the system
 a1 = default.per2.power.max()
 a2 = default.per.power.max()
 
-from matplotlib.pylab import semilogx
+from matplotlib.pylab import semilogx, legend, show
 semilogx(1./default.per.freq, default.per.power, 'b-', label='gls')
-semilogx(1./default.per2.freq, default.per2.power/a1*a2, 'r-', label='gls')
-
+semilogx(1./default.per2.freq, default.per2.power/a1*a2, 'r-', label='bayesian', lw=2.5)
+legend()
+show()
