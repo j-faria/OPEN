@@ -31,21 +31,20 @@ import scipy as sp
 
 if __name__ == "__main__":
     # version info
-    version = 'OPEN v' + __version__    
+    version = 'OPEN v' + __version__
     # command-line argument parser
     args = docopt(__doc__, version=version)
-    
+
     if '--art' in sys.argv:
         with open('./OPEN/asciiart.txt', 'r') as f: print f.read()
-    
+
     banner =  u'Welcome to ' + version + '\n'
     banner += u'Created by João Faria | joao.faria@astro.up.pt\n\n'
-    banner +=  'Type "listcommands" for a list of the available commands\n'
-    banner +=  'For help on a specific command, type "command -h" or see http://j-faria.github.io/OPEN'
+    banner += 'Type "listcommands" for a list of the available commands\n'
+    banner += 'For help on a specific command, type "command -h" or see http://j-faria.github.io/OPEN'
     ipyshell = EmbedShell(config=cfg, user_global_ns=globals(), user_ns={'np':np, 'sp':sp},
-                          banner1 = banner if (not args['--nobanner']) else '',
+                          banner1=banner if (not args['--nobanner']) else '',
                           #banner2 = 'This is in banner 2',
-                          exit_msg = 'Goodbye.')
+                          exit_msg='Goodbye.')
     ipyshell.enable_pylab(import_all=False)
     ipyshell()
-
