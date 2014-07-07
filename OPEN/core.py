@@ -48,8 +48,20 @@ pi = np.pi
 def do_fit(system, verbose):
 	try:
 		degree = system.model['d']
+		## trend removal
+		if degree > 0:
+			z = np.polyfit(system.time, system.vrad, degree)
+			poly = np.poly1d(z)
+			system.vrad = system.vrad - poly(system.time)
+			# save info to system
+			system.model['drift'] = z
+			## output some information
+			msg = yellow('RESULT: ') + 'Fit of degree %d done! Coefficients:' % degree
+			clogger.info(msg)
+			msg = yellow('      : ') + str(z)
+			clogger.info(msg)
 	except TypeError:
-		msg = yellow('Warning: ') + 'To remove linear trends, run mod before fit.\n'
+		msg = yellow('Warning: ') + 'To remove trends, run mod before fit.\n'
 		clogger.error(msg)
 
 	# with warnings.catch_warnings(record=True) as w:
@@ -62,32 +74,38 @@ def do_fit(system, verbose):
 	try:
 		system.per
 	except AttributeError:
-		system.per = ls_PressRybicki(system)  # this periodogram is very fast
+		# system.per = ls_PressRybicki(system)  # this periodogram is very fast
+		system.per = gls(system)  # this periodogram is very fast
 	finally:
-		peak = system.per.get_peaks(output_period=True)
+		peak = system.per.get_peaks(output_period=True)[0]
 
 	peak_val = system.per.power.max()
-	peak_fap = system.per.fap
+	peak_fap = system.per.FAP(peak_val)
 	if peak_fap < 0.01:
-		msg = blue('INFO: ') + 'Peak found at %f days with FAP ~ %e' % (peak[1], peak_fap)
+		msg = blue('INFO: ') + 'Peak found at %f days with FAP ~ %e' % (peak[0], peak_fap)
 		clogger.info(msg)
 	else:
 		msg = yellow('Warning: ') + 'No peaks found with FAP < 1%'
 		clogger.error(msg)
 		return None
 
-	p0 = peak[1] # initial guess period
+	p0 = peak[0] # initial guess period
 	k0 = system.vrad.max()
-	e0 = 0.2
-	om0 = 10
+	e0 = 0.0
+	om0 = 0.0
 	t0 = system.time.min()
 	g0 = system.vrad.mean()
-	msg = blue('INFO: ') + 'Setting initial guesses' #, p0, k0, e0, om0, t0, g0
+
+	msg = blue('INFO: ') + 'Setting initial guesses...'  #, p0, k0, e0, om0, t0, g0
+	clogger.info(msg)
 	initial_guess = [p0, k0, e0, om0, t0, g0]
+
 	## call levenberg markardt fit
 	lm = do_lm(system, initial_guess)
 	lm_par = lm[0]
-	
+	# lm_par[1] = abs(lm_par[1])
+	# lm_par[3] = np.rad2deg(lm_par[3])
+
 	## loop over planets
 	msg = yellow('RESULT: ') + 'Best fit is'
 	clogger.info(msg)
@@ -96,55 +114,58 @@ def do_fit(system, verbose):
 	for i, planet in enumerate(list(ascii_lowercase)[:1]):
 		P, K, ecc, omega, T0, gam = [lm_par[j::6] for j in range(6)]
 		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
-	
+
 	# save fit in the system
 	system.save_fit(lm_par, 0.)
-	par1 = lm_par # backup
+	par_all = lm_par  # backup
 
-	j=1
-	while j<4:
-		# is there a relevant peak in the periodogram of the residuals?
-		system.per_resid = gls(system, quantity='resid')
-		# system.per_resid._plot()
-		peak = system.per_resid.get_peaks(output_period=True)
-		peak_val = system.per_resid.power.max()
-		peak_fap = system.per_resid.FAP(peak_val)
-		if peak_fap < 0.01:
-			msg = blue('INFO: ') + 'Peak found at %f days with FAP ~ %e' % (peak[1], peak_fap)
-			clogger.info(msg)
-		else:
-			msg = yellow('Warning: ') + 'No peaks found in the periodogram of the residuals with FAP < 1%'
-			clogger.error(msg)
-			return None
+	# j=2
+	# while j<3:
+	# 	# is there a relevant peak in the periodogram of the residuals?
+	# 	system.per_resid = gls(system, quantity='resid')
+	# 	# system.per_resid._plot()
+	# 	peak = system.per_resid.get_peaks(output_period=True)[0]
+	# 	peak_val = system.per_resid.power.max()
+	# 	peak_fap = system.per_resid.FAP(peak_val)
+	# 	if peak_fap < 0.01:
+	# 		msg = blue('INFO: ') + 'Peak found at %f days with FAP ~ %e' % (peak[0], peak_fap)
+	# 		clogger.info(msg)
+	# 	else:
+	# 		msg = yellow('Warning: ') + 'No peaks found in the periodogram of the residuals with FAP < 1%'
+	# 		clogger.error(msg)
+	# 		break
 
-		new_system = copy.deepcopy(system)
-		new_system.vrad = new_system.fit['residuals']
+	# 	# 	new_system = copy.deepcopy(system)
+	# 	# 	new_system.vrad = new_system.fit['residuals']
 
-		p0 = peak[1] # initial guess period
-		k0 = new_system.vrad.max()
-		e0 = 0.2
-		om0 = 10
-		t0 = new_system.time.min()
-		g0 = new_system.vrad.mean()
-		msg = blue('INFO: ') + 'Setting initial guesses' #, p0, k0, e0, om0, t0, g0
-		initial_guess = [p0, k0, e0, om0, t0, g0]
-		## call levenberg markardt fit
-		lm = do_lm(new_system, initial_guess)
-		lm_par = lm[0]
+	# 	p0 = 5000 #peak[0] # initial guess period
+	# 	k0 = 370.
+	# 	e0 = 0.8
+	# 	om0 = 300.
+	# 	t0 = system.time.mean()
+	# 	g0 = system.vrad.mean()
+	# 	msg = blue('INFO: ') + 'Setting initial guesses for another planet...' #, p0, k0, e0, om0, t0, g0
+	# 	initial_guess = np.append(par_all, [p0, k0, e0, om0, t0, g0])
 		
-		## loop over planets
-		msg = yellow('RESULT: ') + 'Best fit is'
-		clogger.info(msg)
-		print("%3s %12s %10s %10s %10s %15s %9s" % \
-			('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
-		for i, planet in enumerate(list(ascii_lowercase)[:1]):
-			P, K, ecc, omega, T0, gam = [lm_par[j::6] for j in range(6)]
-			print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+	# 	print initial_guess
+	# 	## call levenberg markardt fit
+	# 	lm = do_lm(system, initial_guess)
+	# 	lm_par = lm[0]
+		
+	# 	## loop over planets
+	# 	msg = yellow('RESULT: ') + 'Best fit is'
+	# 	clogger.info(msg)
+	# 	print("%3s %12s %10s %10s %10s %15s %9s" % \
+	# 		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+	# 	for i, planet in enumerate(list(ascii_lowercase)[:j]):
+	# 		P, K, ecc, omega, T0, gam = [lm_par[k::6] for k in range(6)]
+	# 		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 
-		par_all = np.append(par1, lm_par)
-		# save fit in the system
-		system.save_fit(par_all, 0.)
-		j+=1
+	# 	par_all = np.append(par_all, lm_par)
+	# 	# save fit in the system
+	# 	system.save_fit(par_all, 0.)
+	# 	j+=1
+
 
 	return None
 
@@ -315,9 +336,9 @@ def do_demc(system, zfile, burnin=0):
 		degree = system.model['d']
 		keplerians = system.model['k']
 	except TypeError:
-		msg = red('Error: ') + 'Need to run mod before de. '
+		msg = red('Error: ') + 'Need to run mod before demc. '
 		clogger.error(msg)
-		return	
+		return
 
 	msg = blue('INFO: ') + 'Transfering data to DREAM...'
 	clogger.info(msg)
@@ -329,8 +350,8 @@ def do_demc(system, zfile, burnin=0):
 	dream_header = 'file automatically generated for OPEN-DREAM analysis, ' + timestamp
 	dream_header += '\n' + str(len(system.time))
 	savetxt(dream_filename, zip(system.time, system.vrad, system.error),
-		    header=dream_header,
-		    fmt=['%12.6f', '%7.5f', '%7.5f'])
+				header=dream_header,
+				fmt=['%12.6f', '%7.5f', '%7.5f'])
 
 
 	## automatically fill the necessary parameters in the inlist
@@ -370,7 +391,7 @@ def do_demc(system, zfile, burnin=0):
 	## output best solution
 	results.print_best_solution()
 
-	print # newline
+	print  # newline
 	msg = blue('INFO: ') + 'Estimating kernels...'
 	clogger.info(msg)
 
@@ -672,17 +693,15 @@ def do_genetic(system, just_gen=False):
 def do_lm(system, x0):
 
 	vel = zeros_like(system.time)
-	# print x0
-	# print np.transpose(x0)
 
 	def chi2_n_leastsq(params):
 		""" Fitness function for N planet model """
-		#print params
 		P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
-		#print ecc
-		if any(e>1 or e<0 for e in ecc): return 1e99
+
+		if any(e > 1 or e < 0 for e in ecc): return 1e99
+		# if any(k < 0 for k in K): return 1e99
+
 		get_rvn(system.time, P, K, ecc, omega, T0, gam[0], vel)
-		#print 'out of get_rvn'
 		return (system.vrad - vel) / system.error
 
 	def chi2_2(params):
@@ -690,9 +709,7 @@ def do_lm(system, x0):
 		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
 		return system.vrad - vel
 
-	# x0 = np.transpose(x0)
-	x0 = np.abs(x0)
-	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15)#, maxfev=10)
+	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
 def do_multinest(system):
@@ -1117,144 +1134,207 @@ def do_Dawson_Fabrycky(system):
 	show()
 
 
-def do_create_planets():
-	msg = blue('INFO: ') + 'Starting the planet creator\n'
+def do_create_planets(s):
+	msg = blue('INFO: ') + 'Starting the planet creator'
 	clogger.info(msg)
 
-	try:
-		nplanets = int(raw_input('How many planets? '))
-	except ValueError:
-		msg = red('ERROR: ') + "I don't know how many planets to make\n"
-		clogger.fatal(msg)
-		return
-	
+	if s != '':  # parse options from the command line
+		import re
+		s = s.lower()
+		try:
+			# match periods
+			regex1 = re.compile("p\((.*?)\)")
+			p = regex1.findall(s)[0]
+			periods = [float(i) for i in p.split(',')]
+			# match eccentricities
+			regex2 = re.compile("e\((.*?)\)")
+			e = regex2.findall(s)[0]
+			eccentricities = [float(i) for i in e.split(',')]
+			# match semi-amplitudes
+			regex3 = re.compile("k\((.*?)\)")
+			k = regex3.findall(s)[0]
+			semi_amplitudes = [float(i) for i in k.split(',')]
+		except IndexError:
+			msg = red('ERROR: ') + "Couldn't parse arguments"
+			clogger.fatal(msg)
+			return
 
-	if ask_yes_no('Specify the periods (y/N)? ', default=False):
-	    periods = []
-	    for i in range(nplanets):
-	        p = float(raw_input('\tperiod %d:  '%(i+1)))
-	        periods.append(p)
-	else: 
-	    periods = None
-	
-	if ask_yes_no('Specify the eccentricities (y/N)? ', default=False):
-	    eccentricities = []
-	    for i in range(nplanets):
-	        e = float(raw_input('\teccentricity %d:  '%(i+1)))
-	        eccentricities.append(e)
-	else: 
-	    eccentricities = None
-	        
-	if ask_yes_no('Use sampling from file (y/N)? ', default=False):
-		filename = raw_input('Which file? ')
-		with open(filename) as f:
-			nobs = len(f.readlines())
-	else:
+		if not len(periods) == len(eccentricities) == len(semi_amplitudes):
+			msg = red('ERROR: ') + 'Non-matching number of options'
+			clogger.fatal(msg)
+			return
+
+		nplanets = len(periods)
+
+		try:
+			regex = re.compile("n\((.*?)\)")
+			nobs = int(regex.findall(s)[0])
+		except IndexError:
+			nobs = np.random.randint(30, 220)
+
+		try:
+			regex = re.compile("file\((.*?)\)")
+			save_filename = regex.findall(s)[0]
+		except IndexError:
+			save_filename = None
+
+		type_noise = 'white'  # for now...
 		filename = None
-		obs = raw_input('How many observed RVs? ("r" for random) ')
-		nobs = np.random.randint(30, 220) if obs in ('r','') else int(obs)
 
-	noise = 'wrong_option'
-	while noise not in ('w', '', 'r', 'R', 'wr', 'rw'):
-		noise = raw_input('What type of noise? (W / r / wr) ')
-		if noise in ('w', ''): 
-		    type_noise = 'white'
-		elif noise in ('r', 'R'): 
-		    type_noise = 'correlated'
-		elif noise in ('wr', 'rw'): 
-		    type_noise = 'white + correlated'
-		else: 
-		    print "I don't understand that. Try 'w', 'r' or 'wr'."
+	else:
 
-	print 
-	msg =  blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
+		try:
+			nplanets = int(raw_input('How many planets? '))
+		except ValueError:
+			msg = red('ERROR: ') + "I don't know how many planets to make\n"
+			clogger.fatal(msg)
+			return
+		finally:
+			msg = blue('INFO: ') + 'Finished planet creator\n'
+			clogger.info(msg)
+			return
+
+
+		if ask_yes_no('Specify the periods (y/N)? ', default=False):
+			periods = []
+			for i in range(nplanets):
+				p = float(raw_input('\tperiod %d:  ' % (i+1)))
+				periods.append(p)
+		else:
+			periods = None
+
+		if ask_yes_no('Specify the eccentricities (y/N)? ', default=False):
+			eccentricities = []
+			for i in range(nplanets):
+				e = float(raw_input('\teccentricity %d:  ' % (i+1)))
+				eccentricities.append(e)
+		else:
+			eccentricities = None
+
+		if ask_yes_no('Use sampling from file (y/N)? ', default=False):
+			filename = raw_input('Which file? ')
+			with open(filename) as f:
+				nobs = len(f.readlines())
+		else:
+			filename = None
+			obs = raw_input('How many observed RVs? ("r" for random) ')
+			nobs = np.random.randint(30, 220) if obs in ('r', '') else int(obs)
+
+		noise = 'wrong_option'
+		while noise not in ('no', 'w', '', 'r', 'R', 'wr', 'rw'):
+			noise = raw_input('What type of noise? (no / W / r / wr) ')
+			if noise in ('w', ''):
+				type_noise = 'white'
+			elif noise in ('r', 'R'):
+				type_noise = 'correlated'
+			elif noise in ('wr', 'rw'):
+				type_noise = 'white + correlated'
+			elif noise in ('no'):
+				type_noise = 'no'
+			else:
+				print "I don't understand that. Try 'no', w', 'r' or 'wr'."
+
+	print
+	msg = blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
 	if filename is not None:
-		msg += blue('    : ') + '-> sampling from %s\n' % (filename)	
+		msg += blue('    : ') + '-> sampling from %s\n' % (filename)
 	else:
 		msg += blue('    : ') + '-> randomly spaced sampling\n'
 	msg += blue('    : ') + '-> %d observations\n' % (nobs)
 	msg += blue('    : ') + '-> %s noise\n' % (type_noise)
-	clogger.info(msg)	
+	clogger.info(msg)
 
 	# get rv curve with random parameters
 	def gen_rv(nplanets, nobs, sampling_file, periods, eccentricities, type_noise, temp):
-	    
-	    if sampling_file is not None: # the sampling is set in the file
-	        times_sampled_from_file = np.loadtxt(sampling_file, usecols=(0,), skiprows=1)
-	        times = times_sampled_from_file
-	        times_full = np.linspace(min(times_sampled_from_file), max(times_sampled_from_file), 1000)
-	    else: # the sampling is random
-	        times_full = np.linspace(2449460, 2452860, 1000)
-	        # sample (N points) randomly from the data to produce unevenly sampled time series
-	        rand_args = [ i for i in sorted(random.sample(xrange(len(times_full)), nobs)) ]
-	        times = times_full[rand_args]
 
-	    vel_full = zeros_like(times_full) # rv at oversampled times
-	    vel_full_each = zeros_like(times_full) # rv at oversampled times for each planet
-	    vel_all = np.zeros((len(times), nplanets)) # rv at sample times for each planet
-	    vel_each = zeros_like(times) # rv at sample times for each planet (temporary)
-	    vel_total = zeros_like(times) # rv at sample times
+		if sampling_file is not None:  # the sampling is set in the file
+			times_sampled_from_file = np.loadtxt(sampling_file, usecols=(0,), skiprows=1)
+			times = times_sampled_from_file
+			times_full = np.linspace(min(times_sampled_from_file), max(times_sampled_from_file), 1000)
+		else:  # the sampling is random
+			times_full = np.linspace(2449460, 2452860, 1000)
+			# sample (N points) randomly from the data to produce unevenly sampled time series
+			rand_args = [i for i in sorted(random.sample(xrange(len(times_full)), nobs))]
+			times = times_full[rand_args]
 
-	    output = '# planet %d with P=%f, K=%f, e=%f, w=%f, t0=%f\n'
-	    for planet in range(nplanets):
-	        if periods is None: 
-	            P = np.random.rand()*998. + 2. # random period, U(2, 998)
-	        else: 
-	            P = periods[planet] # user-provided period
-	        
-	        if eccentricities is None:
-	        	ecc = np.random.beta(0.867, 3.03)  # from Kipping 2013
-	        else:
-	        	ecc = eccentricities[planet] # user-provided eccentricity
+		vel_full = zeros_like(times_full)  # rv at oversampled times
+		vel_full_each = zeros_like(times_full)  # rv at oversampled times for each planet
+		vel_all = np.zeros((len(times), nplanets))  # rv at sample times for each planet
+		vel_each = zeros_like(times)  # rv at sample times for each planet (temporary)
+		vel_total = zeros_like(times)  # rv at sample times
 
-	        K = np.random.rand()*50. + 2.
+		output = '# planet %d with P=%f, K=%f, e=%f, w=%f, t0=%f\n'
+		for planet in range(nplanets):
+			if periods is None: 
+				P = np.random.rand()*998. + 2.  # random period, U(2, 998)
+			else: 
+				P = periods[planet]  # user-provided period
 
-	        omega = np.random.rand()*2.*pi 
+			if eccentricities is None:
+				ecc = np.random.beta(0.867, 3.03)  # from Kipping 2013
+			else:
+				ecc = eccentricities[planet]  # user-provided eccentricity
 
-	        if type_noise is 'white':
-	            noise = np.random.randn(len(vel_each))*3. # sigma??????
+			K = np.random.rand()*50. + 2.
 
-	        # log
-	        temp.write(output % (planet+1, P, K, ecc, omega, 2452000))
+			omega = np.random.rand()*2.*pi 
 
-	        # get RVs for this planet
-	        get_rvn(times, P, K, ecc, omega, 2452000, 0., vel_each)
-	        vel_each = vel_each + noise # add noise
+			if type_noise is 'white':
+				noise = np.random.randn(len(vel_each))  # sigma??????
+			else:
+				noise = np.ones_like(vel_each)
 
-	        # get RVs for this planet at oversampled times
-	        get_rvn(times_full, P, K, ecc, omega, 2452000, 0., vel_full_each)
+			# log
+			temp.write(output % (planet+1, P, K, ecc, omega, 2452000))
 
-	        # store
-	        vel_all[:,planet] = vel_each
-	        vel_total += vel_each
-	        vel_full += vel_full_each
+			# get RVs for this planet
+			get_rvn(times, P, K, ecc, omega, 2452000, 0., vel_each)
+			if type_noise is 'white':
+				vel_each = vel_each + noise  # add noise
 
-	    
-	    return times_full, vel_full, times, vel_total, vel_all, noise
+			# get RVs for this planet at oversampled times
+			get_rvn(times_full, P, K, ecc, omega, 2452000, 0., vel_full_each)
+
+			# store
+			vel_all[:,planet] = vel_each
+			vel_total += vel_each
+			vel_full += vel_full_each
+
+		return times_full, vel_full, times, vel_total, vel_all, noise
 
 	# wrapper function that takes care of adding noise and logging to file
-	def generate_planets(nplanets, nobs, sampling_file, type_noise, periods, eccentricities):
-	    # create temporary file to store simulation info
-	    tf = tempfile.NamedTemporaryFile(dir='./')
-	    tf.write('## Planets created on ')
-	    tf.write(time.strftime("%d/%m/%Y - %H:%M:%S\n#\n"))
-	    
-	    times_full, vel_full, times, vel, vel_all, noise = \
-	                gen_rv(nplanets, nobs, sampling_file, periods, eccentricities, type_noise, tf)
-	    
-	    tf.write('#\n## %d observations, %s noise\n#\n'%(nobs, type_noise))
-	    tf.write('# bjd \t vrad(km/s) \t svrad(km/s)\n')
+	def generate_planets(nplanets, nobs, sampling_file, saving_file, type_noise, periods, eccentricities):
+		if saving_file is None:
+			# create temporary file to store simulation info
+			tf = tempfile.NamedTemporaryFile(dir='./')
+		else:
+			tf = open(saving_file, 'w')
 
-	    for t, v, e in zip(times, vel, noise):
-	        tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*1e-3)))
-	    tf.delete = False
-	    print 'Output to %s' % tf.name
-	    tf.close()
-	        
-	    return times_full, vel_full, times, vel, vel_all
+		tf.write('## Planets created on ')
+		tf.write(time.strftime("%d/%m/%Y - %H:%M:%S\n#\n"))
+
+		times_full, vel_full, times, vel, vel_all, noise = \
+			gen_rv(nplanets, nobs, sampling_file, periods, eccentricities, type_noise, tf)
+
+		tf.write('#\n## %d observations, %s noise\n#\n' % (nobs, type_noise))
+		tf.write('# bjd \t vrad(km/s) \t svrad(km/s)\n')
+
+		for t, v, e in zip(times, vel, noise):
+			tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*1e-3)))
+
+		try:
+			tf.delete = False
+		except AttributeError:
+			pass
+
+		print 'Output to %s' % tf.name
+		tf.close()
+
+		return times_full, vel_full, times, vel, vel_all
 
 
-	times_full, vel_full, times, vel1, vel2 = generate_planets(nplanets, nobs, filename, type_noise, periods, eccentricities)
+	r = generate_planets(nplanets, nobs, filename, save_filename, type_noise, periods, eccentricities)
+	times_full, vel_full, times, vel1, vel2 = r
 
 
 def load_plugin(plugin):

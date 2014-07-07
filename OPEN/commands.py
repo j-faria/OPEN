@@ -188,6 +188,19 @@ Options:
     --gui         Restrict data using a graphical interface (experimental)
 """
 
+
+create_usage = \
+"""
+Usage:
+    create
+    create p(%f) e(%f) k(%f) N(%d) file(%s)
+    create --gui
+Options:
+    p(%f) e(%f) k(%f) N(%d) file(%s)   Batch processing
+    --gui         Create data using a graphical interface (experimental)
+"""
+
+
     
 command_list = \
 """
@@ -231,8 +244,8 @@ class EmbeddedMagics(Magics):
         import reimport
         mod = reimport.modified()
         reimport.reimport(*mod)
-        reload(periodograms)
-        reload(core)
+        # reload(periodograms)
+        # reload(core)
 
 
     @needs_local_scope
@@ -848,6 +861,14 @@ class EmbeddedMagics(Magics):
     @needs_local_scope
     @line_magic
     def create(self, parameter_s='', local_ns=None):
+        if '-h' in parameter_s:
+            print create_usage
+            return
+        print parameter_s
+        if '--gui' in parameter_s:
+            core.load_plugin('create_GUI')
+            return
+
         core.do_create_planets(parameter_s)
 
     @needs_local_scope

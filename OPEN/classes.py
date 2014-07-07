@@ -429,8 +429,14 @@ class rvSeries:
         minim = self.time.min() - 1.*std
         maxim = self.time.max() + 1.*std
         return np.linspace(minim, maxim, 10*N)
-        
-        
+
+
+class BasicTimeSeries():
+    time = None
+    vrad = None
+    error = None
+
+
 class PeriodogramBase:
     """
     Base class for all periodograms.
