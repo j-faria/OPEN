@@ -23,7 +23,7 @@ contains
 
 	end subroutine likelihood_init
 
-	subroutine slikelihood(Cube,slhood)
+	subroutine slikelihood(Cube,slhood,context)
 	! Likelihood subroutine
 	! This is called by getLogLike in nestwrap.f90 which does the 
 	! parameter rescaling. 
@@ -33,6 +33,7 @@ contains
 	      
 		real(kind=8), intent(in) :: Cube(nest_nPar)
 		real(kind=8), intent(out) :: slhood
+		integer, intent(in) :: context
 		real(kind=8) :: lhood, lhood_test(1,1), det
 		integer :: i, n
 
@@ -48,9 +49,17 @@ contains
  		slhood=-huge(1.d0)*epsilon(1.d0)
 
  		! get the radial velocity model with these parameters (in vel)
-    	call get_rvN(times, &
-    	           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
-    	           Cube(6), vel, n, 1)
+		call get_rvN(times, &
+					 Cube(1:nest_nPar-1:5), & ! periods for all planets
+					 Cube(2:nest_nPar-1:5), & ! K for all planets
+					 Cube(3:nest_nPar-1:5), & ! ecc for all planets
+					 Cube(4:nest_nPar-1:5), & ! omega for all planets
+					 Cube(5:nest_nPar-1:5), & ! t0 for all planets
+					 Cube(nest_nPar), & ! systematic velocity
+					 vel, n, nplanets)
+    	!call get_rvN(times, &
+    	!           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
+    	!           Cube(6), vel, n, nplanets)
 
 	    dist = rvs - vel
 	    !call get_covmat(times, errors, observ, ss, alpha, tau, covmat, det, inv_covmat)

@@ -3,6 +3,13 @@
     !dimensionality
     sdim = 6
 
+    !additional information to pass to low-level routines
+    ! we use this to set the problem
+    nest_context = 11   ! 1-planet model (6 parameters)
+    ! nest_context = 12   ! 1-planet model with jitter term (7 parameters)
+    ! nest_context = 21   ! 2-planet model (11 parameters)
+
+
 	!whether to use Nested Importance Sampling
     nest_IS = .true.
 
@@ -10,7 +17,7 @@
     !files should be updated 
     !posterior files are updated and dumper routine is called
     !after every updInt*10 iterations
-    nest_updInt=10
+    nest_updInt=500
 
 
     !whether to resume from a previous run
@@ -19,10 +26,9 @@
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
     !iterations or convergence criterion has been satisfied
-    nest_maxIter=100
+    nest_maxIter=100000
     
     !feedback on the sampling progress?
-    nest_fb=.false.
-
+    nest_fb=.true.
 
 /

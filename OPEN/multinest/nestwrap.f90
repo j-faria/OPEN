@@ -20,7 +20,8 @@ contains
 		integer context
 		integer maxNode ! variables used by the posterior routine
 	   
-	   
+	    context = nest_context  ! why do I have to do this here?
+
 	   	! calling MultiNest
 	   	call nestRun(nest_IS,nest_mmodal,nest_ceff,nest_nlive,nest_tol, &
 	   		         nest_efr,sdim,nest_nPar, nest_nClsPar,nest_maxModes, &
@@ -45,7 +46,10 @@ contains
 		! on exit has the physical parameters plus a copy of any
 		! derived parameters you want to store
 		double precision Cube(nPar)
-		real(kind=8) :: P, K, ecc, omega, t0, Vsys
+		real(kind=8) :: P, K, ecc, omega, t0
+		real(kind=8) :: P1, K1, ecc1, omega1, t01
+		real(kind=8) :: P2, K2, ecc2, omega2, t02
+		real(kind=8) :: Vsys
 		 						
 		! Output arguments
 		double precision lnew ! loglikelihood
@@ -53,20 +57,43 @@ contains
 		
 
 		! Transform parameters to physical space using assigned priors
-		! Cube(1:nPar) = P, K, ecc, omega, t0
-		P = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
-		ecc = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
-		omega = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
-		t0 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
+		! Cube(1:nPar) = P, K, ecc, omega, t0  for each planet
+		!                vsys at the last position 
+		if (nest_context == 11) then  ! 1 planet
+			P = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
+			ecc = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
+			omega = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
+			t0 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
+			K = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now
 
-		K = UniformPrior(Cube(2), 1d0, 50d0) ! for now
-		Vsys = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
+			Vsys = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
 
-		Cube(1:nPar) = (/P, K, ecc, omega, t0, Vsys/)
+			Cube(1:nPar) = (/P, K, ecc, omega, t0, Vsys/)
+
+		else if (nest_context == 21) then
+			P1 = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
+			ecc1 = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
+			omega1 = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
+			t01 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
+			K1 = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now !!!!!
+
+			P2 = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
+			ecc2 = UniformPrior(Cube(8), spriorran(8,1), spriorran(8,2))
+			omega2 = UniformPrior(Cube(9), spriorran(9,1), spriorran(9,2))
+			t02 = UniformPrior(Cube(10), spriorran(10,1), spriorran(10,2))
+			K2 = UniformPrior(Cube(7), spriorran(7,1), spriorran(7,2)) ! for now !!!!!		
+
+			Vsys = UniformPrior(Cube(11), spriorran(11,1), spriorran(11,2))
+
+			Cube(1:nPar) = (/P1, K1, ecc1, omega1, t01, &
+			                 P2, K2, ecc2, omega2, t02, &
+			                 Vsys/)
+
+		end if
 		!write(unit=*, fmt=*) '+++', Cube(1:nPar)
 
 		!call loglike function here 
-		call slikelihood(Cube,lnew)
+		call slikelihood(Cube,lnew,context)
 
 	end subroutine getLogLike
 
@@ -90,17 +117,15 @@ contains
 		double precision logZerr ! error on log evidence
 		integer context ! any additional information user wants to pass
 		
-
 		! now do something
 		!if (doing_debug) write(*,*) paramConstr(:)
-		!write(*,*) paramConstr(1:nPar)
+		write(*,*) paramConstr(1:nPar)
 
 	end subroutine dumper
 
 	! these should be in priors.f90 but I'm afraid of recompiling it :)
 	!=======================================================================
 	! Uniform[0:1]  ->  Exponential[0:inf]
-
 	function ExpPrior(r)
       	implicit none
       	double precision r,ExpPrior
@@ -111,7 +136,6 @@ contains
 
 	!=======================================================================
 	! Uniform[0:1]  ->  Jeffreys[x1:x2]
-
 	function JeffreysPrior(r, x1, x2)
 		implicit none
 		double precision r,x1,x2,JeffreysPrior

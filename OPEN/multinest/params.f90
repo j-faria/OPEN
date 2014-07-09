@@ -11,6 +11,7 @@ module params
    	
     !dimensionality
     integer sdim
+    integer nplanets
 
     !priors on the parameters are set in main.f90
     real(kind=8), allocatable, dimension(:,:) :: spriorran  !(sdim,2)
@@ -21,8 +22,7 @@ module params
     real(kind=8), allocatable, dimension(:) :: vel, dist
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
 
-    !real(kind=8), dimension(3,119) :: context
-    integer context      
+    integer nest_context
 
 
 ! Parameters for MultiNest

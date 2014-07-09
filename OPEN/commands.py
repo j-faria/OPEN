@@ -221,6 +221,7 @@ command_list = \
  mod        Define the model that will be adjusted to the data.
  de         Fit the model using a Differential Evolution algorithm (somewhat experimental...)
  restrict   Select data based on date, SNR or RV accuracy.
+ rotation   Calculate rotation period from activity-rotation relation.
  create     Generate synthetic RV data.
  killall    Close all plot windows
 """
@@ -791,6 +792,8 @@ class EmbeddedMagics(Magics):
         """ Start the MultiNest analysis and handle data interaction and IO """
         from shell_colors import red
 
+        user = True if ('-u' in parameter_s) else False
+
         if local_ns.has_key('default'):
             system = local_ns['default']
         else:
@@ -799,7 +802,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system)
+        core.do_multinest(system, user)
 
     @needs_local_scope
     @line_magic

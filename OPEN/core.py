@@ -712,7 +712,60 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system):
+def do_multinest(system, user):
+
+	def get_multinest_output():
+		msg = blue('INFO: ') + 'Analysing output...'
+		clogger.info(msg)
+
+		with open('chains/nest-stats.dat') as f:
+			stats = f.readlines()
+			nlines = len(stats)
+
+		npar = (nlines - 10) / 3
+		nplanets = npar/5
+
+		try:
+			NS_lnE = float(stats[0].split()[-3])
+			NS_lnE_error = float(stats[0].split()[-1])
+
+			INS_lnE = float(stats[1].split()[-3])
+			INS_lnE_error = float(stats[1].split()[-1])
+		except ValueError:
+			NS_lnE, NS_lnE_error = 0, 0
+			INS_lnE, INS_lnE_error = 0, 0
+
+		## mean params
+		par_mean = [float(s.split()[1]) for s in stats[4:4+npar]]
+		# P_mean, K_mean, ecc_mean, omega_mean, t0_mean, vsys_mean = par_mean
+		par_sigma = [float(s.split()[2]) for s in stats[4:4+npar]]
+		# P_sigma, K_sigma, ecc_sigma, omega_sigma, t0_sigma, vsys_sigma = par_sigma
+
+		## MLE
+		start, end = 4+npar+3, 4+npar+3+npar
+		par_mle = [float(s.split()[1]) for s in stats[start:end]]
+		# P_mle, K_mle, ecc_mle, omega_mle, t0_mle, vsys_mle = par_mle
+
+		## MAP
+		start, end = 4+2*3+2*npar, 4+2*3+3*npar
+		par_map = [float(s.split()[1]) for s in stats[start:end]]
+		# P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
+
+		msg = yellow('RESULT: ') + 'Parameters summary'
+		clogger.info(msg)
+
+		print '%8s %14s %9s %14s %14s' % ('', 'mean', '+- sigma', 'ML', 'MAP')
+		## loop over planets
+		for i, planet in enumerate(list(ascii_lowercase)[:nplanets]):
+			print yellow(planet)
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('P',     par_mean[5*i], par_sigma[5*i], par_mle[5*i], par_map[5*i])
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('K',     par_mean[5*i+1], par_sigma[5*i+1], par_mle[5*i+1], par_map[5*i+1])
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('ecc',   par_mean[5*i+2], par_sigma[5*i+2], par_mle[5*i+2], par_map[5*i+2])
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('omega', par_mean[5*i+3], par_sigma[5*i+3], par_mle[5*i+3], par_map[5*i+3])
+			print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
+		print yellow('system')
+		print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys',  par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
+
 	msg = blue('INFO: ') + 'Transfering data to MultiNest...'
 	clogger.info(msg)
 
@@ -724,64 +777,18 @@ def do_multinest(system):
 		    header=nest_header,
 		    fmt=['%12.6f', '%7.5f', '%7.5f'])
 
-	msg = blue('INFO: ') + 'Starting MultiNest...'
-	clogger.info(msg)
+	if user:
+	# user is controlling and editing the namelist, we just start 
+	# multinest once with whatever is in there and read the output
+		msg = blue('INFO: ') + 'Starting MultiNest...'
+		clogger.info(msg)
 
-	cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
-	subprocess.call(cmd, shell=True)
-	# os.system(cmd)
+		# cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
+		# subprocess.call(cmd, shell=True)
+		# os.system(cmd)
 
-	msg = blue('INFO: ') + 'Analysing output...'
-	clogger.info(msg)
-
-	with open('chains/nest-stats.dat') as f:
-		stats = f.readlines()
-		nlines = len(stats)
-
-	npar = (nlines - 10) / 3
-	nplanets = npar/6
-
-	try:
-		NS_lnE = float(stats[0].split()[-3])
-		NS_lnE_error = float(stats[0].split()[-1])
-
-		INS_lnE = float(stats[1].split()[-3])
-		INS_lnE_error = float(stats[1].split()[-1])
-	except ValueError:
-		NS_lnE, NS_lnE_error = 0, 0
-		INS_lnE, INS_lnE_error = 0, 0
-
-	## mean params
-	par_mean = [float(s.split()[1]) for s in stats[4:4+npar]]
-	P_mean, K_mean, ecc_mean, omega_mean, t0_mean, vsys_mean = par_mean
-	par_sigma = [float(s.split()[2]) for s in stats[4:4+npar]]
-	P_sigma, K_sigma, ecc_sigma, omega_sigma, t0_sigma, vsys_sigma = par_sigma
-
-	## MLE
-	start, end = 4+npar+3, 4+npar+3+npar
-	par_mle = [float(s.split()[1]) for s in stats[start:end]]
-	P_mle, K_mle, ecc_mle, omega_mle, t0_mle, vsys_mle = par_mle
-
-	## MAP
-	start, end = 4+2*3+2*npar, 4+2*3+3*npar
-	par_map = [float(s.split()[1]) for s in stats[start:end]]
-	P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
-
-	msg = yellow('RESULT: ') + 'Parameters summary'
-	clogger.info(msg)
-
-	print '%8s %14s %14s %14s' % ('', 'mean', 'ML', 'MAP')
-	## loop over planets
-	for i, planet in enumerate(list(ascii_lowercase)[:nplanets]):
-		print '%8s %14.3f %14.3f %14.3f' % ('P', P_mean, P_mle, P_map)
-		print '%8s %14.3f %14.3f %14.3f' % ('K', K_mean, K_mle, K_map)
-		print '%8s %14.3f %14.3f %14.3f' % ('ecc', ecc_mean, ecc_mle, ecc_map)
-		print '%8s %14.3f %14.3f %14.3f' % ('omega', omega_mean, omega_mle, omega_map)
-		print '%8s %14.2f %14.2f %14.2f' % ('t0', t0_mean, t0_mle, t0_map)
-		print '%8s %14.3f %14.3f %14.3f' % ('vsys', vsys_mean, vsys_mle, vsys_map)
-
-
-
+		get_multinest_output()
+		return
 
 
 
