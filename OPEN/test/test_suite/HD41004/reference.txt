@@ -1,0 +1,9 @@
+Visual binary HD41004, data from CORALIE for both components.
+
+Zucker, S. et al. (2004) 
+Astron. & Astrophys., 426, 695 
+DOI: http://dx.doi.org/10.1051/0004-6361:20040384
+
+Santos, N. C. et al. (2002)
+Astron. & Astrophys., 392, 215 
+DOI: http://dx.doi.org/10.1051/0004-6361:20020876
