@@ -1,0 +1,28 @@
+&NEST_parameters
+
+    !dimensionality
+    sdim = 6
+
+	!whether to use Nested Importance Sampling
+    nest_IS = .true.
+
+    !after how many iterations feedback is required and the output
+    !files should be updated 
+    !posterior files are updated and dumper routine is called
+    !after every updInt*10 iterations
+    nest_updInt=10
+
+
+    !whether to resume from a previous run
+    nest_resume=.false.
+
+    !max no. of iterations, a non-positive value means infinity. 
+    !MultiNest will terminate if either it has done max number of 
+    !iterations or convergence criterion has been satisfied
+    nest_maxIter=100
+    
+    !feedback on the sampling progress?
+    nest_fb=.false.
+
+
+/
