@@ -119,7 +119,7 @@ contains
 		
 		! now do something
 		!if (doing_debug) write(*,*) paramConstr(:)
-		write(*,*) paramConstr(1:nPar)
+		!write(*,*) paramConstr(1:nPar)
 
 	end subroutine dumper
 

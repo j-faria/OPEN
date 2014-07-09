@@ -13,11 +13,10 @@ program main
 	integer, parameter :: nobserv=1
 
 	real(kind=8), parameter :: kmax = 2129d0 ! m/s
-	real(kind=8) :: slhood
 
     namelist /NEST_parameters/ sdim, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, &
-                               nest_context
+                               nest_root, nest_context
     ! read configuration values from namelist
     iou = 8
     open(unit=iou, file="./OPEN/multinest/namelist1", status='old', action='read', delim='quote', iostat=ierr)
@@ -35,6 +34,12 @@ program main
 		stop 'Conflict between "sdim" and "nest_context"'
     end if
 
+
+    if (mod(nest_context, 10) == 2) then
+    	using_jitter = .true.
+    else
+    	using_jitter = .false.
+    end if
 
     !! some parameters depend on the ones set on the namelist
     nplanets = sdim / 5

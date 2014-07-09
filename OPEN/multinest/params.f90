@@ -12,6 +12,7 @@ module params
     !dimensionality
     integer sdim
     integer nplanets
+    logical using_jitter
 
     !priors on the parameters are set in main.f90
     real(kind=8), allocatable, dimension(:,:) :: spriorran  !(sdim,2)
@@ -19,7 +20,7 @@ module params
     ! nuisance parameters and auxiliary variables
     integer, allocatable, dimension(:) :: observ
     real(kind=8), allocatable, dimension(:) :: ss, alpha, tau
-    real(kind=8), allocatable, dimension(:) :: vel, dist
+    real(kind=8), allocatable, dimension(:) :: vel, dist, sigma
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
 
     integer nest_context
@@ -36,8 +37,12 @@ module params
  	parameter(nest_mmodal=.false.)
 	
     !sample with constant efficiency
+    ! If ceff is set to True, then the enlargement factor of the 
+    ! bounding ellipsoids are tuned so that the sampling efficiency 
+    ! is as close to the target efficiency (set by efr) as possible. 
+    ! This does mean however, that the evidence value may not be accurate.
 	logical nest_ceff
- 	parameter(nest_ceff=.true.)
+ 	parameter(nest_ceff=.false.)
 	
     !max no. of live points
     integer nest_nlive
@@ -58,12 +63,13 @@ module params
     parameter(nest_tol=0.5)
       
     !enlargement factor reduction parameter
+    ! defines the sampling efficiency. 0.8 and 0.3 are recommended for 
+    ! parameter estimation & evidence evaluation respectively.
     double precision nest_efr
-    parameter(nest_efr=0.9d0)
+    parameter(nest_efr=0.3d0)
       
     !root for saving posterior files
     character*100 nest_root
-	parameter(nest_root='chains/nest-')
 	
 	!after how many iterations feedback is required and the output
     !files should be updated 

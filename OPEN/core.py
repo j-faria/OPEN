@@ -357,10 +357,10 @@ def do_demc(system, zfile, burnin=0):
 	## automatically fill the necessary parameters in the inlist
 	replacer = '\tpar_num = %d\n' % (5*keplerians+1)
 	for line in fileinput.input('OPEN/demc/namelist1', inplace=True):
-		if 'par_num' in line: 
+		if 'par_num' in line:
 			print replacer,
 		else:
-			 print line,
+			print line,
 
 	## get number of chains and generations from namelist
 	with open('OPEN/demc/namelist1') as f:
@@ -713,12 +713,13 @@ def do_lm(system, x0):
 
 
 def do_multinest(system, user):
+	from time import sleep
 
-	def get_multinest_output():
+	def get_multinest_output(root):
 		msg = blue('INFO: ') + 'Analysing output...'
 		clogger.info(msg)
 
-		with open('chains/nest-stats.dat') as f:
+		with open(root+'stats.dat') as f:
 			stats = f.readlines()
 			nlines = len(stats)
 
@@ -774,22 +775,78 @@ def do_multinest(system, user):
 	nest_header = 'file automatically generated for MultiNest analysis, ' + timestamp
 	nest_header += '\n' + str(len(system.time))
 	savetxt(nest_filename, zip(system.time, system.vrad, system.error),
-		    header=nest_header,
-		    fmt=['%12.6f', '%7.5f', '%7.5f'])
+			header=nest_header,
+			fmt=['%12.6f', '%7.5f', '%7.5f'])
 
 	if user:
-	# user is controlling and editing the namelist, we just start 
-	# multinest once with whatever is in there and read the output
-		msg = blue('INFO: ') + 'Starting MultiNest...'
+		# user is controlling and editing the namelist, we just start 
+		# multinest once with whatever is in there and read the output
+
+		# but first we need the root of output files which may have changed
+		with open('OPEN/multinest/namelist1') as f:
+			l1 = [line for line in f.readlines() if 'nest_root' in line][0]
+			# split the assignment, strip of newline, strip of ', strip of "
+			root_path = l1.split('=')[1].strip().strip("'").strip('"')
+
+		msg = blue('    : ') + 'Starting MultiNest...'
 		clogger.info(msg)
 
-		# cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
-		# subprocess.call(cmd, shell=True)
-		# os.system(cmd)
+		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
+		subprocess.call(cmd, shell=True)
 
-		get_multinest_output()
+		get_multinest_output(root_path)
 		return
 
+	else:
+		# OPEN is in control and will try to run a full model selection
+		# analysis, editing the namelist accordingly.
+		msg = blue('    : ') + 'Starting MultiNest for 1-planet model. Please wait...'
+		clogger.info(msg)
+
+		nplanets = 1
+		context = 11
+		npar = 6
+		root = 'chains/nest-1planet-'
+		## automatically fill the necessary parameters in the inlist
+		replacer1 = '    sdim = %d\n' % npar
+		replacer2 = '    nest_context = %d\n' % context
+		replacer3 = '    nest_root=\'%s\'\n' % root
+		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			if 'sdim' in line: print replacer1,
+			elif ('nest_context' in line) and not line.strip().startswith('!'): print replacer2,
+			elif 'nest_root' in line: print replacer3,
+			else: print line,
+
+		sleep(1)
+		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
+		subprocess.call(cmd, shell=True)
+
+		get_multinest_output(root)
+
+		##############################################################################
+		print  # newline
+		msg = blue('INFO: ') + 'Starting MultiNest for 2-planet model. Please wait...'
+		clogger.info(msg)
+
+		nplanets = 2
+		context = 21
+		npar = 11
+		root = 'chains/nest-2planet-'
+		## automatically fill the necessary parameters in the inlist
+		replacer1 = '    sdim = %d\n' % npar
+		replacer2 = '    nest_context = %d\n' % context
+		replacer3 = '    nest_root=\'%s\'\n' % root
+		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			if 'sdim' in line: print replacer1,
+			elif ('nest_context' in line) and not line.strip().startswith('!'): print replacer2,
+			elif 'nest_root' in line: print replacer3,
+			else: print line,
+
+		sleep(1)
+		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
+		subprocess.call(cmd, shell=True)
+
+		get_multinest_output(root)
 
 
 	return

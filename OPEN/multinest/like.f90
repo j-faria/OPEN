@@ -8,6 +8,8 @@ module like
   
 	real(kind=8), parameter :: pi = 3.1415926535897932384626433832795029d0
 	real(kind=8), parameter :: twopi = 2.d0 * pi 
+	real(kind=8), parameter :: lnstwopi = log(sqrt(twopi))
+
 
 
 contains  
@@ -18,7 +20,7 @@ contains
 		allocate(ss(N), alpha(N), tau(N))
 		allocate(observ(N))
 		allocate(times(N), rvs(N), errors(N))
-		allocate(vel(N), dist(N))
+		allocate(vel(N), dist(N), sigma(N))
 		allocate(covmat(N,N), inv_covmat(N,N))
 
 	end subroutine likelihood_init
@@ -34,7 +36,7 @@ contains
 		real(kind=8), intent(in) :: Cube(nest_nPar)
 		real(kind=8), intent(out) :: slhood
 		integer, intent(in) :: context
-		real(kind=8) :: lhood, lhood_test(1,1), det
+		real(kind=8) :: lhood, lhood_test(1,1), det, jitter
 		integer :: i, n
 
 		! times, rvs and errors are defined in params and initialized/read in main
@@ -67,10 +69,16 @@ contains
 	    !lhood_test = -0.5d0 * matmul(matmul(reshape(dist, (/1,n/)), covmat), reshape(dist, (/n,1/)))
 	    !lhood = lhood_test(1,1) - 0.5d0*log(twopi**n * det)
 
-	    lhood = -0.5d0 * sum(dist**2 / errors**2) - 0.5d0*log(twopi**n * product(errors))
+		if (using_jitter) then
+	    	jitter = Cube(nest_nPar)
+	    	sigma = errors**2 + jitter**2
+	    	lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * dist**2 / sigma)
+	    else
+			lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
+	    end if
 
 		
-		slhood=logSumExp(slhood,lhood)
+		slhood = logSumExp(slhood,lhood)
 		if (doing_debug) write(*,'(f8.3)', advance='no') slhood
 
 	end subroutine slikelihood
