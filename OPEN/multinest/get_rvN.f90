@@ -69,20 +69,24 @@ contains
   elemental real(dp) function ecc_anom(M, ecc) result(E)
     real(dp), intent(in) :: M, ecc
     real(dp), parameter :: derror = 1.0d-3
+    integer :: iter
     real(dp) :: EA_new, EA_old
     
+    iter = 0
     EA_old = 0.5_dp * pi 
-    if (ecc < 0.9d0) then
+    if (ecc < 0.8d0) then
       EA_new = newton(EA_old, ecc, M)
-      do while (abs(EA_old - EA_new) >= derror)
+      do while (abs(EA_old - EA_new) >= derror .and. iter<200)
         EA_old = EA_new
         EA_new = newton(EA_old, ecc, M)
+        iter = iter+1
       end do
     else
       EA_new = strict_iteration(EA_old, ecc, M)
-      do while (abs(EA_old - EA_new) >= derror)
+      do while (abs(EA_old - EA_new) >= derror .and. iter<200)
         EA_old = EA_new
         EA_new = strict_iteration(EA_old, ecc, M)
+        iter = iter+1
       end do    
     endif  
     E = EA_new

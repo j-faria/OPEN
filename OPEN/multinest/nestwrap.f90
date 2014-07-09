@@ -71,7 +71,7 @@ contains
 	end subroutine getLogLike
 
 
-	subroutine dumper(nSamples, nlive, nPar, physLive, posterior, paramConstr, maxLogLike, logZ, logZerr, context)
+	subroutine dumper(nSamples, nlive, nPar, physLive, posterior, paramConstr, maxLogLike, logZ, INSlogZ, logZerr, context)
 	! dumper routine, called after every updInt*10 iterations
 	! and at the end of the sampling.
 		implicit none
@@ -86,14 +86,14 @@ contains
 		! array with mean, sigmas, maxlike & MAP parameters:
 		double precision, pointer :: paramConstr(:)	
 		double precision maxLogLike ! max loglikelihood value
-		double precision logZ ! log evidence
+		double precision logZ, INSlogZ ! log evidence
 		double precision logZerr ! error on log evidence
 		integer context ! any additional information user wants to pass
 		
 
 		! now do something
-		if (doing_debug) write(*,*) paramConstr(:)
-		write(*,*) paramConstr(1:nPar)
+		!if (doing_debug) write(*,*) paramConstr(:)
+		!write(*,*) paramConstr(1:nPar)
 
 	end subroutine dumper
 

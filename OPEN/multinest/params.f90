@@ -11,10 +11,9 @@ module params
    	
     !dimensionality
     integer sdim
-   	parameter( sdim = 6 )
 
     !priors on the parameters are set in main.f90
-    double precision spriorran(sdim,2)
+    real(kind=8), allocatable, dimension(:,:) :: spriorran  !(sdim,2)
 
     ! nuisance parameters and auxiliary variables
     integer, allocatable, dimension(:) :: observ
@@ -27,10 +26,10 @@ module params
 
 
 ! Parameters for MultiNest
+! some of these are set in a namelist for easier access
 
-    !whether to do use Nested Importance Sampling
+    !whether to use Nested Importance Sampling
 	logical nest_IS
- 	parameter(nest_IS=.false.)
 	
     !whether to do multimodal sampling
 	logical nest_mmodal 
@@ -48,8 +47,7 @@ module params
     !should be sdim in most cases but if you need to store some 
     !additional parameters with the actual parameters then
     !you need to pass them through the likelihood routine
-	integer nest_nPar 
-	parameter(nest_nPar=sdim)
+	integer nest_nPar  ! =sdim
       
     !seed for MultiNest, negative value means take it from sys clock
 	integer nest_rseed 
@@ -71,8 +69,7 @@ module params
     !files should be updated 
 	!posterior files are updated and dumper routine is called
     !after every updInt*10 iterations
-	integer nest_updInt
-	parameter(nest_updInt=10)
+	integer nest_updInt ! =10
 	
 	!null evidence 
     !(set it to very high negative number if null evidence is unknown)
@@ -89,7 +86,7 @@ module params
 
     !whether to resume from a previous run
     logical nest_resume
-    parameter(nest_resume=.false.)
+    !parameter(nest_resume=.false.)
 
     !whether to write output files
     logical nest_outfile
@@ -109,15 +106,15 @@ module params
     !iterations or convergence criterion (defined through nest_tol) 
     !has been satisfied
     integer nest_maxIter
-    parameter(nest_maxIter=10000)
+    !parameter(nest_maxIter=100)
 	
 	!parameters to wrap around (0 is False; non-zero is True) meaning
     !if nest_pWrap(1) = 0, then parameter 1 is NOT wrap around
-	integer nest_pWrap(sdim)
+	integer, allocatable, dimension(:) :: nest_pWrap  !(sdim)
 	
     !feedback on the sampling progress?
     logical nest_fb 
-    parameter(nest_fb=.true.)
+    !parameter(nest_fb=.false.)
 
 
 end module params

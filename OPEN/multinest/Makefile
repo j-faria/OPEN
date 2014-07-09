@@ -14,7 +14,7 @@ FFLAGS +=  -I. -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none #-fche
 FLIBDIR = /home/joao/Software/fortranlib
 
 # for MultiNest (CHANGE THIS!!!)
-NESTLIBDIR=/home/joao/Software/MultiNest_v3.4
+NESTLIBDIR=/home/joao/Software/MultiNest/MultiNest_v3.7
 
 
 FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
@@ -25,7 +25,7 @@ ifndef WITHOUT_MPI
 # compiling with MPI support by default. You can disable this with 
 # $ make WITHOUT_MPI=1
 # but MultiNest must have been compiled without MPI also
-FC = mpif90 -f90=${FCPATH}
+FC = mpif90 # -f90=${FCPATH}
 FFLAGS += -DMPI
 endif
 

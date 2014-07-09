@@ -53,14 +53,12 @@ contains
     	           Cube(6), vel, n, 1)
 
 	    dist = rvs - vel
-	    call get_covmat(times, errors, observ, ss, alpha, tau, covmat, det, inv_covmat)
+	    !call get_covmat(times, errors, observ, ss, alpha, tau, covmat, det, inv_covmat)
 
-	    lhood_test = -0.5d0 * matmul(matmul(reshape(dist, (/1,n/)), covmat), reshape(dist, (/n,1/)))
-	    lhood = lhood_test(1,1) - 0.5d0*log(twopi**n * det)
+	    !lhood_test = -0.5d0 * matmul(matmul(reshape(dist, (/1,n/)), covmat), reshape(dist, (/n,1/)))
+	    !lhood = lhood_test(1,1) - 0.5d0*log(twopi**n * det)
 
-! 		call likelihood(times, rvs, errors, &
-!                       Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
-!                       0.d0, vel, lhood, 119, 1)
+	    lhood = -0.5d0 * sum(dist**2 / errors**2) - 0.5d0*log(twopi**n * product(errors))
 
 		
 		slhood=logSumExp(slhood,lhood)

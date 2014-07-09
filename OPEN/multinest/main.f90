@@ -7,6 +7,7 @@ program main
 	implicit none
 	
 	integer i
+	integer :: iou, ierr
 	integer :: n
 	character(len=10) line
 	integer, parameter :: nobserv=1
@@ -14,8 +15,29 @@ program main
 	real(kind=8), parameter :: kmax = 2129d0 ! m/s
 	real(kind=8) :: slhood
 
+    namelist /NEST_parameters/ sdim, &
+                               nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb
+    ! read configuration values from namelist
+    iou = 8
+    open(unit=iou, file="./OPEN/multinest/namelist1", status='old', action='read', delim='quote', iostat=ierr)
+    if (ierr /= 0) then
+      stop 'Failed to open namelist file'
+    else
+      read(iou, nml=NEST_parameters)
+      close(iou)
+    end if
+
+    !! some parameters depend on the ones set on the namelist
+    allocate(spriorran(sdim, 2))
+    allocate(nest_pWrap(sdim))
+    nest_nPar=sdim
+
+
+
+
 	!doing debug?
 	doing_debug = .false.
+
 
 	!load data
 	open(unit=15, file='input.rv', status="old")
@@ -38,8 +60,8 @@ program main
 	! the mathematical form is only used when rescaling
 
 	!! Period, Jeffreys, 0.2d - 365000d
-	spriorran(1,1)= 600d0 !0.2d0
-	spriorran(1,2)= 800d0 !365000.d0
+	spriorran(1,1)= 500d0 !0.2d0
+	spriorran(1,2)= 2500d0 !365000.d0
 	!! semi amplitude K, Mod. Jeffreys
 	spriorran(2,1)=0d0
 	! since the upper limit depends on e and P, it can only be set
