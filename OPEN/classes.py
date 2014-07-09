@@ -311,18 +311,18 @@ class rvSeries:
         final = np.zeros_like(tt)
 
         ### phased RV curves
-        plt.figure()
-        gs = gridspec.GridSpec(keplerians, 1)
-        for i in range(keplerians):
-          get_rvn(tt, P[i], K[i], ecc[i], omega[i], T0[i], gam, final)
-          ax = plt.subplot(gs[i])
-          # plot each file's values
-          for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
-              m = n-nout # how many values are there after restriction
-              ax.errorbar(np.modf(abs(t[:m]-T0[i])/P[i])[0], rv[:m], yerr=err[:m], \
-                           fmt='o'+colors[i], label=fname)
-              t, rv, err = t[m:], rv[m:], err[m:]
-          ax.plot( np.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
+        # plt.figure()
+        # gs = gridspec.GridSpec(keplerians, 1)
+        # for i in range(keplerians):
+        #   get_rvn(tt, P[i], K[i], ecc[i], omega[i], T0[i], gam, final)
+        #   ax = plt.subplot(gs[i])
+        #   # plot each file's values
+        #   for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+        #       m = n-nout # how many values are there after restriction
+        #       ax.errorbar(np.modf(abs(t[:m]-T0[i])/P[i])[0], rv[:m], yerr=err[:m], \
+        #                    fmt='o'+colors[i], label=fname)
+        #       t, rv, err = t[m:], rv[m:], err[m:]
+        #   ax.plot( np.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
 
         plt.show()
 
