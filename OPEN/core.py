@@ -726,10 +726,64 @@ def do_multinest(system):
 
 	msg = blue('INFO: ') + 'Starting MultiNest...'
 	clogger.info(msg)
-	
+
 	cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
 	subprocess.call(cmd, shell=True)
 	# os.system(cmd)
+
+	msg = blue('INFO: ') + 'Analysing output...'
+	clogger.info(msg)
+
+	with open('chains/nest-stats.dat') as f:
+		stats = f.readlines()
+		nlines = len(stats)
+
+	npar = (nlines - 10) / 3
+	nplanets = npar/6
+
+	try:
+		NS_lnE = float(stats[0].split()[-3])
+		NS_lnE_error = float(stats[0].split()[-1])
+
+		INS_lnE = float(stats[1].split()[-3])
+		INS_lnE_error = float(stats[1].split()[-1])
+	except ValueError:
+		NS_lnE, NS_lnE_error = 0, 0
+		INS_lnE, INS_lnE_error = 0, 0
+
+	## mean params
+	par_mean = [float(s.split()[1]) for s in stats[4:4+npar]]
+	P_mean, K_mean, ecc_mean, omega_mean, t0_mean, vsys_mean = par_mean
+	par_sigma = [float(s.split()[2]) for s in stats[4:4+npar]]
+	P_sigma, K_sigma, ecc_sigma, omega_sigma, t0_sigma, vsys_sigma = par_sigma
+
+	## MLE
+	start, end = 4+npar+3, 4+npar+3+npar
+	par_mle = [float(s.split()[1]) for s in stats[start:end]]
+	P_mle, K_mle, ecc_mle, omega_mle, t0_mle, vsys_mle = par_mle
+
+	## MAP
+	start, end = 4+2*3+2*npar, 4+2*3+3*npar
+	par_map = [float(s.split()[1]) for s in stats[start:end]]
+	P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
+
+	msg = yellow('RESULT: ') + 'Parameters summary'
+	clogger.info(msg)
+
+	print '%8s %14s %14s %14s' % ('', 'mean', 'ML', 'MAP')
+	## loop over planets
+	for i, planet in enumerate(list(ascii_lowercase)[:nplanets]):
+		print '%8s %14.3f %14.3f %14.3f' % ('P', P_mean, P_mle, P_map)
+		print '%8s %14.3f %14.3f %14.3f' % ('K', K_mean, K_mle, K_map)
+		print '%8s %14.3f %14.3f %14.3f' % ('ecc', ecc_mean, ecc_mle, ecc_map)
+		print '%8s %14.3f %14.3f %14.3f' % ('omega', omega_mean, omega_mle, omega_map)
+		print '%8s %14.2f %14.2f %14.2f' % ('t0', t0_mean, t0_mle, t0_map)
+		print '%8s %14.3f %14.3f %14.3f' % ('vsys', vsys_mean, vsys_mle, vsys_map)
+
+
+
+
+
 
 	return
 
@@ -968,8 +1022,60 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 
 
 
+def get_rotation_period(system):
+	"""
+	Calculate rotation period from the Noyes (1984) relation
+	"""
+	# try to find name of star automatically
+	import re
+	filename = system.provenance.keys()[0]
+	regex = re.compile("HD[0-9]*")
+	temp_star_name = regex.findall(filename)[0]
+	if ask_yes_no('Is "%s" the star (Y/n)? ' % temp_star_name, default=True):
+		pass
+	else:
+		temp_star_name = raw_input('Name of the star: ').upper()
+
+	print  # newline
+	msg = blue('INFO: ') + 'Calculating rotation period for %s' % temp_star_name
+	clogger.info(msg)
+
+	data_path = '/home/joao/phd/data/'
+	filepath = data_path + 'metadata/sample_simbad.rdb'
+	found_it = False
+	with open(filepath) as f:
+		for line in f:
+			if temp_star_name in line:
+				found_it = True
+				star_info = line.strip().split()
+
+	if not found_it:
+		msg = red('ERROR: ') + 'Cannot find B-V information for %s' % temp_star_name
+		clogger.fatal(msg)
+		return
+
+	msg = blue('    : ') + '%s, V=%s  B=%s' % tuple(star_info[1:])
+	clogger.info(msg)
+
+	Vmag = float(star_info[2])
+	Bmag = float(star_info[3])
+
+	x = 1 - (Bmag - Vmag)
+	## Noyes (1984), Eq 4
+	log_tau = (1.362 - 0.166*x + 0.025*x**2 - 5.323*x**3) if x > 0 else (1.362 - 0.14*x)
+
+	lrhk = np.mean(system.extras.rhk)
+	y = 5. + lrhk
+	## Noyes (1984), Eq 3
+	log_P = (0.324 - 0.4*y - 0.283*y**2 - 1.325*y**3) + log_tau
+
+
+	msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f d' % (10**log_P)
+	clogger.info(msg)
+
+
 def do_Dawson_Fabrycky(system):
-	
+
 	if not periodogram_DF_available:
 		msg = red('ERROR: ') + 'This extension is not available. Something went wrong on install...'
 		clogger.fatal(msg)

@@ -189,6 +189,17 @@ Options:
 """
 
 
+rotation_usage = \
+"""
+Usage:
+    rotation
+    rotation -n SYSTEM
+    rotation -h | --help
+Options
+    -n SYSTEM   Specify name of system (else use default)
+    -h --help   Show this help message
+"""
+
 create_usage = \
 """
 Usage:
@@ -782,12 +793,13 @@ class EmbeddedMagics(Magics):
 
         if local_ns.has_key('default'):
             system = local_ns['default']
-            core.do_multinest(system)
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
             clogger.fatal(msg)
             return
+
+        core.do_multinest(system)
 
     @needs_local_scope
     @line_magic
@@ -857,6 +869,29 @@ class EmbeddedMagics(Magics):
         if args['--gui']:
             selectable_plot([1,2,3], [4, 16, 32], 'ro')
 
+
+    @needs_local_scope
+    @line_magic
+    def rotation(self, parameter_s='', local_ns=None):
+        """ Calculate rotation period from activity-rotation relation"""
+        args = parse_arg_string('rotation', parameter_s)
+        # print args
+
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default') and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['SYSTEM']
+                system = local_ns[system_name]
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.get_rotation_period(system)
 
     @needs_local_scope
     @line_magic
@@ -956,5 +991,8 @@ def parse_arg_string(command, arg_string):
 
     if command is 'add_noise':
         args = docopt(addnoise_usage, splitted)
+
+    if command is 'rotation':
+        args = docopt(rotation_usage, splitted)
 
     return args
