@@ -30,19 +30,22 @@ program main
     !! check compatibility between dimensionality and context
     if ((nest_context == 11 .and. sdim /= 6) .or. &
         (nest_context == 12 .and. sdim /= 7) .or. &
-        (nest_context == 21 .and. sdim /= 11) ) then
+        (nest_context == 21 .and. sdim /= 11) .or. &
+        (nest_context == 22 .and. sdim /= 12) ) then
 		stop 'Conflict between "sdim" and "nest_context"'
     end if
 
-
     if (mod(nest_context, 10) == 2) then
     	using_jitter = .true.
+    	nextra = 2
     else
     	using_jitter = .false.
+    	nextra = 1
     end if
 
     !! some parameters depend on the ones set on the namelist
-    nplanets = sdim / 5
+    !nplanets = sdim / 5 ! this is too restrictive to the extra parameters
+    nplanets = nest_context / 10 ! this is good for now
     allocate(spriorran(sdim, 2))
     allocate(nest_pWrap(sdim))
     nest_nPar=sdim
@@ -70,72 +73,45 @@ program main
 	
 	! here we set prior limits, 
 	! the mathematical form is only used when rescaling
-	if (nest_context == 11) then
+	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(1,1)= 500d0 !0.2d0
-		spriorran(1,2)= 1000d0 !365000.d0
+		spriorran(i,1)= 0.2d0 !0.2d0
+		spriorran(i,2)= 1000d0 !365000.d0
+
 		!! semi amplitude K, Mod. Jeffreys
-		spriorran(2,1)=0d0
+		spriorran(i+1,1)=1d0
 		! since the upper limit depends on e and P, it can only be set
 		! when rescaling. We just initialize it here to a big number
-		spriorran(2,2)=500d0
-		!! eccentricity, Uniform, 0-1
-		spriorran(3,1)=0d0
-		spriorran(3,2)=1d0		
-		!! long. periastron, Uniform, 0-2pi rad
-		spriorran(4,1)=0d0
-		spriorran(4,2)=twopi		
-		!! chi, Uniform, 0-1
-		spriorran(5,1)= minval(times)
-		spriorran(5,2)= spriorran(5,1) + spriorran(1,2)
-		!! systematic velocity, Uniform
-		!! Vmin = -Kmax, Vmax = Kmax
-		spriorran(6,1)= -kmax
-		spriorran(6,2)= kmax
+		spriorran(i+1,2)=500d0
 
-	else if (nest_context == 21) then
-		!!-> planet 1
-		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(1,1)= 500d0 !0.2d0
-		spriorran(1,2)= 1000d0 !365000.d0
-		!! semi amplitude K, Mod. Jeffreys
-		spriorran(2,1)=0d0
-		! since the upper limit depends on e and P, it can only be set
-		! when rescaling. We just initialize it here to a big number
-		spriorran(2,2)=500d0
 		!! eccentricity, Uniform, 0-1
-		spriorran(3,1)=0d0
-		spriorran(3,2)=1d0		
-		!! long. periastron, Uniform, 0-2pi rad
-		spriorran(4,1)=0d0
-		spriorran(4,2)=twopi		
-		!! chi, Uniform, 0-1
-		spriorran(5,1)= minval(times)
-		spriorran(5,2)= spriorran(5,1) + spriorran(1,2)
+		spriorran(i+2,1)=0d0
+		spriorran(i+2,2)=1d0
 
-		!!-> planet 2
-		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(6,1)= 50d0 !0.2d0
-		spriorran(6,2)= 200d0 !365000.d0
-		!! semi amplitude K, Mod. Jeffreys
-		spriorran(7,1)=0d0
-		! since the upper limit depends on e and P, it can only be set
-		! when rescaling. We just initialize it here to a big number
-		spriorran(7,2)=50d0
-		!! eccentricity, Uniform, 0-1
-		spriorran(8,1)=0d0
-		spriorran(8,2)=1d0		
 		!! long. periastron, Uniform, 0-2pi rad
-		spriorran(9,1)=0d0
-		spriorran(9,2)=twopi		
-		!! chi, Uniform, 0-1
-		spriorran(10,1)= minval(times)
-		spriorran(10,2)= spriorran(5,1) + spriorran(1,2)
+		spriorran(i+3,1)=0d0
+		spriorran(i+3,2)=twopi		
 
-		!! systematic velocity, Uniform
-		!! Vmin = -Kmax, Vmax = Kmax
-		spriorran(11,1)= -kmax
-		spriorran(11,2)= kmax
+		!! chi, Uniform, 
+		spriorran(i+4,1)= minval(times)
+		spriorran(i+4,2)= spriorran(5,1) + spriorran(1,2)
+	end do
+
+	if (using_jitter) then
+		i = sdim-nextra+1 ! index of jitter parameter
+		spriorran(i,1)= 1d0
+		spriorran(i,2)= kmax
+
+		!! systematic velocity, Uniform, -kmax - kmax
+		i = sdim-nextra+2 ! index of jitter parameter
+		spriorran(i,1)= -kmax
+		spriorran(i,2)= kmax
+
+	else
+		!! systematic velocity, Uniform, -kmax - kmax
+		i = sdim-nextra+1 ! index of jitter parameter
+		spriorran(i,1)= -kmax
+		spriorran(i,2)= kmax
 
 	end if	
 

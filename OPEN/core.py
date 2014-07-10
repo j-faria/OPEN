@@ -30,8 +30,8 @@ from scipy.stats.stats import spearmanr, pearsonr
 from scipy.stats import nanmean, nanstd
 
 # intra-package imports
-from .classes import MCMC
-from logger import clogger, logging
+from .classes import MCMC_dream, MCMC_nest
+from logger import clogger
 from ext.get_rvN import get_rvn
 from .periodograms import ls_PressRybicki, gls
 try:
@@ -327,7 +327,7 @@ def do_demc(system, zfile, burnin=0):
 	if zfile is not None:
 		msg = blue('INFO: ') + 'Loading chains from file ' + zfile
 		clogger.info(msg)
-		results = MCMC(zfile, burnin=burnin)
+		results = MCMC_dream(zfile, burnin=burnin)
 		results.print_best_solution()
 		results.do_plot_some_solutions(system)
 		return results
@@ -386,7 +386,7 @@ def do_demc(system, zfile, burnin=0):
 	msg = blue('    : ') + 'Starting analysis of output...'
 	clogger.info(msg)
 
-	results = MCMC('OPEN/demc/problem1_chain*', burnin=burnin)
+	results = MCMC_dream('OPEN/demc/problem1_chain*', burnin=burnin)
 
 	## output best solution
 	results.print_best_solution()
@@ -765,7 +765,9 @@ def do_multinest(system, user):
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('omega', par_mean[5*i+3], par_sigma[5*i+3], par_mle[5*i+3], par_map[5*i+3])
 			print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
 		print yellow('system')
-		print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys',  par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
+		if npar == 7:
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])	
+		print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
 
 	msg = blue('INFO: ') + 'Transfering data to MultiNest...'
 	clogger.info(msg)
@@ -795,6 +797,10 @@ def do_multinest(system, user):
 		subprocess.call(cmd, shell=True)
 
 		get_multinest_output(root_path)
+		results = MCMC_nest(root_path)
+
+		results.do_plot_map(system)
+		
 		return
 
 	else:

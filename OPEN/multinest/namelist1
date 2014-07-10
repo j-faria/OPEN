@@ -1,14 +1,15 @@
 &NEST_parameters
 
     !dimensionality
-    sdim = 6
+    sdim = 11
 
     !additional information to pass to low-level routines
     ! we use this to set the problem
-    nest_context = 11
+    nest_context = 21
     ! nest_context = 11   ! 1-planet model (6 parameters)
     ! nest_context = 12   ! 1-planet model with jitter term (7 parameters)
     ! nest_context = 21   ! 2-planet model (11 parameters)
+    ! nest_context = 22   ! 2-planet model with jitter term (12 parameters)
 
 
 	!whether to use Nested Importance Sampling
@@ -30,9 +31,9 @@
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
     !iterations or convergence criterion has been satisfied
-    nest_maxIter=100
+    nest_maxIter=100000
     
     !feedback on the sampling progress?
-    nest_fb=.false.
+    nest_fb=.true.
 
 /

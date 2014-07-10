@@ -70,9 +70,10 @@ contains
 	    !lhood = lhood_test(1,1) - 0.5d0*log(twopi**n * det)
 
 		if (using_jitter) then
-	    	jitter = Cube(nest_nPar)
+	    	jitter = Cube(nest_nPar-1)
 	    	sigma = errors**2 + jitter**2
-	    	lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * dist**2 / sigma)
+	    	!lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * dist**2 / sigma)
+	    	lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(dist**2 / sigma)
 	    else
 			lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
 	    end if
