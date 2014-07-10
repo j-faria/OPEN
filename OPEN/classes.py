@@ -368,39 +368,39 @@ class rvSeries:
         self.fit['aicc'] = aicc
         self.fit['bic'] = bic
 
-# def do_stats(fit, x, y):
-#     def ll_aic_bic(fit):
-#         """
-#         Calculate model log-likelihood, AIC, and BIC information criteria
-#         """
-#         # ll = -(nobs*1/2)*(1+np.log(2*np.pi)) - (nobs/2.)*np.log(np.dot(e,e)/nobs)
-#         # print ll
-#         ll = 0.5 * nobs * np.log(1./2*np.pi) - 0.5 * np.sum(e**2)
-#         k = fit.nvarys
-#         aic = -2*ll + 2.*k
-#         aicc = aic + (2.*k*(k+1)) / (nobs-k-1.)
-#         bic = -2*ll + (fit.nvarys * np.log(nobs))
-#         # print ll, aic, bic
-#         return ll, aic, bic, aicc
+    # def do_stats(fit, x, y):
+    #     def ll_aic_bic(fit):
+    #         """
+    #         Calculate model log-likelihood, AIC, and BIC information criteria
+    #         """
+    #         # ll = -(nobs*1/2)*(1+np.log(2*np.pi)) - (nobs/2.)*np.log(np.dot(e,e)/nobs)
+    #         # print ll
+    #         ll = 0.5 * nobs * np.log(1./2*np.pi) - 0.5 * np.sum(e**2)
+    #         k = fit.nvarys
+    #         aic = -2*ll + 2.*k
+    #         aicc = aic + (2.*k*(k+1)) / (nobs-k-1.)
+    #         bic = -2*ll + (fit.nvarys * np.log(nobs))
+    #         # print ll, aic, bic
+    #         return ll, aic, bic, aicc
 
-#     e = fit.residual
-#     nobs = fit.ndata
+    #     e = fit.residual
+    #     nobs = fit.ndata
 
-#     # durbin watson statistic -- http://en.wikipedia.org/wiki/Durbin%E2%80%93Watson_statistic
-#     fit.DurbinWatson = sum(ediff1d(fit.residual)**2) / sum(fit.residual**2)
+    #     # durbin watson statistic -- http://en.wikipedia.org/wiki/Durbin%E2%80%93Watson_statistic
+    #     fit.DurbinWatson = sum(ediff1d(fit.residual)**2) / sum(fit.residual**2)
 
-#     # r squared, coefficient of determination
-#     fit.R2 = 1 - sum(fit.residual**2) / sum((y - mean(y))**2)
-#     fit.R2adj = 1 - (1-fit.R2)* ((nobs-1)/(nobs-fit.nvarys-1))   # adjusted R-square
+    #     # r squared, coefficient of determination
+    #     fit.R2 = 1 - sum(fit.residual**2) / sum((y - mean(y))**2)
+    #     fit.R2adj = 1 - (1-fit.R2)* ((nobs-1)/(nobs-fit.nvarys-1))   # adjusted R-square
 
-#     # log-likelihood, AIC, BIC
-#     fit.ll, fit.aic, fit.bic, fit.aicc = ll_aic_bic(fit)
+    #     # log-likelihood, AIC, BIC
+    #     fit.ll, fit.aic, fit.bic, fit.aicc = ll_aic_bic(fit)
 
-#     # residual skewness, kurtosis, and JB test for normality
-#     fit.skew = sp.stats.skew(e)
-#     fit.kurtosis = 3. + sp.stats.kurtosis(e)
-#     fit.JB = (e.shape[0] / 6.) * (fit.skew**2 + (1 / 4.) * (fit.kurtosis-3)**2)
-#     fit.JBpv = sp.stats.chi2.sf(fit.JB,2)
+    #     # residual skewness, kurtosis, and JB test for normality
+    #     fit.skew = sp.stats.skew(e)
+    #     fit.kurtosis = 3. + sp.stats.kurtosis(e)
+    #     fit.JB = (e.shape[0] / 6.) * (fit.skew**2 + (1 / 4.) * (fit.kurtosis-3)**2)
+    #     fit.JBpv = sp.stats.chi2.sf(fit.JB,2)
 
 
     def get_nyquist(self, smallest=False):
@@ -726,68 +726,71 @@ class PeriodogramBase:
         # print 60*"-"
 
       
-#    def do_stats(self):
-#        """
-#        Some statistics about the periodogram
-#        """
-#        # Index with maximum power
-#        max_power_idx = argmax(self.power)
-#        # Maximum (unnormalized) power
-#        max_power = self._upower[max_power_idx]
-#    
-#        rms = sqrt(self._YY * (1. - max_power))
-#        
-#        # Get the curvature in the power peak by fitting a parabola y=aa*x^2
-#        if (max_power_idx > 1) and (max_power_idx < len(self.freq)-2):
-#            # Shift the parabola origin to the power peak
-#            xh = (self.freq[max_power_idx-1:max_power_idx+2] - self.freq[max_power_idx])**2
-#            yh = self._upow[max_power_idx-1:max_power_idx+2] - self._upow[max_power_idx]
-#            # Calculate the curvature (final equation from least squares)
-#            aa = sum(yh*xh)/sum(xh*xh)
-#            nt = float(self.N)
-#            f_err = sqrt(-2./nt * max_power/aa*(1.-max_power)/max_power)
-#            Psin_err = sqrt(-2./nt* max_power/aa*(1.-max_power)/max_power) / self.freq[max_power_idx]**2
-#        else:
-#            f_err = None
-#            Psin_err = None
-#            raise ValueError("WARNING: Highest peak is at the edge of the frequency range.\nNo output of frequency error.\nIncrease frequency range to sample the peak maximum.")
-#
-#            
-#        fbest = self.freq[max_power_idx]
-#        amp = sqrt(self._a[max_power_idx]**2 + self._b[max_power_idx]**2)
-#        ph  = arctan2(self._a[max_power_idx], self._b[max_power_idx]) / (2.*pi)
-#        T0  = min(self.th) - ph/fbest
-#        # Re-add the mean
-#        offset = self._off[max_power_idx] + self._Y
-#    
-#        # Statistics
-#        print self.name + " - statistical output"
-#        print "-----------------------------------"
-#        print "Number of input points:     %6d" % (nt)
-#        print "Weighted mean of dataset:   % e" % (self._Y)
-#        print "Weighted rms of dataset:    % e" % (sqrt(self._YY))
-#        print "Time base:                  % e" % (max(self.th) - min(self.th))
-#        print "Number of frequency points: %6d" % (len(self.freq))
-#        print
-#        print "Maximum power, p :    % e " % (self.power[max_power_idx])
-#        print "Maximum power (without normalization):   %e" % (max_power)
-#        print "Normalization    : ", self.norm
-#        print "RMS of residuals :    % e " % (rms)
-#        if self.error is not None:
-#          print "  Mean weighted internal error:  % e" %(sqrt(nt/sum(1./self.error**2)))
-#        print "Best sine frequency : % e +/- % e" % (fbest, f_err)
-#        print "Best sine period    : % e +/- % e" % (1./fbest, Psin_err)
-#        print "Amplitude:          : % e +/- % e" % (amp, sqrt(2./nt)*rms)
-#        print "Phase (ph) : % e +/- % e" % (ph, sqrt(2./nt)*rms/amp/(2.*pi))
-#        print "Phase (T0) : % e +/- % e" % (T0, sqrt(2./nt)*rms/amp/(2.*pi)/fbest)
-#        print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
-#        print "-----------------------------------"
+    #    def do_stats(self):
+    #        """
+    #        Some statistics about the periodogram
+    #        """
+    #        # Index with maximum power
+    #        max_power_idx = argmax(self.power)
+    #        # Maximum (unnormalized) power
+    #        max_power = self._upower[max_power_idx]
+    #    
+    #        rms = sqrt(self._YY * (1. - max_power))
+    #        
+    #        # Get the curvature in the power peak by fitting a parabola y=aa*x^2
+    #        if (max_power_idx > 1) and (max_power_idx < len(self.freq)-2):
+    #            # Shift the parabola origin to the power peak
+    #            xh = (self.freq[max_power_idx-1:max_power_idx+2] - self.freq[max_power_idx])**2
+    #            yh = self._upow[max_power_idx-1:max_power_idx+2] - self._upow[max_power_idx]
+    #            # Calculate the curvature (final equation from least squares)
+    #            aa = sum(yh*xh)/sum(xh*xh)
+    #            nt = float(self.N)
+    #            f_err = sqrt(-2./nt * max_power/aa*(1.-max_power)/max_power)
+    #            Psin_err = sqrt(-2./nt* max_power/aa*(1.-max_power)/max_power) / self.freq[max_power_idx]**2
+    #        else:
+    #            f_err = None
+    #            Psin_err = None
+    #            raise ValueError("WARNING: Highest peak is at the edge of the frequency range.\nNo output of frequency error.\nIncrease frequency range to sample the peak maximum.")
+    #
+    #            
+    #        fbest = self.freq[max_power_idx]
+    #        amp = sqrt(self._a[max_power_idx]**2 + self._b[max_power_idx]**2)
+    #        ph  = arctan2(self._a[max_power_idx], self._b[max_power_idx]) / (2.*pi)
+    #        T0  = min(self.th) - ph/fbest
+    #        # Re-add the mean
+    #        offset = self._off[max_power_idx] + self._Y
+    #    
+    #        # Statistics
+    #        print self.name + " - statistical output"
+    #        print "-----------------------------------"
+    #        print "Number of input points:     %6d" % (nt)
+    #        print "Weighted mean of dataset:   % e" % (self._Y)
+    #        print "Weighted rms of dataset:    % e" % (sqrt(self._YY))
+    #        print "Time base:                  % e" % (max(self.th) - min(self.th))
+    #        print "Number of frequency points: %6d" % (len(self.freq))
+    #        print
+    #        print "Maximum power, p :    % e " % (self.power[max_power_idx])
+    #        print "Maximum power (without normalization):   %e" % (max_power)
+    #        print "Normalization    : ", self.norm
+    #        print "RMS of residuals :    % e " % (rms)
+    #        if self.error is not None:
+    #          print "  Mean weighted internal error:  % e" %(sqrt(nt/sum(1./self.error**2)))
+    #        print "Best sine frequency : % e +/- % e" % (fbest, f_err)
+    #        print "Best sine period    : % e +/- % e" % (1./fbest, Psin_err)
+    #        print "Amplitude:          : % e +/- % e" % (amp, sqrt(2./nt)*rms)
+    #        print "Phase (ph) : % e +/- % e" % (ph, sqrt(2./nt)*rms/amp/(2.*pi))
+    #        print "Phase (T0) : % e +/- % e" % (T0, sqrt(2./nt)*rms/amp/(2.*pi)/fbest)
+    #        print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
+    #        print "-----------------------------------"
 
 
 from time import strftime
 from zipfile import ZipFile     
 
-class MCMC:
+class MCMC_dream:
+    """
+    Base class for MCMC analysis, adapted for DREAM output
+    """
     def __init__(self, filename_glob, burnin=0):
         if filename_glob.endswith('.zip'):
             with ZipFile(filename_glob) as zf:
@@ -1004,6 +1007,292 @@ class MCMC:
         args = [tt] + list(par_best) + [vel]
         get_rvn(*args)
         plt.plot(tt, vel, '-g', lw=2.5, label='best')
+
+        # plot each files' values
+        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+            plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
+                         fmt='o'+colors[i], label=os.path.basename(fname))
+            t, rv, err = t[m:], rv[m:], err[m:]
+        
+        plt.xlabel('Time [days]')
+        plt.ylabel('RV [km/s]')
+        plt.legend()
+        plt.tight_layout()
+        plt.ticklabel_format(useOffset=False)
+        plt.show()
+
+    def do_triangle_plot(self):
+
+        triangle_plot(self.chains[2:].T, quantiles=[0.5])
+
+
+    def do_triangle_plot_kde(self):
+
+        triangle_plot_kde(self.chains[2:].T)
+
+
+
+class MCMC_nest:
+    """
+    Base class for MCMC analysis, adapted for MultiNest output
+    """
+    def __init__(self, root):
+        self.root = root
+        with open(root+'stats.dat') as f:
+            for line in f: pass  # loop over the file
+            last = line  # to get the last line
+
+        # this seems like the easiest way to get the number of parameters
+        self.npar = int(last.split()[0])
+
+        self.read_stats_file()
+
+    def read_stats_file(self):
+        """ 
+        Read stats.dat file for mean, ML and MAP parameters
+        """
+        with open(self.root+'stats.dat') as f:
+            stats = f.readlines()
+
+        npar = self.npar
+        self.nplanets = npar/5
+
+        try:
+            NS_lnE = float(stats[0].split()[-3])
+            NS_lnE_error = float(stats[0].split()[-1])
+
+            INS_lnE = float(stats[1].split()[-3])
+            INS_lnE_error = float(stats[1].split()[-1])
+        except ValueError:
+            NS_lnE, NS_lnE_error = 0, 0
+            INS_lnE, INS_lnE_error = 0, 0
+
+        ## mean params
+        self.par_mean = [float(s.split()[1]) for s in stats[4:4+npar]]
+        # P_mean, K_mean, ecc_mean, omega_mean, t0_mean, vsys_mean = par_mean
+        self.par_sigma = [float(s.split()[2]) for s in stats[4:4+npar]]
+        # P_sigma, K_sigma, ecc_sigma, omega_sigma, t0_sigma, vsys_sigma = par_sigma
+
+        ## MLE
+        start, end = 4+npar+3, 4+npar+3+npar
+        self.par_mle = [float(s.split()[1]) for s in stats[start:end]]
+        # P_mle, K_mle, ecc_mle, omega_mle, t0_mle, vsys_mle = par_mle
+
+        ## MAP
+        start, end = 4+2*3+2*npar, 4+2*3+3*npar
+        self.par_map = [float(s.split()[1]) for s in stats[start:end]]
+        # P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
+
+
+    def read_iterations(self):
+        """
+        """
+        nc = self.nchains
+        # black magic to build input from file list while skipping headers
+        finput = [FileInput(f) for f in sorted(self.chain_filenames)]
+        iterables = [islice(f, self.burnin+1, None) for f in finput]
+        files = chain(*iterables)
+
+        chains = np.loadtxt(files, unpack=True)
+
+        self.nplanets = (chains.shape[0]-3)/5
+        self.nsamples = chains.shape[1] / nc  # number of samples per chain
+
+        self.chains = np.array(chains)
+        self.chains = np.ma.masked_invalid(self.chains) # remove NaNs
+
+        parameter_names = ['period', 'K', 'ecc', 'omega', 't0']
+        parameter_names = np.array([[par + '_'+str(i) for par in parameter_names] for i in range(self.nplanets)])
+
+        p = namedtuple('parameter', parameter_names.flat)
+
+        # this makes a namedtuple of the ith chain
+        # self.trace = p._make(self.chains[i,2:-1,:])
+
+        # this makes a namedtuple of all the chains together
+        self.trace = p._make(self.chains[2:-1,:])
+
+    def compress_chains(self):
+        tstr = strftime("%Y%m%d-%H%M%S")
+        zfilename = 'demc-out-'+tstr+'.zip'
+
+        with ZipFile(zfilename, 'a', compression=8) as zf:
+            for f in self.chain_filenames:
+                zf.write(f)
+            zf.write('OPEN/demc/namelist1')
+
+        print 'done!'
+
+
+    def print_best_solution(self):
+        ## output best solution
+        best_ind = np.argmax(self.chains[1, :])
+        par_best = self.chains[2:, best_ind]
+        print # newline
+        msg = yellow('RESULT: ') + 'Best solution is'
+        clogger.info(msg)
+        ## loop over planets
+        print("%3s %12s %10s %10s %10s %15s %9s" % \
+            ('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+        for i, planet in enumerate(list(ascii_lowercase)[:self.nplanets]):
+            P, K, ecc, omega, T0, gam = [par_best[j::6] for j in range(6)]
+            print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % 
+                                (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+
+
+    def confidence_intervals(self):
+        for i, name in enumerate(self.trace._fields):
+            print '%10s' % name,
+            print '  ', 'mean:', np.mean(self.trace[i]), 'std:', np.std(self.trace[i])
+
+
+    def kde1d(self, parameter, ind=None, npoints=100):
+        try:
+            trace_dict = self.trace._asdict()
+            t = trace_dict[parameter]
+            gkde = scipy.stats.gaussian_kde(t)
+            if ind is None:
+                ind = np.linspace(min(t), max(t), npoints)
+            return ind, gkde.evaluate(ind)
+        except KeyError:
+            print 'No parameter named', parameter
+            print 'Try one of these:', self.trace._fields
+
+    def kde2d(self, parameters, ind=None, npoints=100):
+
+
+        """ Perform kernel density estimation on the joint distribution
+        of two parameters.
+
+        parameters: list with two parameters
+        ind, optional: mesh grid on which to evaluate the kde
+        """
+        p = np.atleast_1d(parameters)
+        assert np.shape(p)[0] == 2, 'Give me two parameters!'
+
+        trace_dict = self.trace._asdict()
+        for par in p:
+            try: 
+                t = trace_dict[par]
+            except KeyError:
+                print 'No parameter named', par
+                print 'Try one of these:', self.trace._fields
+                return
+
+        print 'Estimating kde for', p[0], 'and', p[1]
+        t1 = trace_dict[p[0]]
+        t2 = trace_dict[p[1]]
+        gkde = scipy.stats.gaussian_kde([t1, t2])
+        x,y = np.mgrid[min(t1) : max(t1) : (max(t1)-min(t1)) / 20, 
+                       min(t2) : max(t2) : (max(t2)-min(t2)) / 20]
+        z = np.array(gkde.evaluate([x.flatten(),y.flatten()])).reshape(x.shape)
+        return x, y, z
+
+    def do_plot_some_solutions(self, system):
+        """ Plot the observed radial velocities as a function of time together
+        with a random choice of solutions from the MCMC
+        Data from each file are color coded and labeled.
+        """
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        tt = system.get_time_to_plot()
+        vel = np.zeros_like(tt)
+
+        n_solutions = 20
+        # random n_solutions indices from chains array
+        ind = np.random.choice(self.chains[0,:].size, size=n_solutions, replace=False)
+        # parameters corresponding to those random indices
+        par = self.chains[2:, ind]
+
+        ## best solution found
+        best_ind = np.argmax(self.chains[1, :])
+        par_best = self.chains[2:, best_ind]
+
+        newFig=True        
+        if newFig: 
+            plt.figure()
+
+        # plot each solution
+        for i in range(n_solutions):
+            p = par[:,i]
+            args = [tt] + list(p) + [vel]
+            get_rvn(*args)
+            if i == 0:
+                plt.plot(tt, vel, '-k', alpha=0.5, label='random')
+            else:
+                plt.plot(tt, vel, '-k', alpha=0.5)
+
+        # plot best solution
+        args = [tt] + list(par_best) + [vel]
+        get_rvn(*args)
+        plt.plot(tt, vel, '-g', lw=2.5, label='best')
+
+        # plot each files' values
+        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+            plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
+                         fmt='o'+colors[i], label=os.path.basename(fname))
+            t, rv, err = t[m:], rv[m:], err[m:]
+        
+        plt.xlabel('Time [days]')
+        plt.ylabel('RV [km/s]')
+        plt.legend()
+        plt.tight_layout()
+        plt.ticklabel_format(useOffset=False)
+        plt.show()
+
+    def do_plot_trace(self, parameter):
+
+        if parameter not in self.trace._fields:
+            print 'ERROR'
+            return
+
+        i = self.trace._fields.index(parameter)
+        s = self.nsamples
+
+        t = self.trace[i]
+
+        newFig=True        
+        if newFig: 
+            plt.figure()
+
+        for j in range(self.nchains):
+            plt.plot(t[j*s : (j+1)*s])
+
+    def do_plot_map(self, system):
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        tt = system.get_time_to_plot()
+        vel = np.zeros_like(tt)
+
+        ## MAP estimate of the parameters
+        par_map = self.par_map
+        if self.npar == 7:
+            par_map.pop(5)
+
+        newFig=True        
+        if newFig: 
+            plt.figure()
+
+        # plot best solution
+        args = [tt] + list(par_map) + [vel]
+        get_rvn(*args)
+        plt.plot(tt, vel, '-g', lw=2.5, label='MAP')
 
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
