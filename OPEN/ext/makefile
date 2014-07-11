@@ -38,6 +38,8 @@ get_rv.so: get_rv.f90
 get_rvN.so: get_rvN.f90
 	@$(FPY) -m get_rvN -c $< $(FPYFLAGS)
 
+get_rvN_MultiSite.so: get_rvN_MultiSite.f90
+	@$(FPY) -m get_rvN_MultiSite -c $< $(FPYFLAGS)
 
 ## compile Dawson-Fabrycky special periodogram
 periodogram_DF.so: periodogram_DF.c
