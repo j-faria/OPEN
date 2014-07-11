@@ -22,8 +22,16 @@ contains
 		allocate(times(N), rvs(N), errors(N))
 		allocate(vel(N), dist(N), sigma(N))
 		allocate(covmat(N,N), inv_covmat(N,N))
-
 	end subroutine likelihood_init
+
+	subroutine likelihood_finish()
+	! deallocate memory
+		deallocate(ss, alpha, tau)
+		deallocate(observ)
+		deallocate(times, rvs, errors)
+		deallocate(vel, dist, sigma)
+		deallocate(covmat, inv_covmat)
+	end subroutine likelihood_finish		
 
 	subroutine slikelihood(Cube,slhood,context)
 	! Likelihood subroutine
@@ -80,6 +88,7 @@ contains
 
 		
 		slhood = logSumExp(slhood,lhood)
+		!write(*, '(6f7.3)') Cube(1:nest_nPar)
 		if (doing_debug) write(*,'(f8.3)', advance='no') slhood
 
 	end subroutine slikelihood

@@ -713,7 +713,7 @@ def do_lm(system, x0):
 
 
 def do_multinest(system, user):
-	from time import sleep
+	from time import sleep, time
 
 	def get_multinest_output(root):
 		msg = blue('INFO: ') + 'Analysing output...'
@@ -765,7 +765,7 @@ def do_multinest(system, user):
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('omega', par_mean[5*i+3], par_sigma[5*i+3], par_mle[5*i+3], par_map[5*i+3])
 			print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
 		print yellow('system')
-		if npar == 7:
+		if npar in (7, 12):
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])	
 		print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
 
@@ -775,7 +775,14 @@ def do_multinest(system, user):
 	# write data to file to be read by MultiNest
 	nest_filename = 'input.rv'
 	nest_header = 'file automatically generated for MultiNest analysis, ' + timestamp
-	nest_header += '\n' + str(len(system.time))
+
+	d = system.provenance
+	nest_header += '\n' + str(len(d))  # number of files (observatories)
+	# this is a hack otherwise the dict values are not ordered the right way
+	sizes_each_file = [d[k][0] for k in sorted(d.keys())]
+	sizes = len(sizes_each_file) * '%d ' % tuple(sizes_each_file)
+	nest_header += '\n' + sizes  # number measurements in each file
+	nest_header += '\n' + str(len(system.time))  # total number measurements
 	savetxt(nest_filename, zip(system.time, system.vrad, system.error),
 			header=nest_header,
 			fmt=['%12.6f', '%7.5f', '%7.5f'])
@@ -793,8 +800,13 @@ def do_multinest(system, user):
 		msg = blue('    : ') + 'Starting MultiNest...'
 		clogger.info(msg)
 
-		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
+		start = time()
+		cmd = 'mpirun -np 1 ./OPEN/multinest/nest'
 		subprocess.call(cmd, shell=True)
+
+		print  # newline
+		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
+		clogger.info(msg)
 
 		get_multinest_output(root_path)
 		results = MCMC_nest(root_path)
@@ -810,8 +822,8 @@ def do_multinest(system, user):
 		clogger.info(msg)
 
 		nplanets = 1
-		context = 11
-		npar = 6
+		context = 12
+		npar = 7
 		root = 'chains/nest-1planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    sdim = %d\n' % npar
@@ -824,10 +836,19 @@ def do_multinest(system, user):
 			else: print line,
 
 		sleep(1)
+		start = time()
 		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
 		subprocess.call(cmd, shell=True)
 
+		print  # newline
+		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
+		clogger.info(msg)
+
 		get_multinest_output(root)
+
+		results = MCMC_nest(root)
+		results.do_plot_map(system)
+		one_planet_lnE = results.NS_lnE
 
 		##############################################################################
 		print  # newline
@@ -835,8 +856,8 @@ def do_multinest(system, user):
 		clogger.info(msg)
 
 		nplanets = 2
-		context = 21
-		npar = 11
+		context = 22
+		npar = 12
 		root = 'chains/nest-2planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    sdim = %d\n' % npar
@@ -849,10 +870,22 @@ def do_multinest(system, user):
 			else: print line,
 
 		sleep(1)
+		start = time()
 		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
 		subprocess.call(cmd, shell=True)
 
+		print  # newline
+		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
+		clogger.info(msg)
+
 		get_multinest_output(root)
+
+		results = MCMC_nest(root)
+		results.do_plot_map(system)
+		two_planet_lnE = results.NS_lnE
+
+		print '1 planet lnE = ', one_planet_lnE
+		print '2 planet lnE = ', two_planet_lnE
 
 
 	return

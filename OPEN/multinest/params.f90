@@ -11,8 +11,10 @@ module params
    	
     !dimensionality
     integer sdim
-    !number of planets, number of extra parameters besides the 5*nplanets
-    integer nplanets, nextra
+    !number of planets, 
+    !number of extra parameters besides the 5*nplanets
+    !number of observatories
+    integer nplanets, nextra, nobserv
     logical using_jitter
 
     !priors on the parameters are set in main.f90

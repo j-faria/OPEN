@@ -3,14 +3,19 @@ program main
 	use params
 	use nestwrapper
 	use like
+
+	use strings
       
 	implicit none
 	
 	integer i
 	integer :: iou, ierr
 	integer :: n
-	character(len=10) line
-	integer, parameter :: nobserv=1
+	character(len=40) line
+	character(len=1) delim
+	character(len=5), dimension(10) :: args
+	integer :: nargs, k, ind1, ind2
+	integer, dimension(:), allocatable :: n_each_observ
 
 	real(kind=8), parameter :: kmax = 2129d0 ! m/s
 
@@ -28,19 +33,19 @@ program main
     end if
 
     !! check compatibility between dimensionality and context
-    if ((nest_context == 11 .and. sdim /= 6) .or. &
-        (nest_context == 12 .and. sdim /= 7) .or. &
-        (nest_context == 21 .and. sdim /= 11) .or. &
-        (nest_context == 22 .and. sdim /= 12) ) then
+    if ((nest_context == 11 .and. sdim < 6) .or. &
+        (nest_context == 12 .and. sdim < 7) .or. &
+        (nest_context == 21 .and. sdim < 11) .or. &
+        (nest_context == 22 .and. sdim < 12) ) then
 		stop 'Conflict between "sdim" and "nest_context"'
     end if
 
     if (mod(nest_context, 10) == 2) then
     	using_jitter = .true.
-    	nextra = 2
+    	nextra = 1
     else
     	using_jitter = .false.
-    	nextra = 1
+    	nextra = 0
     end if
 
     !! some parameters depend on the ones set on the namelist
@@ -57,15 +62,47 @@ program main
 	!load data
 	open(unit=15, file='input.rv', status="old")
 	read(15, *) line ! header
-	read(15, '(a)') line ! number of values
+
+	read(15, '(a)') line ! number of observatories
+	line = trim(line(index(line, "#")+1:))
+	read(line, *) nobserv
+
+	allocate(n_each_observ(nobserv))
+	read(15, '(a)') line ! number of measurements in each observatory
+	line = trim(line(index(line, "#")+1:)) ! remove the #
+	delim = ' '
+	call parse(line, delim, args, nargs) ! split whitespaces
+	if (nargs /= nobserv) stop 'Error parsing input file'
+	do k=1, nargs
+		read( args(k), '(i5)' ) n_each_observ(k) ! store
+	end do
+
+	read(15, '(a)') line ! total number of measurements
 	line = trim(line(index(line, "#")+1:))
 	read(line, *) n 
+	if (n /= sum(n_each_observ)) stop 'Error parsing input file'
+
 	
 	!initialize data size dependant variables
 	call likelihood_init(n)
 	do i = 1, n
         read(15, *) times(i), rvs(i), errors(i)
     end do
+    
+    if (nobserv == 1) then ! if only one observatory, observ is always 1
+    	observ = 1
+    else ! else it takes a different value for each observatory
+    	observ(1:n_each_observ(1)) = 1
+    	do i = 1, nobserv-1
+    		ind1 = sum(n_each_observ(:i))
+    		ind2 = sum(n_each_observ(:i+1))
+    		observ(ind1+1:ind2) = i+1
+    	end do
+    end if
+
+    ! extra parameters are systematic velocities for each observatory 
+    ! plus, if present, the jitter
+    nextra = nextra + nobserv
 
 
 	!no parameters to wrap around
@@ -76,7 +113,7 @@ program main
 	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
 		spriorran(i,1)= 0.2d0 !0.2d0
-		spriorran(i,2)= 1000d0 !365000.d0
+		spriorran(i,2)= 3000d0 !365000.d0
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1d0
@@ -102,22 +139,27 @@ program main
 		spriorran(i,1)= 1d0
 		spriorran(i,2)= kmax
 
-		!! systematic velocity, Uniform, -kmax - kmax
-		i = sdim-nextra+2 ! index of jitter parameter
-		spriorran(i,1)= -kmax
-		spriorran(i,2)= kmax
+		!! systematic velocity(ies), Uniform, -kmax - kmax
+		i = sdim-nextra+2 
+		spriorran(i:,1)= -kmax
+		spriorran(i:,2)= kmax
 
 	else
-		!! systematic velocity, Uniform, -kmax - kmax
+		!! systematic velocity(ies), Uniform, -kmax - kmax
 		i = sdim-nextra+1 ! index of jitter parameter
-		spriorran(i,1)= -kmax
-		spriorran(i,2)= kmax
+		spriorran(i:,1)= -kmax
+		spriorran(i:,2)= kmax
 
 	end if	
 
+	print *, spriorran(:,1)
 
-! 	stop "we have to stop here"
+ 	stop "we have to stop here"
    	call nest_Sample
+
+   	! deallocate memory
+   	deallocate(n_each_observ)
+   	call likelihood_finish
 
 contains
 
