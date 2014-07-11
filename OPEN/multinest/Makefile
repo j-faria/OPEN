@@ -29,7 +29,8 @@ FC = mpif90 # -f90=${FCPATH}
 FFLAGS += -DMPI
 endif
 
-MN_OBJ = params.o like.o nestwrap.o main.o
+MN_OBJ = stringmod.o
+MN_OBJ += params.o like.o nestwrap.o main.o
 MN_OBJ += likelihood.o get_rvN.o
 # MN_OBJ += plotting.o
 
