@@ -1066,14 +1066,14 @@ class MCMC_nest:
         self.nplanets = npar/5
 
         try:
-            NS_lnE = float(stats[0].split()[-3])
-            NS_lnE_error = float(stats[0].split()[-1])
+            self.NS_lnE = float(stats[0].split()[-3])
+            self.NS_lnE_error = float(stats[0].split()[-1])
 
-            INS_lnE = float(stats[1].split()[-3])
-            INS_lnE_error = float(stats[1].split()[-1])
+            self.INS_lnE = float(stats[1].split()[-3])
+            self.INS_lnE_error = float(stats[1].split()[-1])
         except ValueError:
-            NS_lnE, NS_lnE_error = 0, 0
-            INS_lnE, INS_lnE_error = 0, 0
+            self.NS_lnE, self.NS_lnE_error = 0, 0
+            self.INS_lnE, self.INS_lnE_error = 0, 0
 
         ## mean params
         self.par_mean = [float(s.split()[1]) for s in stats[4:4+npar]]
@@ -1282,15 +1282,22 @@ class MCMC_nest:
 
         ## MAP estimate of the parameters
         par_map = self.par_map
-        if self.npar == 7:
-            par_map.pop(5)
+        if self.npar in (7, 12):
+            par_map.pop(-2)
 
-        newFig=True        
-        if newFig: 
+        newFig=True
+        if newFig:
             plt.figure()
 
         # plot best solution
-        args = [tt] + list(par_map) + [vel]
+        P = par_map[:-1:5]
+        K = par_map[1:-1:5]
+        ecc = par_map[2:-1:5]
+        omega = par_map[3:-1:5]
+        t0 = par_map[4:-1:5]
+        par = [P, K, ecc, omega, t0, par_map[-1]]
+
+        args = [tt] + par + [vel]
         get_rvn(*args)
         plt.plot(tt, vel, '-g', lw=2.5, label='MAP')
 
