@@ -152,9 +152,7 @@ program main
 
 	end if	
 
-	print *, spriorran(:,1)
-
- 	stop "we have to stop here"
+ 	!stop "we have to stop here"
    	call nest_Sample
 
    	! deallocate memory

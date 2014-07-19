@@ -801,7 +801,7 @@ def do_multinest(system, user):
 		clogger.info(msg)
 
 		start = time()
-		cmd = 'mpirun -np 1 ./OPEN/multinest/nest'
+		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
 		subprocess.call(cmd, shell=True)
 
 		print  # newline

@@ -2,12 +2,12 @@
 
     !dimensionality
     ! 5*nplanets (+ jitter) + nob
-    sdim = 11
+    sdim = 6
 
     ! additional information to pass to low-level routines
     ! we use this to set the problem
     ! nob is the number of observatories
-    nest_context = 21
+    nest_context = 11
     ! nest_context = 11   ! 1-planet model (5+nob parameters)
     ! nest_context = 12   ! 1-planet model with jitter term (6+nob parameters)
     ! nest_context = 21   ! 2-planet model (10+nob parameters)

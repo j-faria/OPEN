@@ -86,7 +86,6 @@ class rvSeries:
           clogger.fatal(msg)
           return
 
-        
         self.time, self.vrad, self.error = data.pop('jdb'), data.pop('vrad'), data.pop('svrad')
 
         # save the extra quantities as a namedtuple if we read them
