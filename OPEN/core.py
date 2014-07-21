@@ -22,7 +22,6 @@ from numpy import polyfit, RankWarning, append, zeros_like, savetxt
 import numpy as np
 import pylab
 import matplotlib.pyplot as plt
-from deap import base, creator, tools, algorithms
 
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
 from scipy.optimize import leastsq
@@ -531,6 +530,8 @@ def do_diffevol(system, just_de=False, npop=100, ngen=250):
 def do_genetic(system, just_gen=False):
 	""" Carry out the fit using a genetic algorithm and if 
 	just_gen=False try to improve it with a run of the LM algorithm """
+	from deap import base, creator, tools, algorithms
+	
 	try:
 		degree = system.model['d']
 		keplerians = system.model['k']
