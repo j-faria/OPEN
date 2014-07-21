@@ -14,7 +14,7 @@ FFLAGS +=  -I. -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none #-fche
 FLIBDIR = /home/joao/Software/fortranlib
 
 # for MultiNest (CHANGE THIS!!!)
-NESTLIBDIR=/home/joao/Software/MultiNest/MultiNest_v3.7
+NESTLIBDIR=../../MultiNest/MultiNest_v3.7
 
 
 FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
@@ -52,7 +52,6 @@ get_rvN.so: ../ext/get_rvN.f90 likelihood.f90
 	$(FC) $(FFLAGS) -I$(NESTLIBDIR)  $(LIBS) -c $*.f90
  
 nest: $(MN_OBJ)
-	echo $(FLIB)
 	$(FC) -o nest $(MN_OBJ) $(FFLAGS) $(LIBS)
 
 
