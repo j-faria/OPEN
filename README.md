@@ -10,6 +10,17 @@ Tools for exoplanet detection.
 - A list of non-Python dependencies (if any) and how to install them
                     
 
+Quickstart
+----------
+
+OPEN depends on the following software:
+
+   * [Numpy](http://www.numpy.org/)
+   * [matplotlib](http://matplotlib.org/)
+   * [IPython](http://ipython.org/)
+ 
+   * Other non-Python packages
+
 Implementation details
 ----------------------
 
