@@ -7,7 +7,7 @@ else
 endif
 
 F2PYFLAGS = --quiet
-F2PYFLAGS += --opt="-O3 -Ofast"
+F2PYFLAGS += --opt="-O3"
 F2PYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 
 # for compiling Fortran

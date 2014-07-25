@@ -15,7 +15,7 @@ else
 endif
 FPYFLAGS = --quiet
 # FPYFLAGS = --verbose
-FPYFLAGS += --opt="-O3 -Ofast" --fcompiler=gnu95 -lgomp
+FPYFLAGS += --opt="-O3" --fcompiler=gnu95 -lgomp
 FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none -fopenmp"
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none -fopenmp"
 

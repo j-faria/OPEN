@@ -36,7 +36,7 @@ all: ext nest
 
 ext: 
 	@echo "Compiling Fortran extensions..."
-	@make -C ./OPEN/ext PYTHON=$(PYTHON) >> compile.out
+	@make -C ./OPEN/ext >> compile.out
 	@echo "OPEN extensions  --  $(OK_STRING)"
 
 
