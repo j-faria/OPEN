@@ -3,7 +3,7 @@ module like
 	use params
 	use utils1, only: logSumExp
 
-	use lib_matrix, only: inverse, determinant
+	!use lib_matrix, only: inverse, determinant
 	implicit none
   
 	real(kind=8), parameter :: pi = 3.1415926535897932384626433832795029d0
@@ -93,36 +93,36 @@ contains
 
 	end subroutine slikelihood
 
-	subroutine get_covmat(times, sigma, observ, ss, alpha, tau, covmat, det, inv_covmat)
-	! Calculates the covariance matrix of the observations and returns its 
-	! determinant and inverse.
-		! vectors with times and uncertainties
-		real(kind=8), intent(in), dimension(:) :: times, sigma
-		! vector with flags for points comming from each observatory
-		integer, intent(in), dimension(:) :: observ
-		! nuisance parameters for each observatory
-		real(kind=8), intent(in), dimension(:) :: ss, alpha, tau
-		! on output, the covariance matrix of the observations and its inverse
-		real(kind=8), intent(out), dimension(:,:) :: covmat, inv_covmat
-		real(kind=8), intent(out) :: det ! determinant of covmat
-
-		! local variables
-		integer :: i, j, nt
-
-		covmat = 0.d0; inv_covmat = 0.d0
-		nt = size(sigma)
-		do i=1,nt
-			do j=1,nt
-				! Kronecker delta on the times
-				if (i==j) covmat(i,j) = (sigma(j)/alpha(j))**2
-				! Kronecker delta on the observatories
-				if (observ(i)==observ(j)) then
-					covmat(i,j) = covmat(i,j) + ss(j)**2 * exp(-abs(times(i)-times(j))/tau(j))
-				endif
-			end do
-		end do	
-		det = determinant(covmat)
-		call inverse(covmat, inv_covmat)
-	end subroutine get_covmat     
+!	subroutine get_covmat(times, sigma, observ, ss, alpha, tau, covmat, det, inv_covmat)
+!	! Calculates the covariance matrix of the observations and returns its 
+!	! determinant and inverse.
+!		! vectors with times and uncertainties
+!		real(kind=8), intent(in), dimension(:) :: times, sigma
+!		! vector with flags for points comming from each observatory
+!		integer, intent(in), dimension(:) :: observ
+!		! nuisance parameters for each observatory
+!		real(kind=8), intent(in), dimension(:) :: ss, alpha, tau
+!		! on output, the covariance matrix of the observations and its inverse
+!		real(kind=8), intent(out), dimension(:,:) :: covmat, inv_covmat
+!		real(kind=8), intent(out) :: det ! determinant of covmat
+!
+!		! local variables
+!		integer :: i, j, nt
+!
+!		covmat = 0.d0; inv_covmat = 0.d0
+!		nt = size(sigma)
+!		do i=1,nt
+!			do j=1,nt
+!				! Kronecker delta on the times
+!				if (i==j) covmat(i,j) = (sigma(j)/alpha(j))**2
+!				! Kronecker delta on the observatories
+!				if (observ(i)==observ(j)) then
+!					covmat(i,j) = covmat(i,j) + ss(j)**2 * exp(-abs(times(i)-times(j))/tau(j))
+!				endif
+!			end do
+!		end do	
+!		det = determinant(covmat)
+!		call inverse(covmat, inv_covmat)
+!	end subroutine get_covmat     
 
 end module like
