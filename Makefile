@@ -45,6 +45,7 @@ ifdef mpif90_version
 	@make fortran -C ./OPEN/multinest --quiet 
 else
 	@make fortran -C ./OPEN/multinest WITHOUT_MPI=1 --quiet 
+endif
 	@echo "OPEN <-> MultiNest  --  $(OK_STRING)"
 
 
