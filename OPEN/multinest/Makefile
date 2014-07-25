@@ -1,5 +1,11 @@
 # for compiling python extensions
-FPY = f2py
+f2py_version := $(shell f2py -v 2>/dev/null)
+ifeq ($(f2py_version), 2)
+	FPY = f2py
+else
+	FPY = f2py2.7
+endif
+
 F2PYFLAGS = --quiet
 F2PYFLAGS += --opt="-O3 -Ofast"
 F2PYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
@@ -10,16 +16,9 @@ FCPATH = /opt/mesasdk/bin/gfortran
 
 FFLAGS +=  -I. -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none #-fcheck=all
 
-# utils library directory (CHANGE THIS!!!)
-FLIBDIR = /home/joao/Software/fortranlib
 
-# for MultiNest (CHANGE THIS!!!)
-NESTLIBDIR=../../MultiNest/MultiNest_v3.7
-
-
-FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
-LAPACKLIB = -llapack -L/usr/lib
-LIBS = -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) $(FLIB)
+# FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
+LIBS = -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
 
 ifndef WITHOUT_MPI
 # compiling with MPI support by default. You can disable this with 
@@ -35,8 +34,11 @@ MN_OBJ += likelihood.o get_rvN.o
 # MN_OBJ += plotting.o
 
 
-all: nest get_rv1.so get_rvN.so # covmat
-fortran: nest # covmat
+all:
+	echo $(FPY)
+
+# all: nest get_rv1.so get_rvN.so # covmat
+fortran: nest
 
 test: get_rv1.so get_rvN.so
 	python test.py

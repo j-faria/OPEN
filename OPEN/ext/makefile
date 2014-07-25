@@ -7,16 +7,18 @@ CFLAGS= -O3
 FCC = gfortran
 FFLAGS= -ffree-form -O3
 
-FPY = f2py
+f2py_version := $(shell f2py -v 2>/dev/null)
+ifeq ($(f2py_version), 2)
+	FPY = f2py
+else
+	FPY = f2py2.7
+endif
 FPYFLAGS = --quiet
 # FPYFLAGS = --verbose
 FPYFLAGS += --opt="-O3 -Ofast" --fcompiler=gnu95 -lgomp
 FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none -fopenmp"
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none -fopenmp"
 
-### choose your python interpreter here
-PYTHON=/home/joao/anaconda/bin/python
-# PYTHON=python2.7
 
 # --- targets
 all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so
@@ -43,6 +45,7 @@ get_rvN_MultiSite.so: get_rvN_MultiSite.f90
 
 ## compile Dawson-Fabrycky special periodogram
 periodogram_DF.so: periodogram_DF.c
+	echo $(PYTHON)
 	@$(PYTHON) setup_periodogram_DF.py build_ext --inplace
 
 # --- remove binary and executable files
