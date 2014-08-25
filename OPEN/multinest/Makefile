@@ -12,25 +12,26 @@ F2PYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 
 # for compiling Fortran
 FC := gfortran
-FCPATH = /opt/mesasdk/bin/gfortran
 
-FFLAGS +=  -I. -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none #-fcheck=all
+FFLAGS += -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none #-fcheck=all
 
 
 # FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
-LIBS = -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
+LIBS = -I$(NESTLIBDIR) -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
+LIBS += -L/home/joao/Work/Python/f_ext/ranlib.f -lranlib -lblas # this has to go!
 
 ifndef WITHOUT_MPI
 # compiling with MPI support by default. You can disable this with 
 # $ make WITHOUT_MPI=1
 # but MultiNest must have been compiled without MPI also
-FC = mpif90 # -f90=${FCPATH}
+FC = mpif90 -f90=${FCPATH}
 FFLAGS += -DMPI
 endif
 
-MN_OBJ = stringmod.o
+MN_OBJ = stringmod.o array_utils.o gp_utils.o
 MN_OBJ += params.o like.o nestwrap.o main.o
 MN_OBJ += likelihood.o get_rvN.o
+# MN_OBJ += 
 # MN_OBJ += plotting.o
 
 
@@ -68,7 +69,7 @@ covmat: covmat_dump.f90
 
 
 clean: 
-	rm -f nest *.so *.o *.mod $(MN_OBJ) 
+	rm -f nest *.so *.o $(MN_OBJ) 
 
 cleanall:
 	rm -f nest *.so *.o *.mod $(MN_OBJ) chains/* covmat

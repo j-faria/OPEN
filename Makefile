@@ -11,8 +11,11 @@ FLIBDIR = /home/joao/Software/fortranlib
 ### relative to OPEN/OPEN/multinest
 NESTLIBDIR=../../MultiNest/MultiNest_v3.7
 
+### gfortran path
+FCPATH = /opt/mesasdk/bin/gfortran
+
 ### LAPACK library
-LAPACKLIB = -L/usr/lib -llapack 
+LAPACKLIB = -llapack 
 # LAPACKLIB = -L/data/jfaria/mesasdk/mesasdk -llapack 
 
 
