@@ -13,7 +13,7 @@ F2PYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 # for compiling Fortran
 FC := gfortran
 
-FFLAGS += -O3 -w -Wno-unused-parameter -fPIC -ffree-line-length-none #-fcheck=all
+FFLAGS += -O0 -fPIC -ffree-line-length-none -fbounds-check #-fcheck=all
 
 
 # FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
@@ -51,11 +51,11 @@ get_rv1.so: ../ext/get_rv.f90
 get_rvN.so: ../ext/get_rvN.f90 likelihood.f90
 	$(FPY) -m get_rvN -c $^ $(F2PYFLAGS)
 
-%.o %.mod: %.f90
-	$(FC) $(FFLAGS) -I$(NESTLIBDIR)  $(LIBS) -c $*.f90
+%.o: %.f90
+	$(FC) $(FFLAGS) -I$(NESTLIBDIR)  $(LIBS) -c -o $@ $^ 
  
 nest: $(MN_OBJ)
-	$(FC) -o nest $(MN_OBJ) $(FFLAGS) $(LIBS)
+	$(FC) -o $@ $(MN_OBJ) $(FFLAGS) $(LIBS)
 
 
 main: main.f90 like.f90 nestwrap.f90 params.f90

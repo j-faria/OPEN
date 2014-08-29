@@ -62,9 +62,9 @@ nest: MultiNest
 	@echo "Compiling OPEN-MultiNest interface..."
 	@make clean -C ./OPEN/multinest --quiet 
 ifdef mpif90_version
-	@make fortran -C ./OPEN/multinest
+	@make nest -C ./OPEN/multinest
 else
-	@make fortran -C ./OPEN/multinest WITHOUT_MPI=1
+	@make nest -C ./OPEN/multinest WITHOUT_MPI=1
 endif
 	@echo "OPEN <-> MultiNest  --  $(OK_STRING)"
 
