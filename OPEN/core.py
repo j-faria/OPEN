@@ -39,7 +39,7 @@ try:
 except ImportError:
 	periodogram_DF_available = False
 from shell_colors import yellow, red, blue
-from .utils import julian_day_to_date, ask_yes_no
+from .utils import julian_day_to_date, ask_yes_no, get_number_cores
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 pi = np.pi
@@ -713,7 +713,7 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user):
+def do_multinest(system, user, ncpu=None):
 	from time import sleep, time
 
 	def get_multinest_output(root):
@@ -770,6 +770,10 @@ def do_multinest(system, user):
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])	
 		print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
 
+	available_cpu = get_number_cores()
+	if (ncpu is None) or (ncpu > available_cpu): 
+		ncpu = available_cpu
+
 	msg = blue('INFO: ') + 'Transfering data to MultiNest...'
 	clogger.info(msg)
 
@@ -798,12 +802,17 @@ def do_multinest(system, user):
 			# split the assignment, strip of newline, strip of ', strip of "
 			root_path = l1.split('=')[1].strip().strip("'").strip('"')
 
-		msg = blue('    : ') + 'Starting MultiNest...'
+		msg = blue('    : ') + 'Starting MultiNest (%d threads) ...' % (ncpu,)
 		clogger.info(msg)
 
 		start = time()
-		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
-		subprocess.call(cmd, shell=True)
+		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
+		rc = subprocess.call(cmd, shell=True)
+
+		if (rc==1): 
+			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
+			clogger.fatal(msg)
+			return
 
 		print  # newline
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
@@ -813,13 +822,14 @@ def do_multinest(system, user):
 		results = MCMC_nest(root_path)
 
 		results.do_plot_map(system)
-		
+
 		return
 
 	else:
 		# OPEN is in control and will try to run a full model selection
 		# analysis, editing the namelist accordingly.
-		msg = blue('    : ') + 'Starting MultiNest for 1-planet model. Please wait...'
+		msg = blue('    : ') + 'Starting MultiNest for 1-planet model.\n'
+		msg += ' '*6 + '(using %d threads). Please wait...' % (ncpu,)
 		clogger.info(msg)
 
 		nplanets = 1
@@ -838,7 +848,7 @@ def do_multinest(system, user):
 
 		sleep(1)
 		start = time()
-		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
+		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
 		subprocess.call(cmd, shell=True)
 
 		print  # newline
@@ -853,7 +863,8 @@ def do_multinest(system, user):
 
 		##############################################################################
 		print  # newline
-		msg = blue('INFO: ') + 'Starting MultiNest for 2-planet model. Please wait...'
+		msg = blue('    : ') + 'Starting MultiNest for 2-planet model.\n'
+		msg += ' '*6 + '(using %d threads). Please wait...' % (ncpu,)
 		clogger.info(msg)
 
 		nplanets = 2
@@ -872,7 +883,7 @@ def do_multinest(system, user):
 
 		sleep(1)
 		start = time()
-		cmd = 'mpirun -np 2 ./OPEN/multinest/nest'
+		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
 		subprocess.call(cmd, shell=True)
 
 		print  # newline
@@ -1003,6 +1014,26 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 		rot_param = leastsq(func2, starting_values, maxfev=500000)[0]
 		print rot_param
 
+	elif nrem == 3:
+		def func3(par, *args):
+			if fix_p:
+				As1, Ac1, As2, Ac2, As3, Ac3 = par
+				P = prot
+			else:
+				As1, Ac1, As2, Ac2, P = par
+			# P = args[0]
+			Po2 = P/2.
+			Po3 = P/3.
+			return (v - (As1*np.sin(2.*pi*t/P) + Ac1*np.cos(2.*pi*t/P)) -
+				        (As2*np.sin(2.*pi*t/Po2) + Ac2*np.cos(2.*pi*t/Po2)) -
+				        (As3*np.sin(2.*pi*t/Po3) + Ac3*np.cos(2.*pi*t/Po3)) ) / err
+
+		starting_values = [0.1, 0.1, 0.01, 0.01, 0.01, 0.01]
+		if not fix_p: starting_values = starting_values + [prot]
+		rot_param = leastsq(func3, starting_values, maxfev=500000)[0]
+		print rot_param
+
+
 	if fix_p: 
 		prot_fit = prot
 	else: 
@@ -1037,6 +1068,17 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
 		             (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), 'o-')
 	
+	if nrem==3:
+		if fix_p:
+			As1, Ac1, As2, Ac2, As3, Ac3 = rot_param
+			P = prot
+		else:
+			As1, Ac1, As2, Ac2, As3, Ac3, P = rot_param
+
+		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
+					 (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)) + \
+					 (As3*np.sin(6.*pi*xx/P) + Ac3*np.cos(6.*pi*xx/P)), 'o-')
+
 	plt.errorbar(system.time, system.vrad - vrad_mean, yerr=err, fmt='ro')
 
 	# plt.figure()
@@ -1044,6 +1086,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 	# plt.plot(system.time, system.vrad, 'o')
 	if nrem == 1: vrad_new = func(rot_param, prot)*err + vrad_mean
 	elif nrem == 2: vrad_new = func2(rot_param, prot)*err + vrad_mean
+	elif nrem == 3: vrad_new = func3(rot_param, prot)*err + vrad_mean
 	# plt.plot(system.time, vrad_new, 'go')
 
 	# plt.show()
