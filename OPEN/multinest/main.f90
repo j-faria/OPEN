@@ -5,9 +5,10 @@ program main
 	use like
 
 	use strings
-      
+	use gputils
+
 	implicit none
-	
+
 	integer i
 	integer :: iou, ierr
 	integer :: n
@@ -18,6 +19,7 @@ program main
 	integer, dimension(:), allocatable :: n_each_observ
 
 	real(kind=8), parameter :: kmax = 2129d0 ! m/s
+	real(kind=8), dimension(6) :: a
 
     namelist /NEST_parameters/ sdim, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, &
@@ -33,24 +35,40 @@ program main
     end if
 
     !! check compatibility between dimensionality and context
-    if ((nest_context == 11 .and. sdim < 6) .or. &
-        (nest_context == 12 .and. sdim < 7) .or. &
-        (nest_context == 21 .and. sdim < 11) .or. &
-        (nest_context == 22 .and. sdim < 12) ) then
+    if ((nest_context == 111 .and. sdim < 6) .or. &
+        (nest_context == 112 .and. sdim < 7) .or. &
+        (nest_context == 121 .and. sdim < 11) .or. &
+        (nest_context == 122 .and. sdim < 12) ) then
 		stop 'Conflict between "sdim" and "nest_context"'
     end if
 
     if (mod(nest_context, 10) == 2) then
+    	if (nest_context / 100 == 2) then
+#ifdef MPI
+    		call MPI_INIT(ierr)
+    		call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+    		if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
+    		call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    		call MPI_ABORT(MPI_COMM_WORLD,1)
+#else
+			print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
+			STOP 1
+#endif
+    	end if
     	using_jitter = .true.
     	nextra = 1
     else
     	using_jitter = .false.
     	nextra = 0
+    	if (nest_context / 100 == 2) then
+    		using_gp = .true.
+    		nextra = 0  ! hyperparameters of GP
+    	end if
     end if
 
     !! some parameters depend on the ones set on the namelist
     !nplanets = sdim / 5 ! this is too restrictive to the extra parameters
-    nplanets = nest_context / 10 ! this is good for now
+    nplanets = mod(nest_context,100) / 10 ! this is good for now
     allocate(spriorran(sdim, 2))
     allocate(nest_pWrap(sdim))
     nest_nPar=sdim
@@ -105,6 +123,17 @@ program main
     nextra = nextra + nobserv
 
 
+    if (using_gp) then
+    	k3 = DiagonalKernel((/1.d0/))
+    	kernel_to_pass => k3
+    	!k5 = ExpSquaredKernel((/ 1.d0, 1.d0 /))
+    	!kernel_to_pass => k5
+    	gp1 = GP(k3%evaluate_kernel(times, times), kernel_to_pass)
+    	gp1%mean_fun => mean_fun_keplerian
+		gp_n_planets = 1
+		gp_n_planet_pars = 6
+    end if
+
 	!no parameters to wrap around
 	nest_pWrap = 0
 	
@@ -113,7 +142,7 @@ program main
 	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
 		spriorran(i,1)= 0.2d0 !0.2d0
-		spriorran(i,2)= 3000d0 !365000.d0
+		spriorran(i,2)= 365000d0 !365000.d0
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1d0
@@ -156,6 +185,7 @@ program main
    	call nest_Sample
 
    	! deallocate memory
+   	!call nullify(kernel_to_pass)
    	deallocate(n_each_observ)
    	call likelihood_finish
 

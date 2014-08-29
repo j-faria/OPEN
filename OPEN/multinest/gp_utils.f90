@@ -3,15 +3,18 @@ module gputils
 	use array_utils
 	implicit none
 
-	real(kind=8), parameter :: pi = 3.1415926535897932384626433832795029d0
-	real(kind=8), parameter :: const1 = 0.9189385332046727417803297364056176398d0 ! 0.5*ln(2*pi)
+	real(kind=8), parameter, private :: pi = 3.1415926535897932384626433832795029d0
+	real(kind=8), parameter, private :: const1 = 0.9189385332046727417803297364056176398d0 ! 0.5*ln(2*pi)
+
+	! extra integers to be saved between calls to mean_fun_keplerian
+	integer, save :: gp_n_planets
+	integer, save :: gp_n_planet_pars ! this should be 5*nplanets + 1*nobservatories
 
 	! base type for Gaussian Process kernels
 	type Kernel
 		real(kind=8), dimension(:), allocatable :: pars
 	contains
-		!PROCEDURE (TYPE(real(kind(8)))), POINTER :: p
-		!procedure(get_matrix), pointer :: get_matrix_pointer => NULL()
+		!procedure(evaluate_kernel), pointer :: get_matrix_pointer => NULL()
 		procedure :: evaluate_kernel
 		procedure :: sample_prior
 		!procedure :: add_kernel_to_kernel
@@ -29,10 +32,16 @@ module gputils
 	end type ConstantKernel
 
 	! This kernel returns a constant along the diagonal
+	type, extends(Kernel) :: DiagonalKernel
+	contains
+		procedure :: evaluate_kernel => evaluate_kernel_DiagonalKernel
+	end type DiagonalKernel
+
+	! This is a "white noise" kernel
 	type, extends(Kernel) :: WhiteKernel
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_WhiteKernel
-	end type WhiteKernel
+	end type WhiteKernel	
 
 	! Exponential kernel
 	type, extends(Kernel) :: ExpKernel
@@ -51,6 +60,21 @@ module gputils
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_ExpSineSquaredKernel
 	end type ExpSineSquaredKernel
+
+	! Sum of kernels
+	! this is a hack to substitute operator overloading (which I can't do...)
+	! it should be pretty slow 
+	type, extends(Kernel) :: SumKernels
+		! nullify to prevent from needing initialization
+		class(Kernel), pointer :: kernel1 => NULL()
+		class(Kernel), pointer :: kernel2 => NULL()
+		class(Kernel), pointer :: kernel3 => NULL()
+		!class(Kernel), pointer :: kernel4 => NULL()
+		!class(Kernel), pointer :: kernel5 => NULL()
+	contains
+		procedure :: evaluate_kernel => evaluate_kernel_sum
+	end type SumKernels
+
 
 
 	! user-defined constructor for the Kernel type
@@ -80,6 +104,7 @@ module gputils
 		! the kernel associated with this GP
 		class(Kernel), pointer :: gp_kernel
 	contains 
+		procedure :: is_posdef
 		procedure :: get_lnlikelihood
 		procedure :: predict
 		procedure :: sample_conditional
@@ -107,9 +132,8 @@ contains
 	end function new_Kernel
 
 
-	function new_GP(mean, cov_matrix, kernel_ptr)
+	function new_GP(cov_matrix, kernel_ptr)
 		! this is the GP derived-type constructor
-		real(kind=8) :: mean
 		real(kind=8), dimension(:, :) :: cov_matrix
 		class(Kernel), pointer :: kernel_ptr
 		type(GP) new_GP
@@ -121,8 +145,6 @@ contains
 
 		allocate(new_GP%cov(N, N))
 		new_GP%cov = cov_matrix
-		!new_GP%mean_fun => mean
-		!new_GP%get_cov_matrix => evaluate_kernel_ConstantKernel
 		new_GP%gp_kernel => kernel_ptr
 
 	end function new_GP
@@ -140,22 +162,30 @@ contains
 	end function evaluate_kernel
 
 
-!	function add_kernel_to_kernel(k1, k2) result(k3)
-!		class(Kernel), intent(in) :: k1, k2
-!		type(Kernel) :: k3
-!	end function add_kernel_to_kernel
-
 	function evaluate_kernel_ConstantKernel(self, x1, x2) result(matrix)
 		! Value of the kernel evaluated at a given pair of coordinates x1, x2
 		class(ConstantKernel), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x1, x2
 		real(kind=8), dimension(size(x1), size(x2)) :: matrix
-		integer :: n
 
-		if (size(self%pars) /= 1) STOP 'Wrong parameter dimension'
+		if (size(self%pars) /= 1) STOP 'Wrong parameter dimension - ConstantKernel(1 hyper)'
 		call fill_matrix_with_value(matrix, self%pars(1)**2)
 
 	end function evaluate_kernel_ConstantKernel
+
+
+	function evaluate_kernel_DiagonalKernel(self, x1, x2) result(matrix)
+		! Value of the kernel evaluated at a given pair of coordinates x1, x2
+		class(DiagonalKernel), intent(in) :: self
+		real(kind=8), dimension(:), intent(in) :: x1, x2
+		real(kind=8), dimension(size(x1), size(x2)) :: matrix
+
+		if (size(self%pars) /= 1) STOP 'Wrong parameter dimension - DiagonalKernel(1 hyper)'
+		! pars(1) --> amplitude
+		matrix = 0.d0
+		call add_value_to_diagonal(matrix, self%pars(1))
+
+	end function evaluate_kernel_DiagonalKernel
 
 
 	function evaluate_kernel_WhiteKernel(self, x1, x2) result(matrix)
@@ -163,11 +193,11 @@ contains
 		class(WhiteKernel), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x1, x2
 		real(kind=8), dimension(size(x1), size(x2)) :: matrix
-		integer :: n
 
-		if (size(self%pars) /= 1) STOP 'Wrong parameter dimension'
+		if (size(self%pars) /= size(x1)) STOP 'Wrong parameter dimension - WhiteKernel(diag array)'
+		! pars(:) --> uncertainties on the data points, added in quadrature to the diagonal of the covariance matrix
 		matrix = 0.d0
-		call add_value_to_diagonal(matrix, self%pars(1)**2)
+		call add_array_to_diagonal(matrix, self%pars**2)
 
 	end function evaluate_kernel_WhiteKernel
 
@@ -177,11 +207,9 @@ contains
 		class(ExpKernel), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x1, x2
 		real(kind=8), dimension(size(x1), size(x2)) :: matrix
-		integer :: n
 
 		!if (size(self%pars) /= 1) STOP 'Wrong parameter dimension'
 		matrix = 0.d0
-		!call add_value_to_diagonal(matrix, 1.d0)
 		matrix = get_radial_coordinates(x1, x2)
 		matrix = exp(-abs(matrix))
 
@@ -193,13 +221,13 @@ contains
 		class(ExpSquaredKernel), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x1, x2
 		real(kind=8), dimension(size(x1), size(x2)) :: matrix
-		integer :: n
 
-		!if (size(self%pars) /= 1) STOP 'Wrong parameter dimension'
+		if (size(self%pars) /= 2) STOP 'Wrong parameter dimension - ExpSquaredKernel(2 hyper)'
+		! pars(1) --> amplitude
+		! pars(2) --> lengthscale
 		matrix = 0.d0
-		!call add_value_to_diagonal(matrix, 1.d0)
 		matrix = get_radial_coordinates(x1, x2)
-		matrix = exp(-0.5d0 * matrix**2)
+		matrix = self%pars(1) * exp(-0.5d0 * (matrix / self%pars(2))**2)
 
 	end function evaluate_kernel_ExpSquaredKernel
 
@@ -209,10 +237,11 @@ contains
 		class(ExpSineSquaredKernel), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x1, x2
 		real(kind=8), dimension(size(x1), size(x2)) :: matrix
-		integer :: n
 		real(kind=8) :: gamma, omega
 
-		if (size(self%pars) /= 2) STOP 'Wrong parameter dimension'
+		if (size(self%pars) /= 2) STOP 'Wrong parameter dimension - ExpSineSquaredKernel(2 hyper)'
+		! pars(1) --> amplitude
+		! pars(2) --> period
 		gamma = self%pars(1)
 		omega = pi / self%pars(2)
 
@@ -236,8 +265,8 @@ contains
 		aa2 = 1.d0
 		if (present(a1)) aa1 = a1
 		if (present(a2)) aa2 = a2
-
 		matrix = aa1 * k1%evaluate_kernel(x1, x2) + aa2 * k2%evaluate_kernel(x1, x2)
+		!print *, 'kernel evaluated'
 
 	end function evaluate_kernel_sum_2_kernels
 
@@ -300,6 +329,26 @@ contains
 	end function evaluate_kernel_product_3_kernels
 
 
+	function evaluate_kernel_sum(self, x1, x2) result(matrix)
+		! Return the sum of covariance matrices for k1 and k2 at given independent coordinates
+		class(SumKernels), intent(in) :: self
+		real(kind=8), dimension(:), intent(in) :: x1, x2
+		real(kind=8), dimension(size(x1), size(x2)) :: matrix
+
+		if (.not. associated(self%kernel1)) STOP 'kernel1 is not associated'
+		
+		if (associated(self%kernel1) .and. associated(self%kernel2) .and. associated(self%kernel3)) then
+			! three kernels are associated
+			matrix = evaluate_kernel_sum_3_kernels(self%kernel1, self%kernel2, self%kernel3, x1, x2)
+		else if (associated(self%kernel1) .and. associated(self%kernel2)) then
+			! only two kernels are associated
+			matrix = evaluate_kernel_sum_2_kernels(self%kernel1, self%kernel2, x1, x2)
+		end if
+
+	end function evaluate_kernel_sum
+
+
+
 	function sample_prior(self, t) result(sample)
 		! draw samples from the prior at coordinates t
 		class(Kernel), intent(in) :: self
@@ -326,20 +375,74 @@ contains
 		real(kind=8), dimension(size(x)) :: mean
 	end function mean_fun_template
 
+	function mean_fun_constant(x, args) result(mean)
+		! Constant value mean function - returns args(1)
+		real(kind=8), dimension(:), intent(in) :: x, args
+		real(kind=8), dimension(size(x)) :: mean
 
-	function get_lnlikelihood(self, x, y, args) result(lnlike)
+		mean = args(1)
+	end function mean_fun_constant
+
+	function mean_fun_keplerian(x, args) result(mean)
+		! Keplerian mean function - args should contain [ (P,K,ecc,omega,t0)*nplanets, vsys ]
+		real(kind=8), dimension(:), intent(in) :: x, args
+		real(kind=8), dimension(size(x)) :: mean
+		integer :: n
+		n = size(x)
+
+		! ATTENTION: the systematic velocity argument below only allows for one observatory!!!
+
+		call get_rvN(x, &
+					 args(1:gp_n_planet_pars-1:5), & ! periods for all planets
+					 args(2:gp_n_planet_pars-1:5), & ! K for all planets
+					 args(3:gp_n_planet_pars-1:5), & ! ecc for all planets
+					 args(4:gp_n_planet_pars-1:5), & ! omega for all planets
+					 args(5:gp_n_planet_pars-1:5), & ! t0 for all planets
+					 args(gp_n_planet_pars), & ! systematic velocity
+					 mean, n, gp_n_planets)
+
+	end function mean_fun_keplerian
+
+	function is_posdef(self) result(is)
+		class(GP), intent(in) :: self
+		logical :: is
+		real(kind=8), dimension(:, :), allocatable :: cov_cho_factor
+		real(kind=8), dimension(:), allocatable :: yy, xsol
+		integer :: N, rc
+
+		N = minval(shape(self%cov))
+		allocate(yy(N), xsol(N))
+		allocate(cov_cho_factor(N,N))
+		cov_cho_factor = self%cov
+
+		call choly(1, N, cov_cho_factor, yy, xsol, rc)
+		is = .true.
+		if (rc == 2) is = .false.
+
+	end function is_posdef
+
+	function get_lnlikelihood(self, x, y, args, yerr) result(lnlike)
 		! Compute the log likelihood of a set of observations x,y under this GP
 		! args is passed directly to GP%mean_fun
 		class(GP), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x, y, args
+		real(kind=8), dimension(:), intent(in), optional :: yerr
 		real(kind=8) :: lnlike
 		real(kind=8), dimension(size(y), size(y)) :: cov_cho_factor
 		real(kind=8), dimension(size(y)) :: yy, b, xsol
-		integer :: shape_cov(2), N, rc
+		integer :: N, rc
 
 		if (size(x) /= size(y)) STOP 'Dimension mismatch in get_lnlikelihood'
+		if (.not. associated(self%mean_fun)) STOP 'GP%mean_fun is not associated'
+
 		N = size(y)
 		cov_cho_factor = self%cov
+
+		! optionally add data uncertainties in quadrature to covariance matrix
+		if (present(yerr)) then
+			if (size(yerr) /= N) STOP 'Dimension mismatch in get_lnlikelihood'
+			call add_array_to_diagonal(cov_cho_factor, yerr**2)
+		end if
 
 		! solve the linear system using the cholesky method
 		yy = y - self%mean_fun(x, args)  ! rhs
@@ -353,12 +456,14 @@ contains
 	end function get_lnlikelihood
 
 
-	subroutine predict(self, x, y, args, t, mu, cov)
+	subroutine predict(self, x, y, args, t, mu, cov, yerr)
 		! Predictive distribution of the GP, conditional on data x, y
-		! and calculated on coordinates t. args is passed directly to
-		! self%mean_fun. Predictive mean and covariance in mu and cov.
+		! (and optional data uncertainties yerr) and calculated on 
+		! coordinates t. args is passed directly to self%mean_fun. 
+		! Predictive mean and covariance in mu and cov, on output.
 		class(GP), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x, y, args, t
+		real(kind=8), dimension(:), intent(in), optional :: yerr
 		real(kind=8), dimension(:), intent(inout) :: mu
 		real(kind=8), dimension(:,:), intent(inout) :: cov
 		real(kind=8), dimension(size(y)) :: b, xsol
@@ -373,20 +478,30 @@ contains
 		cov_cho_factor = self%cov
 		N = size(y)
 		ns = size(t)
+
+		! optionally add data uncertainties in quadrature to covariance matrix
+		if (present(yerr)) then
+			if (size(yerr) /= N) STOP 'Dimension mismatch in predict'
+			call add_array_to_diagonal(cov_cho_factor, yerr**2)
+		end if
+
 		! solve the linear system using the cholesky method
 		call choly(0, N, cov_cho_factor, y-self%mean_fun(x, args), xsol, rc)
 		if (rc /= 0) STOP 'Error in choly. Matrix is not positive definite?'
 
 		! calculate predictive mean
+		!print *, 'evaluate kernel with t,x'
 		Kxs = self%gp_kernel%evaluate_kernel(t, x)
-		mu = matmul(Kxs, xsol) ! + mean
+		mu = matmul(Kxs, xsol) + self%mean_fun(t, args)
 
 		! calculate predictive covariance
 		Kxs_trans = transpose(Kxs)
+		!print *, 'evaluate kernel with t,t'
 		cov = self%gp_kernel%evaluate_kernel(t, t)
 		! LAPACK routine - DPOTRS solves a system of linear equations A*X = B
 		!                  using the Cholesky factorization (for matrix B of rhs)
 		call DPOTRS( 'L', N, ns, cov_cho_factor, N, Kxs_trans, N, rc )
+		!if (rc /= 0) STOP 'Error in choly. Matrix is not positive definite?'
 		! on exit from DPOTRS, Kxs_trans contains the solution matrix
         cov = cov - matmul(Kxs, Kxs_trans)
 

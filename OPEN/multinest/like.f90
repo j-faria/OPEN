@@ -35,8 +35,7 @@ contains
 
 	subroutine slikelihood(Cube,slhood,context)
 	! Likelihood subroutine
-	! This is called by getLogLike in nestwrap.f90 which does the 
-	! parameter rescaling. 
+	! This is called by getLogLike in nestwrap.f90 which does the parameter rescaling. 
 	! Cube(1:nPar) has already physical parameters. 
 	! The log-likelihood is returned in slhood
 		implicit none
@@ -54,6 +53,11 @@ contains
  		ss = 1.d0
  		alpha = 1.d0
  		tau = 1.d0
+
+ 		if (using_gp) then
+			slhood = gp1%get_lnlikelihood(times, rvs, Cube)
+			return
+ 		end if
 
  		n = size(times)
  		slhood=-huge(1.d0)*epsilon(1.d0)

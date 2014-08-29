@@ -112,4 +112,25 @@ function ones_like_2d(arr) result(ones)
 end function ones_like_2d
 
 
+function linspace(xmin, xmax, num) result(x)
+    implicit none
+    real(kind=8), intent(in) :: xmin, xmax
+    integer, intent(in) :: num
+    real(kind=8), dimension(num) :: x
+    integer :: i
+    if (num == 1) then
+       if(xmin /= xmax) then
+          write(0,'("ERROR: Cannot call linspace with n=1 and xmin /= xmax")')
+          stop
+       else
+          x = xmin
+       end if
+    else
+       do i=1,num
+          x(i) = (xmax-xmin) * real(i-1, kind=8) / real(num-1, kind=8) + xmin
+       end do
+    end if
+end function linspace
+
+
 end module array_utils

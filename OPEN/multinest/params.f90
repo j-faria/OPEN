@@ -1,4 +1,5 @@
 module params
+    use gputils
     implicit none
 
 ! Debug
@@ -15,7 +16,9 @@ module params
     !number of extra parameters besides the 5*nplanets
     !number of observatories
     integer nplanets, nextra, nobserv
-    logical using_jitter
+    !considering a jitter parameter
+    !using the gaussian process thing
+    logical using_jitter, using_gp
 
     !priors on the parameters are set in main.f90
     real(kind=8), allocatable, dimension(:,:) :: spriorran  !(sdim,2)
@@ -27,6 +30,16 @@ module params
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
 
     integer nest_context
+
+! Gaussian process variables
+    type(WhiteKernel), target :: k2
+    type(DiagonalKernel), target :: k3
+    type(ExpKernel), target :: k4
+    type(ExpSquaredKernel), target :: k5
+    type(ExpSineSquaredKernel), target :: k6
+    type(SumKernels), target :: k7
+    type(GP) gp1
+    class(Kernel), pointer :: kernel_to_pass
 
 
 ! Parameters for MultiNest
