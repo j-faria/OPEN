@@ -155,6 +155,40 @@ def notnan(v):
     return v[~np.isnan(v)]
 
 
+
+### get number of cpus
+def get_number_cores():
+    """ Returns the number of available cpus in the machine """
+    # Python 2.6+
+    try:
+        import multiprocessing
+        return multiprocessing.cpu_count()
+    except (ImportError, NotImplementedError):
+        pass
+    # http://code.google.com/p/psutil/
+    try:
+        import psutil
+        return psutil.NUM_CPUS
+    except (ImportError, AttributeError):
+        pass
+    # POSIX
+    try:
+        res = int(os.sysconf('SC_NPROCESSORS_ONLN'))
+        if res > 0:
+            return res
+    except (AttributeError, ValueError):
+        pass
+    # Linux
+    try:
+        res = open('/proc/cpuinfo').read().count('processor\t:')
+
+        if res > 0:
+            return res
+    except IOError:
+        pass
+    # if all else fails
+    return None
+
 def triangle_plot(xs, labels=None, extents=None, truths=None, truth_color="#4682b4",
                   scale_hist=False, quantiles=[], **kwargs):
     """
