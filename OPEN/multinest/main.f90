@@ -63,7 +63,7 @@ program main
     	nextra = 0
     	if (nest_context / 100 == 2) then
     		using_gp = .true.
-    		nextra = 1  ! hyperparameters of GP
+    		nextra = 2  ! hyperparameters of GP
     	end if
     end if
 
@@ -137,6 +137,7 @@ program main
 
     	gp1 = GP(k6%evaluate_kernel(times, times), kernel_to_pass)
     	gp1%mean_fun => mean_fun_keplerian
+        !print *, gp1%gp_kernel%pars
 		gp_n_planets = 1
 		gp_n_planet_pars = 6
     end if
@@ -192,8 +193,12 @@ program main
 
         !! hyperparameters
         i = sdim-nextra+nobserv+1
-        spriorran(i:,1)= -1.d0
-        spriorran(i:,2)= 1.d0
+        spriorran(i,1)= 0.9d0
+        spriorran(i,2)= 1.1d0
+
+        spriorran(i+1:,1)= 24.d0
+        spriorran(i+1:,2)= 26.d0
+
 
 	else
     ! parameter array organization in this case:
@@ -205,16 +210,16 @@ program main
 
 	end if	
 
-    call MPI_INIT(ierr)
-    call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-    if (i==0) then
-        write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
-        write(*, fmt) spriorran(:,1)
-        write(*, fmt) spriorran(:,2)
-    end if
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
- 	stop "we have to stop here"
+!    call MPI_INIT(ierr)
+!    call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+!    if (i==0) then
+!        write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
+!        write(*, fmt) spriorran(:,1)
+!        write(*, fmt) spriorran(:,2)
+!    end if
+!    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+!
+! 	stop "we have to stop here"
    	call nest_Sample
 
    	! deallocate memory
