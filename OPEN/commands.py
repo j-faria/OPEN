@@ -176,6 +176,16 @@ Options
     -h --help   Show this help message
 """
 
+nest_usage = \
+"""
+Usage:
+    nest 
+    nest [-u] [--ncpu=<cpu>]
+Options
+    -u          User sets the namelist file
+    -ncpu=<cpu> Number of threads to use [default: all available]
+"""
+
 restrict_usage = \
 """
 Usage:
@@ -792,7 +802,19 @@ class EmbeddedMagics(Magics):
         """ Start the MultiNest analysis and handle data interaction and IO """
         from shell_colors import red
 
-        user = True if ('-u' in parameter_s) else False
+        try:
+            args = parse_arg_string('nest', parameter_s)
+        except DocoptExit:
+            print nest_usage.lstrip()
+            return
+        except SystemExit:
+            return
+
+        user = args['-u']
+        try: 
+            ncpu = int(args['--ncpu'])
+        except TypeError:
+            ncpu = None
 
         if local_ns.has_key('default'):
             system = local_ns['default']
@@ -802,7 +824,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user)
+        core.do_multinest(system, user, ncpu=ncpu)
 
     @needs_local_scope
     @line_magic
@@ -997,5 +1019,8 @@ def parse_arg_string(command, arg_string):
 
     if command is 'rotation':
         args = docopt(rotation_usage, splitted)
+
+    if command is 'nest':
+        args = docopt(nest_usage, splitted)
 
     return args
