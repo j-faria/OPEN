@@ -4,7 +4,7 @@
 CC = gcc
 CFLAGS= -O3
 
-FCC = gfortran
+FCC = $(FCPATH)
 FFLAGS= -ffree-form -O3
 
 f2py_version := $(shell f2py -v 2>/dev/null)
