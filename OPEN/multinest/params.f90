@@ -12,7 +12,7 @@ module params
    	
     !dimensionality
     integer sdim
-    !number of planets, 
+    !number of planets,
     !number of extra parameters besides the 5*nplanets
     !number of observatories
     integer nplanets, nextra, nobserv

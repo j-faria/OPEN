@@ -61,10 +61,14 @@ contains
 		
 
 		! Transform parameters to physical space using assigned priors
-		! Cube(1:nPar) = P, K, ecc, omega, t0  for each planet
-		!				 jitter at the next to last position						
-		!                vsys at the last position 
-
+		! Cube(1:nPar) = P, K, ecc, omega, t0  for each planet     |
+		!				 jitter at the next to last position	   | - if jitter model				
+		!                vsys at the last position                 |
+		!
+		! Cube(1:nPar) = P, K, ecc, omega, t0  for each planet						|
+		!				 vsys for each observatory at the next to last positions	| - if GP model				
+		!                hyperparameters at the last positions						|
+		
 		if (using_jitter) then
 			! prior for jitter
 			i = nPar-nextra+1 ! index of jitter parameter
@@ -74,46 +78,39 @@ contains
 			i = npar-nextra+2 ! index of systematic velocity
 			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))			
 
-			! prior for period(s)
-			do i = 1, nPar-nextra, 5
-				Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			end do
+		else if (using_gp) then
+			! prior for systematic velocity
+			i = nPar-nextra+1 
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 
-			! prior for semi-amplitude(s)
-			do i = 2, nPar-nextra, 5
-				Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			end do
-
-			! priors for ecc, omega, t0
-			do i = 3, nPar-nextra, 5
-				Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
-				Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
-				Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
-			end do
+			! prior for hyperparameters
+			i = nPar-nextra+nobserv+1
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2))
 
 		else
 			! prior for systematic velocity
 			i = npar-nextra+1 ! index of systematic velocity
 			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))			
-
-			! prior for period(s)
-			do i = 1, nPar-nextra, 5
-				Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			end do
-
-			! prior for semi-amplitude(s)
-			do i = 2, nPar-nextra, 5
-				Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			end do
-
-			! priors for ecc, omega, t0
-			do i = 3, nPar-nextra, 5
-				Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
-				Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
-				Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
-			end do
-
 		end if
+
+		! prior for period(s)
+		do i = 1, nPar-nextra, 5
+			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+		end do
+
+		! prior for semi-amplitude(s)
+		do i = 2, nPar-nextra, 5
+			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+		end do
+
+		! priors for ecc, omega, t0
+		do i = 3, nPar-nextra, 5
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
+			Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
+		end do
+
 
 !		if (nest_context == 11) then  ! 1 planet
 !			P = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
@@ -181,35 +178,20 @@ contains
 		! now do something
 		!if (doing_debug) write(*,*) paramConstr(:)
 		!write(*,*) paramConstr(1:nPar)
-		if (ending) then
-			gppredictfile=TRIM(nest_root)//'gp.dat'
+		if (ending .and. using_gp) then
+			gppredictfile = TRIM(nest_root)//'gp.dat'
 
 			t = linspace(minval(times), maxval(times), 500)
-
-!	call cpu_time(time1)
-			! MAP = paramConstr(nPar*3+1:nPar*4)
 			! this does not accept hyperparams yet!
-			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4), t, mu, cov, yerr=errors)
-!	call cpu_time(time2)
-!	print '("Time for prediction = ",f6.3," seconds.")',time2-time1
+			!print *, gp1%gp_kernel%pars
+			!print *, paramConstr(nPar*3+1:nPar*4-2)
+			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-2), t, mu, cov, yerr=errors)
 			std = sqrt(get_diagonal(cov))
 
 			open(unit=59, file=gppredictfile, form='formatted', status='replace')
-			
 			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1,500)
-
 			close(59)
-!	
-!	open(unit=16, file='output.rv', status="replace")
-!	do i = 1, 10
-!        write(16, '(10f13.6)') a(i), b(i), berr(i)
-!    end do
-!    close(16)
-!    open(unit=16, file='output2.rv', status="replace")
-!	do i = 1, 500
-!        write(16, '(10f13.6)') t(i), mu(i), std(i)
-!    end do
-!    close(16)
+
 		end if
 
 	end subroutine dumper
