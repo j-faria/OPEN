@@ -334,15 +334,24 @@ contains
 		class(SumKernels), intent(in) :: self
 		real(kind=8), dimension(:), intent(in) :: x1, x2
 		real(kind=8), dimension(size(x1), size(x2)) :: matrix
+		real(kind=8) :: aa1, aa2, aa3
 
 		if (.not. associated(self%kernel1)) STOP 'kernel1 is not associated'
 		
 		if (associated(self%kernel1) .and. associated(self%kernel2) .and. associated(self%kernel3)) then
 			! three kernels are associated
-			matrix = evaluate_kernel_sum_3_kernels(self%kernel1, self%kernel2, self%kernel3, x1, x2)
+			if (size(self%pars) /= 3) STOP 'Need 3 multiplying constants for 3 associated kernels'
+			aa1 = self%pars(1)
+			aa2 = self%pars(2)
+			aa3 = self%pars(3)
+			matrix = evaluate_kernel_sum_3_kernels(self%kernel1, self%kernel2, self%kernel3, x1, x2, a1=aa1, a2=aa2, a3=aa3)
+
 		else if (associated(self%kernel1) .and. associated(self%kernel2)) then
 			! only two kernels are associated
-			matrix = evaluate_kernel_sum_2_kernels(self%kernel1, self%kernel2, x1, x2)
+			if (size(self%pars) /= 2) STOP 'Need 2 multiplying constants for 2 associated kernels'
+			aa1 = self%pars(1)
+			aa2 = self%pars(2)
+			matrix = evaluate_kernel_sum_2_kernels(self%kernel1, self%kernel2, x1, x2, a1=aa1, a2=aa2)
 		end if
 
 	end function evaluate_kernel_sum
