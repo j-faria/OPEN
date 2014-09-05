@@ -15,6 +15,7 @@ program main
 	character(len=40) line
 	character(len=1) delim
 	character(len=5), dimension(10) :: args
+    character(len=100) :: fmt
 	integer :: nargs, k, ind1, ind2
 	integer, dimension(:), allocatable :: n_each_observ
 
@@ -62,31 +63,25 @@ program main
     	nextra = 0
     	if (nest_context / 100 == 2) then
     		using_gp = .true.
-    		nextra = 0  ! hyperparameters of GP
+    		nextra = 1  ! hyperparameters of GP
     	end if
     end if
-
-    !! some parameters depend on the ones set on the namelist
-    !nplanets = sdim / 5 ! this is too restrictive to the extra parameters
-    nplanets = mod(nest_context,100) / 10 ! this is good for now
-    allocate(spriorran(sdim, 2))
-    allocate(nest_pWrap(sdim))
-    nest_nPar=sdim
 
 	!doing debug?
 	doing_debug = .false.
 
 
-	!load data
+	!! load data
 	open(unit=15, file='input.rv', status="old")
 	read(15, *) line ! header
 
-	read(15, '(a)') line ! number of observatories
+	read(15, '(a)') line
 	line = trim(line(index(line, "#")+1:))
-	read(line, *) nobserv
+	read(line, *) nobserv ! number of observatories
+    if (nobserv < 1) stop 'Error parsing input file'
 
-	allocate(n_each_observ(nobserv))
-	read(15, '(a)') line ! number of measurements in each observatory
+	allocate(n_each_observ(nobserv)) ! number of measurements in each observatory
+	read(15, '(a)') line
 	line = trim(line(index(line, "#")+1:)) ! remove the #
 	delim = ' '
 	call parse(line, delim, args, nargs) ! split whitespaces
@@ -95,12 +90,20 @@ program main
 		read( args(k), '(i5)' ) n_each_observ(k) ! store
 	end do
 
-	read(15, '(a)') line ! total number of measurements
+	read(15, '(a)') line
 	line = trim(line(index(line, "#")+1:))
-	read(line, *) n 
+	read(line, *) n  ! total number of measurements
 	if (n /= sum(n_each_observ)) stop 'Error parsing input file'
 
-	
+
+    !! some parameters and allocations depend on the ones set on the namelist / input file
+    nplanets = mod(nest_context,100) / 10 ! this is good for now
+    sdim = 5*nplanets + nobserv + nextra
+    allocate(spriorran(sdim, 2))
+    allocate(nest_pWrap(sdim))
+    nest_nPar=sdim
+
+
 	!initialize data size dependant variables
 	call likelihood_init(n)
 	do i = 1, n
@@ -119,16 +122,20 @@ program main
     end if
 
     ! extra parameters are systematic velocities for each observatory 
-    ! plus, if present, the jitter
+    ! plus, if present, the jitter or the hyperparameters
     nextra = nextra + nobserv
 
 
     if (using_gp) then
-    	k3 = DiagonalKernel((/1.d0/))
-    	kernel_to_pass => k3
+        !write(*,*) 'Using Gaussian Process model'
+    	!k3 = DiagonalKernel((/1.d0/))
+    	!kernel_to_pass => k3
     	!k5 = ExpSquaredKernel((/ 1.d0, 1.d0 /))
     	!kernel_to_pass => k5
-    	gp1 = GP(k3%evaluate_kernel(times, times), kernel_to_pass)
+        k6 = ExpSineSquaredKernel((/ 1.d0, 25.d0 /))
+        kernel_to_pass => k6
+
+    	gp1 = GP(k6%evaluate_kernel(times, times), kernel_to_pass)
     	gp1%mean_fun => mean_fun_keplerian
 		gp_n_planets = 1
 		gp_n_planet_pars = 6
@@ -164,6 +171,8 @@ program main
 	end do
 
 	if (using_jitter) then
+    ! parameter array organization in this case:
+    ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], jitter, vsys_obs1, [vsys_obs2]
 		i = sdim-nextra+1 ! index of jitter parameter
 		spriorran(i,1)= 1d0
 		spriorran(i,2)= kmax
@@ -173,15 +182,39 @@ program main
 		spriorran(i:,1)= -kmax
 		spriorran(i:,2)= kmax
 
+    else if (using_gp) then
+    ! parameter array organization in this case:
+    ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2], hyperpar1, hyperpar2
+        !! systematic velocity(ies), Uniform, -kmax - kmax
+        i = sdim-nextra+1
+        spriorran(i:,1)= -kmax
+        spriorran(i:,2)= kmax
+
+        !! hyperparameters
+        i = sdim-nextra+nobserv+1
+        spriorran(i:,1)= -1.d0
+        spriorran(i:,2)= 1.d0
+
 	else
+    ! parameter array organization in this case:
+    ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2]
 		!! systematic velocity(ies), Uniform, -kmax - kmax
-		i = sdim-nextra+1 ! index of jitter parameter
+		i = sdim-nextra+1
 		spriorran(i:,1)= -kmax
 		spriorran(i:,2)= kmax
 
 	end if	
 
- 	!stop "we have to stop here"
+    call MPI_INIT(ierr)
+    call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+    if (i==0) then
+        write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
+        write(*, fmt) spriorran(:,1)
+        write(*, fmt) spriorran(:,2)
+    end if
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+ 	stop "we have to stop here"
    	call nest_Sample
 
    	! deallocate memory
