@@ -135,13 +135,30 @@ class rvSeries:
             clogger.info(stats)
             return
 
-        stats += sinfo + "{:14s} : {:10.3f}\n".format('<fwhm> [km/s]', np.mean(self.extras.fwhm))
-        stats += sinfo + "{:14s} : {:10.3f}\n".format('<contrast>', np.mean(self.extras.contrast) )
-        stats += sinfo + "{:14s} : {:10.3f}\n".format('<BIS> [km/s]', np.mean(self.extras.bis_span) )
-        stats += sinfo + "{:14s} : {:10.3f}\n".format('<S_index> [MW]', np.mean(self.extras.s_mw) )
-        stats += sinfo + "{:14s} : {:10.3f}\n".format('<log(rhk)>', np.mean(self.extras.rhk))
+        try:
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<fwhm> [km/s]', np.mean(self.extras.fwhm))
+        except AttributeError:
+            pass
+        try:
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<contrast>', np.mean(self.extras.contrast) )
+        except AttributeError:
+            pass
+        try:
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<BIS> [km/s]', np.mean(self.extras.bis_span) )
+        except AttributeError:
+            pass
+        try:            
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<S_index> [MW]', np.mean(self.extras.s_mw) )
+        except AttributeError:
+            pass
+        try:
+            stats += sinfo + "{:14s} : {:10.3f}\n".format('<log(rhk)>', np.mean(self.extras.rhk))
+        except AttributeError:
+            pass
+        finally:
+            clogger.info(stats)
 
-        clogger.info(stats)
+            
 
     def do_plot_obs(self, newFig=True, leg=True):
         """ Plot the observed radial velocities as a function of time.
@@ -1043,7 +1060,7 @@ class MCMC_nest:
     """
     Base class for MCMC analysis, adapted for MultiNest output
     """
-    def __init__(self, root):
+    def __init__(self, root, gp_context=1):
         self.root = root
         with open(root+'stats.dat') as f:
             for line in f: pass  # loop over the file
@@ -1051,6 +1068,11 @@ class MCMC_nest:
 
         # this seems like the easiest way to get the number of parameters
         self.npar = int(last.split()[0])
+
+        self.gp = False
+        if (gp_context == 2):
+            self.gp = True
+            self.read_gp_file()
 
         self.read_stats_file()
 
@@ -1090,6 +1112,10 @@ class MCMC_nest:
         self.par_map = [float(s.split()[1]) for s in stats[start:end]]
         # P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
 
+
+    def read_gp_file(self):
+        filename = self.root+'gp.dat'
+        self.pred_t, self.pred_y, self.pred_std = np.loadtxt(filename, unpack=True)
 
     def read_iterations(self):
         """
@@ -1299,6 +1325,12 @@ class MCMC_nest:
         args = [tt] + par + [vel]
         get_rvn(*args)
         plt.plot(tt, vel, '-g', lw=2.5, label='MAP')
+
+        # plot GP predictions
+        if self.gp:
+            plt.plot(self.pred_t, self.pred_y, '-k', lw=1.5, label='GP mean')
+            plt.fill_between(self.pred_t, y1=self.pred_y-2*self.pred_std, y2=self.pred_y+2*self.pred_std,
+                                          color='k', alpha=0.3, label='2*std')
 
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):

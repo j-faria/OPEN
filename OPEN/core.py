@@ -796,11 +796,20 @@ def do_multinest(system, user, ncpu=None):
 		# user is controlling and editing the namelist, we just start 
 		# multinest once with whatever is in there and read the output
 
-		# but first we need the root of output files which may have changed
+		# but first we need some info from the namelist
 		with open('OPEN/multinest/namelist1') as f:
-			l1 = [line for line in f.readlines() if 'nest_root' in line][0]
-			# split the assignment, strip of newline, strip of ', strip of "
-			root_path = l1.split('=')[1].strip().strip("'").strip('"')
+			namelist_lines = f.readlines()
+
+		# the root of output files which may have changed
+		l1 = [line for line in namelist_lines if 'nest_root' in line][0]
+		# split the assignment, strip of newline, strip of ', strip of "
+		root_path = l1.split('=')[1].strip().strip("'").strip('"')
+
+		# whether or not the model is a GP
+		l1 = [line for line in namelist_lines 
+		             if ('nest_context' in line) and not line.strip().startswith('!')][0]
+		user_gp_context = int(l1.split('=')[1].strip()[0])
+
 
 		msg = blue('    : ') + 'Starting MultiNest (%d threads) ...' % (ncpu,)
 		clogger.info(msg)
@@ -819,7 +828,7 @@ def do_multinest(system, user, ncpu=None):
 		clogger.info(msg)
 
 		get_multinest_output(root_path)
-		results = MCMC_nest(root_path)
+		results = MCMC_nest(root_path, gp_context=user_gp_context)
 
 		results.do_plot_map(system)
 
