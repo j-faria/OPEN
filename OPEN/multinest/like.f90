@@ -1,6 +1,7 @@
 module like
 
 	use params
+	use gputils, only: gp_n_planet_pars
 	use utils1, only: logSumExp
 	use Nested, only: MPI_COMM_WORLD
 
@@ -46,6 +47,7 @@ contains
 		integer, intent(in) :: context
 		real(kind=8) :: lhood, lhood_test(1,1), det, jitter
 		integer :: i, n, ierr
+		character(len=100) :: fmt
 
 		! times, rvs and errors are defined in params and initialized/read in main
 		! Cube(1:nest_nPar) = P, K, ecc, omega, t0, Vsys
@@ -56,11 +58,20 @@ contains
  		tau = 1.d0
 
  		if (using_gp) then
- 			!call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
- 			!if (i==0) print *, 'using_gp'
-    		!if (i==0) write(*, '(6f20.3)') Cube(1:6), Cube(1:nest_nPar-nextra)
- 			!STOP
-			slhood = gp1%get_lnlikelihood(times, rvs, Cube, yerr=errors)
+			!call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+			!if (i==0) then
+			!    write(fmt,'(a,i2,a)')  '(',nest_nPar,'f13.4)'
+			!    write(*, fmt) Cube(:)
+			!    write(*, fmt) Cube(:gp_n_planet_pars)
+			!    write(*, fmt) Cube(gp_n_planet_pars+1:)
+			!end if
+			!call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+			!STOP 1
+			
+			gp1%gp_kernel%pars = (/1.d0, 25.d0/)
+			!gp1%gp_kernel%pars = Cube(gp_n_planet_pars+1:)
+
+			slhood = gp1%get_lnlikelihood(times, rvs, Cube(:gp_n_planet_pars), yerr=errors)
 			return
  		end if
 
