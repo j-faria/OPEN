@@ -2,6 +2,7 @@ module like
 
 	use params
 	use utils1, only: logSumExp
+	use Nested, only: MPI_COMM_WORLD
 
 	!use lib_matrix, only: inverse, determinant
 	implicit none
@@ -44,7 +45,7 @@ contains
 		real(kind=8), intent(out) :: slhood
 		integer, intent(in) :: context
 		real(kind=8) :: lhood, lhood_test(1,1), det, jitter
-		integer :: i, n
+		integer :: i, n, ierr
 
 		! times, rvs and errors are defined in params and initialized/read in main
 		! Cube(1:nest_nPar) = P, K, ecc, omega, t0, Vsys
@@ -55,7 +56,11 @@ contains
  		tau = 1.d0
 
  		if (using_gp) then
-			slhood = gp1%get_lnlikelihood(times, rvs, Cube)
+ 			!call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+ 			!if (i==0) print *, 'using_gp'
+    		!if (i==0) write(*, '(6f20.3)') Cube(1:6), Cube(1:nest_nPar-nextra)
+ 			!STOP
+			slhood = gp1%get_lnlikelihood(times, rvs, Cube, yerr=errors)
 			return
  		end if
 
