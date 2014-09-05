@@ -6,6 +6,7 @@ use Nested
 use params
 use like
 use priors
+use array_utils, only: linspace, get_diagonal
    
 implicit none
    
@@ -153,11 +154,10 @@ contains
 	end subroutine getLogLike
 
 
-	subroutine dumper(nSamples, nlive, nPar, physLive, posterior, paramConstr, maxLogLike, logZ, INSlogZ, logZerr, context)
+	subroutine dumper(nSamples, nlive, nPar, physLive, posterior, paramConstr, maxLogLike, logZ, INSlogZ, logZerr, context, ending)
 	! dumper routine, called after every updInt*10 iterations
 	! and at the end of the sampling.
 		implicit none
-
 		integer nSamples ! number of samples in posterior array
 		integer nlive ! number of live points
 		integer nPar ! number of parameters saved (physical plus derived)
@@ -171,10 +171,46 @@ contains
 		double precision logZ, INSlogZ ! log evidence
 		double precision logZerr ! error on log evidence
 		integer context ! any additional information user wants to pass
-		
+		logical ending ! is this the final call?
+		! local variables
+		double precision, dimension(500) :: t, mu, std
+		double precision, dimension(500, 500) :: cov
+		character(len=100) gppredictfile
+		integer i
+
 		! now do something
 		!if (doing_debug) write(*,*) paramConstr(:)
 		!write(*,*) paramConstr(1:nPar)
+		if (ending) then
+			gppredictfile=TRIM(nest_root)//'gp.dat'
+
+			t = linspace(minval(times), maxval(times), 500)
+
+!	call cpu_time(time1)
+			! MAP = paramConstr(nPar*3+1:nPar*4)
+			! this does not accept hyperparams yet!
+			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4), t, mu, cov, yerr=errors)
+!	call cpu_time(time2)
+!	print '("Time for prediction = ",f6.3," seconds.")',time2-time1
+			std = sqrt(get_diagonal(cov))
+
+			open(unit=59, file=gppredictfile, form='formatted', status='replace')
+			
+			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1,500)
+
+			close(59)
+!	
+!	open(unit=16, file='output.rv', status="replace")
+!	do i = 1, 10
+!        write(16, '(10f13.6)') a(i), b(i), berr(i)
+!    end do
+!    close(16)
+!    open(unit=16, file='output2.rv', status="replace")
+!	do i = 1, 500
+!        write(16, '(10f13.6)') t(i), mu(i), std(i)
+!    end do
+!    close(16)
+		end if
 
 	end subroutine dumper
 
