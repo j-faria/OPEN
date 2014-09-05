@@ -1305,10 +1305,16 @@ class MCMC_nest:
         tt = system.get_time_to_plot()
         vel = np.zeros_like(tt)
 
+        if self.gp:
+            self.npar
+
         ## MAP estimate of the parameters
-        par_map = self.par_map
-        if self.npar in (7, 12):
-            par_map.pop(-2)
+        if self.gp:
+            par_map = self.par_map[:-2]  # don't care about the hyperparameters for now
+        else:
+            par_map = self.par_map
+            if self.npar in (7, 12):
+                par_map.pop(-2)
 
         newFig=True
         if newFig:

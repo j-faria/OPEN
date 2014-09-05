@@ -716,7 +716,7 @@ def do_lm(system, x0):
 def do_multinest(system, user, ncpu=None):
 	from time import sleep, time
 
-	def get_multinest_output(root):
+	def get_multinest_output(root, gp_context=1):
 		msg = blue('INFO: ') + 'Analysing output...'
 		clogger.info(msg)
 
@@ -767,8 +767,14 @@ def do_multinest(system, user, ncpu=None):
 			print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
 		print yellow('system')
 		if npar in (7, 12):
-			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])	
-		print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
+			# jitter parameter
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])
+		if gp_context == 1:
+			# in this case, the vsys parameters is the last one
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
+		elif gp_context == 2:
+			# in this case, the vsys is before the hyperparameters
+			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
 
 	available_cpu = get_number_cores()
 	if (ncpu is None) or (ncpu > available_cpu): 
@@ -827,7 +833,7 @@ def do_multinest(system, user, ncpu=None):
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
 		clogger.info(msg)
 
-		get_multinest_output(root_path)
+		get_multinest_output(root_path, gp_context=user_gp_context)
 		results = MCMC_nest(root_path, gp_context=user_gp_context)
 
 		results.do_plot_map(system)
