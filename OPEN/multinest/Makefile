@@ -13,11 +13,11 @@ F2PYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 # for compiling Fortran
 FC := gfortran
 
-FFLAGS += -O0 -fPIC -ffree-line-length-none -fbounds-check #-fcheck=all
+FFLAGS += -O3 -ffast-math -fPIC -ffree-line-length-none #-fcheck=all
 
 
 # FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
-LIBS = -I$(NESTLIBDIR) -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
+LIBS = -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
 LIBS += -L/home/joao/Work/Python/f_ext/ranlib.f -lranlib -lblas # this has to go!
 
 ifndef WITHOUT_MPI
@@ -52,7 +52,7 @@ get_rvN.so: ../ext/get_rvN.f90 likelihood.f90
 	$(FPY) -m get_rvN -c $^ $(F2PYFLAGS)
 
 %.o: %.f90
-	$(FC) $(FFLAGS) -I$(NESTLIBDIR)  $(LIBS) -c -o $@ $^ 
+	$(FC) $(FFLAGS) $(LIBS) -I$(NESTLIBDIR) -c -o $@ $^ 
  
 nest: $(MN_OBJ)
 	$(FC) -o $@ $(MN_OBJ) $(FFLAGS) $(LIBS)
