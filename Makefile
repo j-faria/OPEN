@@ -1,8 +1,8 @@
 #!/bin/sh
 
 ### choose your python interpreter here
-PYTHON=/home/joao/anaconda/bin/python
-# PYTHON=python2.7
+# PYTHON=/home/joao/anaconda/bin/python
+PYTHON=python
 
 ### utils library directory (CHANGE THIS!!!)
 FLIBDIR = /home/joao/Software/fortranlib
@@ -12,10 +12,11 @@ FLIBDIR = /home/joao/Software/fortranlib
 NESTLIBDIR=../../MultiNest/MultiNest_v3.7
 
 ### gfortran path
-FCPATH = /opt/mesasdk/bin/gfortran
+# FCPATH = /opt/mesasdk/bin/gfortran
+FCPATH = /data/jfaria/mesasdk/mesasdk/bin/gfortran
 
 ### LAPACK library
-LAPACKLIB = -llapack 
+LAPACKLIB = -L/data/jfaria/mesasdk/mesasdk/lib64 -llapack 
 # LAPACKLIB = -L/data/jfaria/mesasdk/mesasdk -llapack 
 
 
@@ -39,7 +40,7 @@ all: ext nest
 
 ext: 
 	@echo "Compiling Fortran extensions..."
-	@make -C ./OPEN/ext >> compile.out
+	make -C ./OPEN/ext
 	@echo "OPEN extensions  --  $(OK_STRING)"
 
 
