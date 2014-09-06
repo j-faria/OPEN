@@ -16,7 +16,7 @@ endif
 FPYFLAGS = --quiet
 # FPYFLAGS = --verbose
 FPYFLAGS += --opt="-O3" --fcompiler=gnu95 -lgomp
-FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none -fopenmp"
+# FPYFLAGS += --f77flags="-fPIC -ffree-line-length-none -fopenmp"
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none -fopenmp"
 
 
@@ -27,7 +27,7 @@ all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so
 
 ## compile bayesian lomb scargle periodogram
 blombscargle.so: lombscargle_bayes.f90
-	$(FPY) -m blombscargle -c $< $(FPYFLAGS)
+	@$(FPY) -m blombscargle -c $< $(FPYFLAGS)
 
 ## compile generalized lomb scargle periodogram
 glombscargle.so: lombscargle_generalized.f90
@@ -45,7 +45,7 @@ get_rvN_MultiSite.so: get_rvN_MultiSite.f90
 
 ## compile Dawson-Fabrycky special periodogram
 periodogram_DF.so: periodogram_DF.c
-	echo $(PYTHON)
+	# echo $(PYTHON)
 	@$(PYTHON) setup_periodogram_DF.py build_ext --inplace
 
 # --- remove binary and executable files
