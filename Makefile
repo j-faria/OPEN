@@ -69,7 +69,11 @@ endif
 	@echo "OPEN <-> MultiNest  --  $(OK_STRING)"
 
 
-clean:
+clean: clean-ext clean-multinest clean-multinest-open
+
+clean-ext:
 	make clean -C ./OPEN/ext
+clean-multinest:
 	make clean -C ./OPEN/multinest
+clean-multinest-open:
 	make clean -C ./MultiNest/MultiNest_v3.7
