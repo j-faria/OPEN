@@ -16,7 +16,6 @@ FC := gfortran
 FFLAGS += -O3 -ffast-math -fPIC -ffree-line-length-none #-fcheck=all
 
 
-# FLIB = -L$(FLIBDIR) -I$(FLIBDIR) -lmodules
 LIBS = -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
 LIBS += -L/home/joao/Work/Python/f_ext/ranlib.f -lranlib -lblas # this has to go!
 
@@ -61,8 +60,8 @@ nest: $(MN_OBJ)
 main: main.f90 like.f90 nestwrap.f90 params.f90
 	$(FPY) -m main -c $^ $(F2PYFLAGS) $(LIBS)
 
-covmat: covmat_dump.f90
-	$(FC) -o covmat $(FFLAGS) $^ -L$(FLIBDIR) -I$(FLIBDIR) $(LAPACKLIB) -lmodules
+#covmat: covmat_dump.f90
+#	$(FC) -o covmat $(FFLAGS) $^ -L$(FLIBDIR) -I$(FLIBDIR) $(LAPACKLIB) -lmodules
 
 
 
