@@ -38,6 +38,7 @@ module params
     type(ExpSquaredKernel), target :: k5
     type(ExpSineSquaredKernel), target :: k6
     type(SumKernels), target :: k7
+    type(ProductKernels), target :: k8
     type(GP) gp1
     class(Kernel), pointer :: kernel_to_pass
 
@@ -58,7 +59,7 @@ module params
     ! is as close to the target efficiency (set by efr) as possible. 
     ! This does mean however, that the evidence value may not be accurate.
 	logical nest_ceff
- 	parameter(nest_ceff=.false.)
+ 	parameter(nest_ceff=.true.)
 	
     !max no. of live points
     integer nest_nlive
@@ -82,7 +83,7 @@ module params
     ! defines the sampling efficiency. 0.8 and 0.3 are recommended for 
     ! parameter estimation & evidence evaluation respectively.
     double precision nest_efr
-    parameter(nest_efr=0.3d0)
+    parameter(nest_efr=0.8d0)
       
     !root for saving posterior files
     character*100 nest_root
