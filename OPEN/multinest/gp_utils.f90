@@ -17,6 +17,7 @@ module gputils
 		!procedure(evaluate_kernel), pointer :: get_matrix_pointer => NULL()
 		procedure :: evaluate_kernel
 		procedure :: sample_prior
+		procedure :: set_kernel_pars, get_kernel_pars
 		!procedure :: add_kernel_to_kernel
 		!generic :: operator(+) => add_kernel_to_kernel
 	end type Kernel
@@ -73,6 +74,8 @@ module gputils
 		!class(Kernel), pointer :: kernel5 => NULL()
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_sum
+		procedure :: set_kernel_pars => set_sub_kernel_pars_sum
+		procedure :: get_kernel_pars => get_sub_kernel_pars_sum
 	end type SumKernels
 
 	! Product of kernels
@@ -83,6 +86,8 @@ module gputils
 		class(Kernel), pointer :: kernel3 => NULL()
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_product
+		procedure :: set_kernel_pars => set_sub_kernel_pars_prod
+		procedure :: get_kernel_pars => get_sub_kernel_pars_prod
 	end type ProductKernels
 
 
@@ -232,12 +237,11 @@ contains
 		real(kind=8), dimension(:), intent(in) :: x1, x2
 		real(kind=8), dimension(size(x1), size(x2)) :: matrix
 
-		if (size(self%pars) /= 2) STOP 'Wrong parameter dimension - ExpSquaredKernel(2 hyper)'
-		! pars(1) --> amplitude
-		! pars(2) --> lengthscale
+		if (size(self%pars) /= 1) STOP 'Wrong parameter dimension - ExpSquaredKernel(1 hyper)'
+		! pars(1) --> lengthscale
 		matrix = 0.d0
 		matrix = get_radial_coordinates(x1, x2)
-		matrix = self%pars(1) * exp(-0.5d0 * (matrix / self%pars(2))**2)
+		matrix = exp(-0.5d0 * (matrix / self%pars(1))**2)
 
 	end function evaluate_kernel_ExpSquaredKernel
 
@@ -393,6 +397,82 @@ contains
 		end if
 
 	end function evaluate_kernel_product
+
+
+	subroutine set_kernel_pars(self, k, p)
+		! dummy method: subclasses should implement this themselves
+		class(Kernel), intent(inout) :: self
+		integer, intent(in) :: k
+		real(kind=8), dimension(:), intent(in) :: p
+	end subroutine set_kernel_pars
+
+	subroutine set_sub_kernel_pars_sum(self, k, p)
+		class(SumKernels), intent(inout) :: self
+		integer, intent(in) :: k
+		real(kind=8), dimension(:), intent(in) :: p
+
+		if (.not. associated(self%kernel1)) STOP 'set_sub_kernel_pars_sum : kernel1 is not associated'
+		if (k == 1) then
+			!print *, self%kernel1%pars
+			self%kernel1%pars = p
+			!print *, self%kernel1%pars
+			return
+		end if
+
+		if (.not. associated(self%kernel2)) STOP 'set_sub_kernel_pars_sum : kernel2 is not associated'
+		if (k == 2) then
+			!print *, self%kernel2%pars
+			self%kernel2%pars = p
+			!print *, self%kernel2%pars
+			return
+		end if
+	end subroutine set_sub_kernel_pars_sum
+
+	subroutine set_sub_kernel_pars_prod(self, k, p)
+		class(ProductKernels), intent(inout) :: self
+		integer, intent(in) :: k
+		real(kind=8), dimension(:), intent(in) :: p
+
+		if (.not. associated(self%kernel1)) STOP 'set_sub_kernel_pars_prod : kernel1 is not associated'
+		if (k == 1) then
+			!print *, self%kernel1%pars
+			self%kernel1%pars = p
+			!print *, self%kernel1%pars
+			return
+		end if
+
+		if (.not. associated(self%kernel2)) STOP 'set_sub_kernel_pars_prod : kernel2 is not associated'
+		if (k == 2) then
+			!print *, self%kernel2%pars
+			self%kernel2%pars = p
+			!print *, self%kernel2%pars
+			return
+		end if
+	end subroutine set_sub_kernel_pars_prod
+
+
+	subroutine get_kernel_pars(self, k)
+		! dummy method: subclasses should implement this themselves
+		class(Kernel), intent(inout) :: self
+		integer, intent(in) :: k
+	end subroutine get_kernel_pars
+
+
+	subroutine get_sub_kernel_pars_sum(self, k)
+		! dummy method: subclasses should implement this themselves
+		class(SumKernels), intent(inout) :: self
+		integer, intent(in) :: k
+		if (k==1) print *, self%kernel1%pars
+		if (k==2) print *, self%kernel1%pars
+	end subroutine get_sub_kernel_pars_sum
+
+	subroutine get_sub_kernel_pars_prod(self, k)
+		! dummy method: subclasses should implement this themselves
+		class(ProductKernels), intent(inout) :: self
+		integer, intent(in) :: k
+		if (k==1) print *, self%kernel1%pars
+		if (k==2) print *, self%kernel1%pars
+	end subroutine get_sub_kernel_pars_prod
 
 
 	function sample_prior(self, t) result(sample)
