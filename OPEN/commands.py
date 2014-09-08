@@ -69,16 +69,15 @@ per_usage = \
 """
 Usage:
     per obs
-    per (bis | fwhm)
     per -n SYSTEM
-    per (obs | bis | fwhm | rhk | contrast | resid) [--gls|--bayes|--fast] [-v] [--force] [--hifac=<hf>] [--ofac=<of>] [--fap]
+    per (obs |bis |fwhm |rhk |contrast |resid) [-g|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
-    --gls         Calculate the Generalized Lomb-Scargle periodogram (default)
-    --bayes       Calculate the Bayesian periodogram
-    --fast        Calculate the Lomb-Scargle periodogram with fast algorithm
-    --force       Force recalculation
+    -g --gls      Calculate the Generalized Lomb-Scargle periodogram (default)
+    -b --bayes    Calculate the Bayesian periodogram
+    -l --ls       Calculate the Lomb-Scargle periodogram with fast algorithm
+    -f --force    Force recalculation
     --hifac=<hf>  hifac * Nyquist is lowest frequency used [default: 40]
     --ofac=<of>   Oversampling factor [default: 6]
     --fap         Plot false alarm probabilities
@@ -420,7 +419,7 @@ class EmbeddedMagics(Magics):
         if args['--bayes']: 
             per_fcn = periodograms.bls
             name = 'Bayesian Lomb-Scargle'
-        if args['--fast']: 
+        if args['--ls']: 
             per_fcn = periodograms.ls_PressRybicki
             name = 'Lomb Scargle'
         if args['--gls']: 
