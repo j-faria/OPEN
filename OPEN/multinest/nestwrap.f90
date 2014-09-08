@@ -174,20 +174,27 @@ contains
 		double precision, dimension(1000) :: t, mu, std
 		double precision, dimension(1000, 1000) :: cov
 		character(len=100) gppredictfile
-		integer i
+		integer i, map_index
 		character(len=100) :: fmt
 
 		! now do something
 		!if (doing_debug) write(*,*) paramConstr(nPar*3+1:nPar*4-2)
 		write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
 		write(*,fmt) paramConstr(nPar*3+1:nPar*4)
+		!print *, ending, using_gp
 
 		if (ending .and. using_gp) then
 			gppredictfile = TRIM(nest_root)//'gp.dat'
+			write(*,*) 'Writing file ', gppredictfile
 
 			t = linspace(minval(times), maxval(times), 1000)
-			! this does not accept hyperparams yet!
-			!print *, gp1%gp_kernel%pars
+
+			!! set hyperparameters to their MAP values
+			map_index = nPar*3 ! this is where the MAP parameters start in the array
+			gp1%gp_kernel%pars(1) = paramConstr(map_index+gp_n_planet_pars+1)
+			call gp1%gp_kernel%set_kernel_pars(1, (/paramConstr(map_index+gp_n_planet_pars+2)/) )
+			call gp1%gp_kernel%set_kernel_pars(2, paramConstr(map_index+gp_n_planet_pars+3:))
+
 			!print *, paramConstr(nPar*3+1:nPar*4-2)
 			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-4), t, mu, cov, yerr=errors)
 			std = sqrt(get_diagonal(cov))
