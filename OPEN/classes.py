@@ -1116,7 +1116,10 @@ class MCMC_nest:
 
     def read_gp_file(self):
         filename = self.root+'gp.dat'
-        self.pred_t, self.pred_y, self.pred_std = np.loadtxt(filename, unpack=True)
+        try:
+            self.pred_t, self.pred_y, self.pred_std = np.loadtxt(filename, unpack=True)
+        except IOError:
+            self.pred_t, self.pred_y, self.pred_std = (np.nan, np.nan, np.nan)
 
     def read_iterations(self):
         """
