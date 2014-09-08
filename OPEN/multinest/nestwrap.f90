@@ -171,8 +171,8 @@ contains
 		integer context ! any additional information user wants to pass
 		logical ending ! is this the final call?
 		! local variables
-		double precision, dimension(500) :: t, mu, std
-		double precision, dimension(500, 500) :: cov
+		double precision, dimension(1000) :: t, mu, std
+		double precision, dimension(1000, 1000) :: cov
 		character(len=100) gppredictfile
 		integer i
 		character(len=100) :: fmt
@@ -185,7 +185,7 @@ contains
 		if (ending .and. using_gp) then
 			gppredictfile = TRIM(nest_root)//'gp.dat'
 
-			t = linspace(minval(times), maxval(times), 500)
+			t = linspace(minval(times), maxval(times), 1000)
 			! this does not accept hyperparams yet!
 			!print *, gp1%gp_kernel%pars
 			!print *, paramConstr(nPar*3+1:nPar*4-2)
@@ -193,7 +193,7 @@ contains
 			std = sqrt(get_diagonal(cov))
 
 			open(unit=59, file=gppredictfile, form='formatted', status='replace')
-			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1,500)
+			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1,1000)
 			close(59)
 
 		end if
