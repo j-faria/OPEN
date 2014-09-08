@@ -35,13 +35,13 @@ program main
       close(iou)
     end if
 
-    !! check compatibility between dimensionality and context
-    if ((nest_context == 111 .and. sdim < 6) .or. &
-        (nest_context == 112 .and. sdim < 7) .or. &
-        (nest_context == 121 .and. sdim < 11) .or. &
-        (nest_context == 122 .and. sdim < 12) ) then
-		stop 'Conflict between "sdim" and "nest_context"'
-    end if
+!    !! check compatibility between dimensionality and context
+!    if ((nest_context == 111 .and. sdim < 6) .or. &
+!        (nest_context == 112 .and. sdim < 7) .or. &
+!        (nest_context == 121 .and. sdim < 11) .or. &
+!        (nest_context == 122 .and. sdim < 12) ) then
+!		stop 'Conflict between "sdim" and "nest_context"'
+!    end if
 
     if (mod(nest_context, 10) == 2) then
     	if (nest_context / 100 == 2) then
@@ -63,7 +63,7 @@ program main
     	nextra = 0
     	if (nest_context / 100 == 2) then
     		using_gp = .true.
-    		nextra = 2  ! hyperparameters of GP
+    		nextra = 4  ! hyperparameters of GP
     	end if
     end if
 
@@ -104,7 +104,7 @@ program main
     nest_nPar=sdim
 
 
-	!initialize data size dependant variables
+	!! initialize data size dependant variables
 	call likelihood_init(n)
 	do i = 1, n
         read(15, *) times(i), rvs(i), errors(i)
@@ -121,21 +121,25 @@ program main
     	end do
     end if
 
-    ! extra parameters are systematic velocities for each observatory 
-    ! plus, if present, the jitter or the hyperparameters
+    !! extra parameters are systematic velocities for each observatory 
+    !! plus, if present, the jitter or the hyperparameters
     nextra = nextra + nobserv
 
-
+    !! initialize the GP "object"
     if (using_gp) then
         !write(*,*) 'Using Gaussian Process model'
     	!k3 = DiagonalKernel((/1.d0/))
     	!kernel_to_pass => k3
-    	!k5 = ExpSquaredKernel((/ 1.d0, 1.d0 /))
+    	k5 = ExpSquaredKernel((/ 1.d0 /))
     	!kernel_to_pass => k5
         k6 = ExpSineSquaredKernel((/ 1.d0, 25.d0 /))
-        kernel_to_pass => k6
 
-    	gp1 = GP(k6%evaluate_kernel(times, times), kernel_to_pass)
+        k8 = ProductKernels((/1.d0, 1.d0 /))
+        k8%kernel1 => k5
+        k8%kernel2 => k6
+        kernel_to_pass => k8
+
+    	gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
     	gp1%mean_fun => mean_fun_keplerian
         !print *, gp1%gp_kernel%pars
 		gp_n_planets = 1
@@ -149,8 +153,8 @@ program main
 	! the mathematical form is only used when rescaling
 	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(i,1)= 0.2d0 !0.2d0
-		spriorran(i,2)= 365000d0 !365000.d0
+		spriorran(i,1)= 1.2d0 !0.2d0
+		spriorran(i,2)= 365d0 !365000.d0
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1d0
@@ -192,12 +196,21 @@ program main
         spriorran(i:,2)= kmax
 
         !! hyperparameters
+        ! amplitude of GP
         i = sdim-nextra+nobserv+1
-        spriorran(i,1)= 0.9d0
-        spriorran(i,2)= 1.1d0
-
-        spriorran(i+1:,1)= 24.d0
-        spriorran(i+1:,2)= 26.d0
+        spriorran(i,1)= 0.1d0
+        spriorran(i,2)= 10d0
+        ! timescale for growth / decay of active regions (d)
+        spriorran(i+1:,1)= 1.d0
+        spriorran(i+1:,2)= 10.d0
+        ! periodicity (recurrence) timescale -> rotation period of the star
+        spriorran(i+2:,1)= 17.d0
+        spriorran(i+2:,2)= 23.d0
+        ! smoothing parameter (?)
+        spriorran(i+3:,1)= 0.1d0
+        spriorran(i+3:,2)= 10d0
+        
+        
 
 
 	else

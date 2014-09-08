@@ -57,7 +57,7 @@ contains
 		integer context ! additional information user wants to pass
 
 		! Local variables
-		integer i
+		integer i, j
 		
 
 		! Transform parameters to physical space using assigned priors
@@ -85,8 +85,9 @@ contains
 
 			! prior for hyperparameters
 			i = nPar-nextra+nobserv+1
-			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2))
+			do j = i, i+3
+				Cube(j) = UniformPrior(Cube(j), spriorran(j,1), spriorran(j,2))
+			end do
 
 		else
 			! prior for systematic velocity
@@ -174,10 +175,13 @@ contains
 		double precision, dimension(500, 500) :: cov
 		character(len=100) gppredictfile
 		integer i
+		character(len=100) :: fmt
 
 		! now do something
-		!if (doing_debug) write(*,*) paramConstr(:)
-		!write(*,*) paramConstr(1:nPar)
+		!if (doing_debug) write(*,*) paramConstr(nPar*3+1:nPar*4-2)
+		write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
+		write(*,fmt) paramConstr(nPar*3+1:nPar*4)
+
 		if (ending .and. using_gp) then
 			gppredictfile = TRIM(nest_root)//'gp.dat'
 
@@ -185,7 +189,7 @@ contains
 			! this does not accept hyperparams yet!
 			!print *, gp1%gp_kernel%pars
 			!print *, paramConstr(nPar*3+1:nPar*4-2)
-			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-2), t, mu, cov, yerr=errors)
+			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-4), t, mu, cov, yerr=errors)
 			std = sqrt(get_diagonal(cov))
 
 			open(unit=59, file=gppredictfile, form='formatted', status='replace')

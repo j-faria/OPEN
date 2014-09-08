@@ -1085,6 +1085,7 @@ class MCMC_nest:
 
         npar = self.npar
         self.nplanets = npar/5
+        if self.gp: self.nplanets = 1
 
         try:
             self.NS_lnE = float(stats[0].split()[-3])
@@ -1310,7 +1311,7 @@ class MCMC_nest:
 
         ## MAP estimate of the parameters
         if self.gp:
-            par_map = self.par_map[:-2]  # don't care about the hyperparameters for now
+            par_map = self.par_map[:-4]  # don't care about the hyperparameters for now
         else:
             par_map = self.par_map
             if self.npar in (7, 12):

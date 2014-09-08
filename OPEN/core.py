@@ -726,6 +726,7 @@ def do_multinest(system, user, ncpu=None):
 
 		npar = (nlines - 10) / 3
 		nplanets = npar/5
+		if gp_context == 2: nplanets = 1
 
 		try:
 			NS_lnE = float(stats[0].split()[-3])

@@ -68,8 +68,20 @@ contains
 			!call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 			!STOP 1
 			
-			gp1%gp_kernel%pars = (/1.d0, 25.d0/)
+			!gp1%gp_kernel%pars = (/1.d0, 25.d0/)
 			!gp1%gp_kernel%pars = Cube(gp_n_planet_pars+1:)
+
+			!! hyperparameters
+			! amplitude of GP
+			gp1%gp_kernel%pars(1) = Cube(gp_n_planet_pars+1)
+			! timescale for growth / decay of active regions (d)
+			call gp1%gp_kernel%set_kernel_pars(1, (/Cube(gp_n_planet_pars+2)/) )
+			!gp1%gp_kernel%kernel1%pars = Cube(gp_n_planet_pars+2)
+			! periodicity (recurrence) timescale -> rotation period of the star
+			! smoothing parameter (?)
+			call gp1%gp_kernel%set_kernel_pars(2, Cube(gp_n_planet_pars+3:))
+			!gp1%gp_kernel%kernel2%pars = Cube(gp_n_planet_pars+3:)
+
 
 			slhood = gp1%get_lnlikelihood(times, rvs, Cube(:gp_n_planet_pars), yerr=errors)
 			return
