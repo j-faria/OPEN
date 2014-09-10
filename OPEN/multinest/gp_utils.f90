@@ -254,10 +254,10 @@ contains
 		real(kind=8) :: gamma, omega
 
 		if (size(self%pars) /= 2) STOP 'Wrong parameter dimension - ExpSineSquaredKernel(2 hyper)'
-		! pars(1) --> amplitude
-		! pars(2) --> period
-		gamma = self%pars(1)
-		omega = pi / self%pars(2)
+		! pars(1) --> period
+		! pars(2) --> correlation scale
+		omega = pi / self%pars(1)
+		gamma = self%pars(2)
 
 		matrix = 0.d0
 		!call add_value_to_diagonal(matrix, 1.d0)
@@ -601,7 +601,8 @@ contains
 		if (size(x) /= size(y)) STOP 'Dimension mismatch in predict'
 		if (size(t) /= size(mu)) STOP 'Dimension mismatch in predict'
 
-		cov_cho_factor = self%cov
+		!cov_cho_factor = self%cov
+		cov_cho_factor = self%gp_kernel%evaluate_kernel(x, x)
 		N = size(y)
 		ns = size(t)
 
