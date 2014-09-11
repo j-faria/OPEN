@@ -7,6 +7,7 @@ use params
 use like
 use priors
 use array_utils, only: linspace, get_diagonal
+use gputils
    
 implicit none
    
@@ -195,7 +196,16 @@ contains
 			call gp1%gp_kernel%set_kernel_pars(1, (/paramConstr(map_index+gp_n_planet_pars+2)/) )
 			call gp1%gp_kernel%set_kernel_pars(2, paramConstr(map_index+gp_n_planet_pars+3:))
 
-			!print *, paramConstr(nPar*3+1:nPar*4-2)
+			!print *, paramConstr(map_index+gp_n_planet_pars+1)
+			!print *, paramConstr(map_index+gp_n_planet_pars+2)
+			!print *, paramConstr(map_index+gp_n_planet_pars+3:)
+			!print *, paramConstr(nPar*3+1:nPar*4-4)
+			!print *, ''
+			!write(*, '(10f13.6)') gp1%gp_kernel%evaluate_kernel(times, times)
+			!print *, ''
+
+			!gp1%mean_fun => mean_fun_constant
+			!call gp1%predict(times, rvs, (/ 0.d0 /), t, mu, cov, yerr=errors)
 			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-4), t, mu, cov, yerr=errors)
 			std = sqrt(get_diagonal(cov))
 
