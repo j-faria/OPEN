@@ -186,7 +186,6 @@ contains
 
 		if (ending .and. using_gp) then
 			gppredictfile = TRIM(nest_root)//'gp.dat'
-			write(*,*) 'Writing file ', gppredictfile
 
 			t = linspace(minval(times), maxval(times), 1000)
 
@@ -206,9 +205,11 @@ contains
 
 			!gp1%mean_fun => mean_fun_constant
 			!call gp1%predict(times, rvs, (/ 0.d0 /), t, mu, cov, yerr=errors)
+			write(*,*) 'Calculating predictions...'
 			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-4), t, mu, cov, yerr=errors)
 			std = sqrt(get_diagonal(cov))
 
+			write(*,*) 'Writing file ', gppredictfile
 			open(unit=59, file=gppredictfile, form='formatted', status='replace')
 			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1,1000)
 			close(59)
