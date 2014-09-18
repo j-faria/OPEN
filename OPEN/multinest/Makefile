@@ -14,11 +14,13 @@ F2PYFLAGS += --f90flags="-w -Wno-unused-parameter -fPIC -ffree-line-length-none"
 FC := gfortran
 
 FFLAGS += -O3 -ffast-math -fPIC -ffree-line-length-none #-fcheck=all
-
+ifeq ($(PROFFILING),"true")
+	FFLAGS += -pg
+endif
 
 LIBS = -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
-LIBS += -L/home/jfaria/data/ranlib.f -lranlib -lblas # this has to go!
-# LIBS += -L/home/joao/Work/Python/f_ext/ranlib.f -lranlib -lblas # this has to go!
+# LIBS += -L/home/jfaria/data/ranlib.f -lranlib -lblas # this has to go!
+LIBS += -L/home/joao/Work/Python/f_ext/ranlib.f -lranlib -lblas # this has to go!
 
 ifndef WITHOUT_MPI
 # compiling with MPI support by default. You can disable this with 

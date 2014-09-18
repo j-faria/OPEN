@@ -45,16 +45,16 @@ program main
 
     if (mod(nest_context, 10) == 2) then
     	if (nest_context / 100 == 2) then
-#ifdef MPI
+!#ifdef MPI
     		call MPI_INIT(ierr)
     		call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
     		if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
     		call MPI_BARRIER(MPI_COMM_WORLD, ierr)
     		call MPI_ABORT(MPI_COMM_WORLD,1)
-#else
-			print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
-			STOP 1
-#endif
+!#else
+!			print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
+!			STOP 1
+!#endif
     	end if
     	using_jitter = .true.
     	nextra = 1
@@ -78,14 +78,14 @@ program main
 	read(15, '(a)') line
 	line = trim(line(index(line, "#")+1:))
 	read(line, *) nobserv ! number of observatories
-    if (nobserv < 1) stop 'Error parsing input file'
+    if (nobserv < 1) stop 'Error parsing input file (1)'
 
 	allocate(n_each_observ(nobserv)) ! number of measurements in each observatory
 	read(15, '(a)') line
 	line = trim(line(index(line, "#")+1:)) ! remove the #
 	delim = ' '
 	call parse(line, delim, args, nargs) ! split whitespaces
-	if (nargs /= nobserv) stop 'Error parsing input file'
+	if (nargs /= nobserv) stop 'Error parsing input file (2)'
 	do k=1, nargs
 		read( args(k), '(i5)' ) n_each_observ(k) ! store
 	end do
@@ -93,7 +93,7 @@ program main
 	read(15, '(a)') line
 	line = trim(line(index(line, "#")+1:))
 	read(line, *) n  ! total number of measurements
-	if (n /= sum(n_each_observ)) stop 'Error parsing input file'
+	if (n /= sum(n_each_observ)) stop 'Error parsing input file (3)'
 
 
     !! some parameters and allocations depend on the ones set on the namelist / input file
@@ -121,10 +121,6 @@ program main
     	end do
     end if
 
-    !! extra parameters are systematic velocities for each observatory 
-    !! plus, if present, the jitter or the hyperparameters
-    nextra = nextra + nobserv
-
     !! initialize the GP "object"
     if (using_gp) then
         !write(*,*) 'Using Gaussian Process model'
@@ -142,9 +138,14 @@ program main
     	gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
     	gp1%mean_fun => mean_fun_keplerian
         !print *, gp1%gp_kernel%pars
-		gp_n_planets = 1
-		gp_n_planet_pars = 6
+		gp_n_planets = nplanets
+		gp_n_planet_pars = 5*nplanets + nobserv
     end if
+
+    !! extra parameters are systematic velocities for each observatory 
+    !! plus, if present, the jitter or the hyperparameters
+    nextra = nextra + nobserv
+
 
 	!no parameters to wrap around
 	nest_pWrap = 0
@@ -154,7 +155,7 @@ program main
 	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
 		spriorran(i,1)= 1.2d0 !0.2d0
-		spriorran(i,2)= 365d0 !365000.d0
+		spriorran(i,2)= 3650d0 !365000.d0
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1d0
@@ -199,10 +200,10 @@ program main
         ! amplitude of GP
         i = sdim-nextra+nobserv+1
         spriorran(i,1)= 0.1d0
-        spriorran(i,2)= 10d0
+        spriorran(i,2)= 20d0
         ! timescale for growth / decay of active regions (d)
-        spriorran(i+1:,1)= 1.d0
-        spriorran(i+1:,2)= 10.d0
+        spriorran(i+1:,1)= 10.d0
+        spriorran(i+1:,2)= 50.d0
         ! periodicity (recurrence) timescale -> rotation period of the star
         spriorran(i+2:,1)= 17.d0
         spriorran(i+2:,2)= 23.d0
