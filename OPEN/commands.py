@@ -19,7 +19,7 @@ from IPython.core.magic_arguments import argument
 from IPython.utils.io import ask_yes_no
 
 # other imports
-from numpy import sqrt
+from numpy import sqrt, mean, min
 
 # intra-package imports
 from .docopt import docopt, DocoptExit
@@ -70,12 +70,13 @@ per_usage = \
 Usage:
     per obs
     per -n SYSTEM
-    per (obs |bis |fwhm |rhk |contrast |resid) [-g|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap]
+    per (obs |bis |fwhm |rhk |contrast |resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap]
     per -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
     -g --gls      Calculate the Generalized Lomb-Scargle periodogram (default)
-    -b --bayes    Calculate the Bayesian periodogram
+    -m --bgls     Calculate the Bayesian Generalized Lomb-Scargle periodogram
+    -b --bayes    Calculate the Bayesian LS periodogram
     -l --ls       Calculate the Lomb-Scargle periodogram with fast algorithm
     -f --force    Force recalculation
     --hifac=<hf>  hifac * Nyquist is lowest frequency used [default: 40]
@@ -179,9 +180,10 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [--ncpu=<cpu>]
+    nest [-u] [-r] [--ncpu=<cpu>]
 Options
     -u          User sets the namelist file
+    -r          Resume from a previous MultiNest run
     -ncpu=<cpu> Number of threads to use [default: all available]
 """
 
@@ -204,6 +206,17 @@ Usage:
     rotation
     rotation -n SYSTEM
     rotation -h | --help
+Options
+    -n SYSTEM   Specify name of system (else use default)
+    -h --help   Show this help message
+"""
+
+tp_mps_usage = \
+"""
+Usage:
+    to_mps
+    to_mps -n SYSTEM
+    to_mps -h | --help
 Options
     -n SYSTEM   Specify name of system (else use default)
     -h --help   Show this help message
@@ -416,6 +429,9 @@ class EmbeddedMagics(Magics):
 
         # which periodogram should be calculated?
         per_fcn = None
+        if args['--bgls']:
+            per_fcn = periodograms.bgls
+            name = 'Bayesian Generalized Lomb-Scargle'
         if args['--bayes']: 
             per_fcn = periodograms.bls
             name = 'Bayesian Lomb-Scargle'
@@ -435,7 +451,7 @@ class EmbeddedMagics(Magics):
                 # are we forced to recalculate it?
                 if args['--force']: raise AttributeError
                 # it was calculated already?
-                system.per 
+                system.per
                 # the same periodogram?
                 if system.per.name != name:
                     raise AttributeError
@@ -810,6 +826,7 @@ class EmbeddedMagics(Magics):
             return
 
         user = args['-u']
+        resume = args['-r']
         try: 
             ncpu = int(args['--ncpu'])
         except TypeError:
@@ -823,7 +840,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user, ncpu=ncpu)
+        core.do_multinest(system, user, resume=resume, ncpu=ncpu)
 
     @needs_local_scope
     @line_magic
@@ -932,6 +949,39 @@ class EmbeddedMagics(Magics):
 
     @needs_local_scope
     @line_magic
+    def to_mps(self, parameter_s='', local_ns=None):
+        # Convert data to meters per second, if in km/s
+        from shell_colors import blue
+
+        args = parse_arg_string('to_mps', parameter_s)
+        # print args
+
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default') and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['SYSTEM']
+                system = local_ns[system_name]
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        if (min(system.error) < 0.01):
+            msg = blue('INFO: ') + 'Converting to m/s'
+            clogger.info(msg)
+
+            system.vrad = (system.vrad - mean(system.vrad)) * 1e3
+            system.error *= 1e3
+            system.units = 'm/s'
+
+
+
+    @needs_local_scope
+    @line_magic
     def metalpoor(self, parameter_s='', local_ns=None):
         core.load_plugin('metalpoor')
 
@@ -1018,6 +1068,9 @@ def parse_arg_string(command, arg_string):
 
     if command is 'rotation':
         args = docopt(rotation_usage, splitted)
+
+    if command is 'to_mps':
+        args = docopt(tp_mps_usage, splitted)
 
     if command is 'nest':
         args = docopt(nest_usage, splitted)
