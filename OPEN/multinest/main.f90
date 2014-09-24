@@ -61,7 +61,8 @@ program main
     else
     	using_jitter = .false.
     	nextra = 0
-    	if (nest_context / 100 == 2) then
+    	if (nest_context / 100 == 2 .or. nest_context / 100 == 3) then
+            ! if 2, using GP plus planets; if 3, using GP only, without planets
     		using_gp = .true.
     		nextra = 4  ! hyperparameters of GP
     	end if
@@ -234,6 +235,7 @@ program main
 !    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 !
 ! 	stop "we have to stop here"
+
    	call nest_Sample
 
    	! deallocate memory
