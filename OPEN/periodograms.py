@@ -68,6 +68,12 @@ class ls_PressRybicki(PeriodogramBase):
       self.y = rv.extras.rhk
     elif quantity == 'contrast':
       self.y = rv.extras.contrast
+    elif quantity == 'resid':
+      try:
+        self.y = rv.fit['residuals']
+      except TypeError:
+        clogger.fatal('error!')
+        return 
     self.t = rv.time
     self.th = rv.time - min(rv.time)
     self.jmax = self.fap = None
