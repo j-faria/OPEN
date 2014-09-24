@@ -713,10 +713,10 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, ncpu=None):
+def do_multinest(system, user, gp, resume=False, ncpu=None):
 	from time import sleep, time
 
-	def get_multinest_output(root, gp_context=1):
+	def get_multinest_output(root, nplanets, gp_context=1):
 		msg = blue('INFO: ') + 'Analysing output...'
 		clogger.info(msg)
 
@@ -725,8 +725,7 @@ def do_multinest(system, user, ncpu=None):
 			nlines = len(stats)
 
 		npar = (nlines - 10) / 3
-		nplanets = npar/5
-		if gp_context == 2: nplanets = 1
+		if gp_context == 3: return
 
 		try:
 			NS_lnE = float(stats[0].split()[-3])
@@ -791,7 +790,7 @@ def do_multinest(system, user, ncpu=None):
 	d = system.provenance
 	nest_header += '\n' + str(len(d))  # number of files (observatories)
 	# this is a hack otherwise the dict values are not ordered the right way
-	sizes_each_file = [d[k][0] for k in sorted(d.keys())]
+	sizes_each_file = [d[k][0] if (d[k][1]==0) else (d[k][0]-d[k][1]) for k in sorted(d.keys())]
 	sizes = len(sizes_each_file) * '%d ' % tuple(sizes_each_file)
 	nest_header += '\n' + sizes  # number measurements in each file
 	nest_header += '\n' + str(len(system.time))  # total number measurements
@@ -816,6 +815,20 @@ def do_multinest(system, user, ncpu=None):
 		l1 = [line for line in namelist_lines 
 		             if ('nest_context' in line) and not line.strip().startswith('!')][0]
 		user_gp_context = int(l1.split('=')[1].strip()[0])
+		# how many planets are in the model
+		nplanets = int(l1.split('=')[1].strip()[1])
+
+		# if resuming from a previous run, set the appropriate namelist flag
+		if resume:
+			replacer = '    nest_resume=.true.\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_resume' in line: print replacer,
+				else: print line,
+		else:
+			replacer = '    nest_resume=.false.\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_resume' in line: print replacer,
+				else: print line,
 
 
 		msg = blue('    : ') + 'Starting MultiNest (%d threads) ...' % (ncpu,)
@@ -825,7 +838,7 @@ def do_multinest(system, user, ncpu=None):
 		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
 		rc = subprocess.call(cmd, shell=True)
 
-		if (rc==1): 
+		if (rc == 1): 
 			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
 			clogger.fatal(msg)
 			return
@@ -834,10 +847,14 @@ def do_multinest(system, user, ncpu=None):
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
 		clogger.info(msg)
 
-		get_multinest_output(root_path, gp_context=user_gp_context)
-		results = MCMC_nest(root_path, gp_context=user_gp_context)
+		get_multinest_output(root_path, nplanets, gp_context=user_gp_context)
+		system.results = MCMC_nest(root_path, gp_context=user_gp_context)
 
-		results.do_plot_map(system)
+		system.results.do_plot_map(system)
+
+		# save fit in the system
+		# print results.par_map
+		# system.save_fit(results.par_map, 1.)
 
 		return
 
@@ -845,75 +862,130 @@ def do_multinest(system, user, ncpu=None):
 		# OPEN is in control and will try to run a full model selection
 		# analysis, editing the namelist accordingly.
 		msg = blue('    : ') + 'Starting MultiNest for 1-planet model.\n'
-		msg += ' '*6 + '(using %d threads). Please wait...' % (ncpu,)
+		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
 		clogger.info(msg)
 
 		nplanets = 1
-		context = 12
-		npar = 7
+		if gp: 
+			context = 211
+		else: 
+			context = 112
 		root = 'chains/nest-1planet-'
 		## automatically fill the necessary parameters in the inlist
-		replacer1 = '    sdim = %d\n' % npar
-		replacer2 = '    nest_context = %d\n' % context
-		replacer3 = '    nest_root=\'%s\'\n' % root
+		replacer1 = '    nest_context = %d\n' % context
+		replacer2 = '    nest_root=\'%s\'\n' % root
 		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-			if 'sdim' in line: print replacer1,
-			elif ('nest_context' in line) and not line.strip().startswith('!'): print replacer2,
-			elif 'nest_root' in line: print replacer3,
+			if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
+			elif 'nest_root' in line: print replacer2,
+			elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
 			else: print line,
 
 		sleep(1)
 		start = time()
 		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
-		subprocess.call(cmd, shell=True)
+		rc = subprocess.call(cmd, shell=True)
+
+		if (rc == 1): 
+			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
+			clogger.fatal(msg)
+			return
 
 		print  # newline
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
 		clogger.info(msg)
 
-		get_multinest_output(root)
+		gp_context = {False: 1, True: 2}
+		get_multinest_output(root, nplanets, gp_context=gp_context[gp])
+		system.results = MCMC_nest(root, gp_context=gp_context[gp])
+		system.results.do_plot_map(system)
 
-		results = MCMC_nest(root)
-		results.do_plot_map(system)
-		one_planet_lnE = results.NS_lnE
+		one_planet_lnE = system.results.NS_lnE
 
 		##############################################################################
 		print  # newline
-		msg = blue('    : ') + 'Starting MultiNest for 2-planet model.\n'
-		msg += ' '*6 + '(using %d threads). Please wait...' % (ncpu,)
+		msg = blue('INFO: ') + 'Starting MultiNest for 2-planet model.\n'
+		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
 		clogger.info(msg)
 
 		nplanets = 2
-		context = 22
-		npar = 12
+		if gp: 
+			context = 221
+		else: 
+			context = 122
 		root = 'chains/nest-2planet-'
 		## automatically fill the necessary parameters in the inlist
-		replacer1 = '    sdim = %d\n' % npar
-		replacer2 = '    nest_context = %d\n' % context
-		replacer3 = '    nest_root=\'%s\'\n' % root
+		replacer1 = '    nest_context = %d\n' % context
+		replacer2 = '    nest_root=\'%s\'\n' % root
 		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-			if 'sdim' in line: print replacer1,
-			elif ('nest_context' in line) and not line.strip().startswith('!'): print replacer2,
-			elif 'nest_root' in line: print replacer3,
+			if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
+			elif 'nest_root' in line: print replacer2,
+			elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
 			else: print line,
 
 		sleep(1)
 		start = time()
 		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
-		subprocess.call(cmd, shell=True)
+		rc = subprocess.call(cmd, shell=True)
+
+		if (rc == 1): 
+			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
+			clogger.fatal(msg)
+			return
 
 		print  # newline
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
 		clogger.info(msg)
 
-		get_multinest_output(root)
 
-		results = MCMC_nest(root)
-		results.do_plot_map(system)
-		two_planet_lnE = results.NS_lnE
+		gp_context = {False: 1, True: 2}
+		get_multinest_output(root, nplanets, gp_context=gp_context[gp])
+		system.results = MCMC_nest(root, gp_context=gp_context[gp])
+		system.results.do_plot_map(system)
 
-		print '1 planet lnE = ', one_planet_lnE
-		print '2 planet lnE = ', two_planet_lnE
+		two_planet_lnE = system.results.NS_lnE
+
+		##############################################################################
+		print  # newline
+		msg = yellow('RESULT: ') + 'Evidence results'
+		clogger.info(msg)
+
+		msg =  yellow('      : ') + '1 planet lnE = %f \n' % (one_planet_lnE)
+		msg += yellow('      : ') + '2 planet lnE = %f \n' % (two_planet_lnE)
+		clogger.info(msg)
+
+		## odds ratio
+		K = np.exp(one_planet_lnE) / np.exp(two_planet_lnE)
+
+		msg =  yellow('      : ') + 'Odds ratio = %f \n' % (K)
+		clogger.info(msg)
+
+		jeffreys_scale = {(0, 1) : 'Negative', 
+		                  (1, 3) : 'Barely worth mentioning', 
+		                  (3, 10) : 'Substantial', 
+		                  (10, 30) :'Strong', 
+		                  (30, 100) : 'Very strong', 
+		                  (100, 1e99) : 'Decisive'}
+		kass_raftery_scale = {(0, 1) : 'Negative', 
+		                      (1, 3) : 'Not worth more than a bare mention', 
+		                  	  (3, 20) : 'Positive', 
+		                  	  (20, 150) :'Strong', 
+		                  	  (150, 1e99) : 'Very strong'}
+
+		print  # newline
+		msg =  yellow('      : ') + '%-15s\t%s' % ('Scale', 'strength of evidence supporting 1 planet')
+		clogger.info(msg)
+
+		msg =  yellow('      : ')
+		for key in jeffreys_scale:
+			if key[0] < K <= key[1]: 
+				msg += '%-15s\t%s' % ('Jeffreys', jeffreys_scale[key])
+		clogger.info(msg)
+
+		msg =  yellow('      : ')
+		for key in kass_raftery_scale:
+			if key[0] < K <= key[1]: 
+				msg += '%-15s\t%s' % ('Kass & Raftery', kass_raftery_scale[key])
+		clogger.info(msg)
 
 
 	return
@@ -1232,9 +1304,20 @@ def get_rotation_period(system):
 	## Noyes (1984), Eq 3
 	log_P = (0.324 - 0.4*y - 0.283*y**2 - 1.325*y**3) + log_tau
 
-
 	msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f d' % (10**log_P)
 	clogger.info(msg)
+
+
+	# ## Mamajek & Hillenbrand (2008), Eq 3
+	# log_tau = -38.053 - 17.912*lrhk - 1.6675*lrhk**2
+	# tau = 10**log_tau
+
+	# ## Mamajek & Hillenbrand (2008), Eq 5
+	# P = (0.808 - 2.966*(lrhk+4.52)) * tau
+
+	# msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f d' % (P)
+	# clogger.info(msg)
+
 
 
 def do_Dawson_Fabrycky(system):
