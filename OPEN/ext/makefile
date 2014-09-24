@@ -43,6 +43,13 @@ get_rvN.so: get_rvN.f90
 get_rvN_MultiSite.so: get_rvN_MultiSite.f90
 	@$(FPY) -m get_rvN_MultiSite -c $< $(FPYFLAGS)
 
+
+## compile gp helper functions
+GPPATH = ../multinest
+gp.so: $(GPPATH)/gp.so
+	cp $(GPPATH)/gp.so .
+
+
 ## compile Dawson-Fabrycky special periodogram
 periodogram_DF.so: periodogram_DF.c
 	# echo $(PYTHON)
@@ -50,7 +57,7 @@ periodogram_DF.so: periodogram_DF.c
 
 # --- remove binary and executable files
 clean:
-	rm -f blombscargle.so glombscargle.so get_rv.so get_rvN.so periodogram_DF.so
+	rm -f *.so
 
 
 ## compile bayesian lomb scargle periodogram with additional outputs

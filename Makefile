@@ -71,6 +71,9 @@ endif
 	@echo "OPEN <-> MultiNest  --  $(OK_STRING)"
 
 
+gp: 
+	@make gp.so -C ./OPEN/multinest
+
 clean: clean-ext clean-multinest clean-multinest-open
 
 clean-ext:

@@ -67,7 +67,7 @@ main: main.f90 like.f90 nestwrap.f90 params.f90
 #	$(FC) -o covmat $(FFLAGS) $^ -L$(FLIBDIR) -I$(FLIBDIR) $(LAPACKLIB) -lmodules
 
 gp.so: gp_python_wrapper.f90 gp_utils.o array_utils.o get_rvN.o
-	f2py -c -m gp $< -llapack $(F2PYFLAGS) $(LIBS) --f90exec="${FCPATH}"
+	f2py -c -m gp $^ -llapack $(F2PYFLAGS) -L/home/joao/Work/Python/f_ext/ranlib.f -lranlib -lblas --f90exec="${FCPATH}"
 	cp gp.so ../ext/
 
 
