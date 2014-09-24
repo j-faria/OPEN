@@ -6,7 +6,7 @@ use Nested
 use params
 use like
 use priors
-use array_utils, only: linspace, get_diagonal
+use array_utils, only: linspace, get_diagonal, sort
 use gputils
    
 implicit none
@@ -114,37 +114,37 @@ contains
 		end do
 
 
-!		if (nest_context == 11) then  ! 1 planet
-!			P = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
-!			ecc = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
-!			omega = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
-!			t0 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
-!			K = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now
-!
-!			Vsys = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
-!
-!			Cube(1:nPar) = (/P, K, ecc, omega, t0, Vsys/)
-!
-!		else if (nest_context == 21) then
-!			P1 = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
-!			ecc1 = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
-!			omega1 = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
-!			t01 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
-!			K1 = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now !!!!!
-!
-!			P2 = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
-!			ecc2 = UniformPrior(Cube(8), spriorran(8,1), spriorran(8,2))
-!			omega2 = UniformPrior(Cube(9), spriorran(9,1), spriorran(9,2))
-!			t02 = UniformPrior(Cube(10), spriorran(10,1), spriorran(10,2))
-!			K2 = UniformPrior(Cube(7), spriorran(7,1), spriorran(7,2)) ! for now !!!!!		
-!
-!			Vsys = UniformPrior(Cube(11), spriorran(11,1), spriorran(11,2))
-!
-!			Cube(1:nPar) = (/P1, K1, ecc1, omega1, t01, &
-!			                 P2, K2, ecc2, omega2, t02, &
-!			                 Vsys/)
-!
-!		end if
+		!if (nest_context == 11) then  ! 1 planet
+		!	P = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
+		!	ecc = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
+		!	omega = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
+		!	t0 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
+		!	K = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now
+		!
+		!	Vsys = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
+		!
+		!	Cube(1:nPar) = (/P, K, ecc, omega, t0, Vsys/)
+		!
+		!else if (nest_context == 21) then
+		!	P1 = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
+		!	ecc1 = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
+		!	omega1 = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
+		!	t01 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
+		!	K1 = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now !!!!!
+		!
+		!	P2 = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
+		!	ecc2 = UniformPrior(Cube(8), spriorran(8,1), spriorran(8,2))
+		!	omega2 = UniformPrior(Cube(9), spriorran(9,1), spriorran(9,2))
+		!	t02 = UniformPrior(Cube(10), spriorran(10,1), spriorran(10,2))
+		!	K2 = UniformPrior(Cube(7), spriorran(7,1), spriorran(7,2)) ! for now !!!!!		
+		!
+		!	Vsys = UniformPrior(Cube(11), spriorran(11,1), spriorran(11,2))
+		!
+		!	Cube(1:nPar) = (/P1, K1, ecc1, omega1, t01, &
+		!	                 P2, K2, ecc2, omega2, t02, &
+		!	                 Vsys/)
+		!
+		!end if
 		!write(unit=*, fmt=*) '+++', Cube(1:nPar)
 
 		!call loglike function here 
@@ -172,22 +172,52 @@ contains
 		integer context ! any additional information user wants to pass
 		logical ending ! is this the final call?
 		! local variables
-		double precision, dimension(1000) :: t, mu, std
-		double precision, dimension(1000, 1000) :: cov
+		double precision, dimension(size(times) + 1000) :: t, mu, std
+		double precision, dimension(size(times) + 1000, size(times) + 1000) :: cov
 		character(len=100) gppredictfile
 		integer i, map_index
 		character(len=100) :: fmt
 
-		! now do something
-		!if (doing_debug) write(*,*) paramConstr(nPar*3+1:nPar*4-2)
-		write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
-		write(*,fmt) paramConstr(nPar*3+1:nPar*4)
-		!print *, ending, using_gp
+		!write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
+		!write(*,fmt) paramConstr(nPar*3+1:nPar*4)
+
+		write(*,*) ' '
+		if (nplanets == 1) then  ! 1 planet + 4 hyper
+			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',nPar - 4,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*4 - 4)
+			
+			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
+			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 3:)
+		
+		else if (nplanets == 2) then  ! 2 planets + 4 hyper
+			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*3+5)
+			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+6:nPar*4 - 4)
+
+			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
+			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 3:)
+
+		else if (nplanets == 0) then  ! 4 hyper
+			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
+			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:)
+
+		end if
+		write(*,*) ' '
 
 		if (ending .and. using_gp) then
 			gppredictfile = TRIM(nest_root)//'gp.dat'
 
-			t = linspace(minval(times), maxval(times), 1000)
+			! prediction times are lineary spaced
+			t(1:1000) = linspace(minval(times), maxval(times), 1000)
+			! and put together with observed times
+			t(1001:) = times
+			call sort(t, size(t))  ! sort it
 
 			!! set hyperparameters to their MAP values
 			map_index = nPar*3 ! this is where the MAP parameters start in the array
@@ -203,15 +233,13 @@ contains
 			!write(*, '(10f13.6)') gp1%gp_kernel%evaluate_kernel(times, times)
 			!print *, ''
 
-			!gp1%mean_fun => mean_fun_constant
-			!call gp1%predict(times, rvs, (/ 0.d0 /), t, mu, cov, yerr=errors)
 			write(*,*) 'Calculating predictions...'
 			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-4), t, mu, cov, yerr=errors)
 			std = sqrt(get_diagonal(cov))
 
 			write(*,*) 'Writing file ', gppredictfile
 			open(unit=59, file=gppredictfile, form='formatted', status='replace')
-			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1,1000)
+			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1, size(times) + 1000)
 			close(59)
 
 		end if
