@@ -31,6 +31,7 @@ from .logger import clogger, logging
 from shell_colors import yellow, blue
 from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
 from ext.get_rvN import get_rvn
+from ext.gp import gp_predictor
 
 
 # if the interpreter calls open.py from another directory, matplotlib will not
@@ -87,6 +88,9 @@ class rvSeries:
           return
 
         self.time, self.vrad, self.error = data.pop('jdb'), data.pop('vrad'), data.pop('svrad')
+
+        # by default
+        self.units = 'km/s'
 
         # save the extra quantities as a namedtuple if we read them
         extra = namedtuple('Extra', data.keys(), verbose=False)
@@ -185,7 +189,7 @@ class rvSeries:
             t, rv, err = t[m:], rv[m:], err[m:]
         
         plt.xlabel('Time [days]')
-        plt.ylabel('RV [km/s]')
+        plt.ylabel('RV [%s]'%self.units)
         if leg: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
@@ -1069,10 +1073,12 @@ class MCMC_nest:
         # this seems like the easiest way to get the number of parameters
         self.npar = int(last.split()[0])
 
-        self.gp = False
-        if (gp_context == 2):
+        self.gp = self.gp_only = False
+        if (gp_context in (2, 3)):
             self.gp = True
             self.read_gp_file()
+            if gp_context == 3: 
+                self.gp_only = True
 
         self.read_stats_file()
 
@@ -1309,6 +1315,84 @@ class MCMC_nest:
         tt = system.get_time_to_plot()
         vel = np.zeros_like(tt)
 
+        ## MAP estimate of the parameters
+        if self.gp:
+            par_map = self.par_map[:-4] 
+            hyper_map = self.par_map[-4:]
+            pred = gp_predictor(t, rv, err, par_map, hyper_map)
+        else:
+            par_map = self.par_map
+            if self.npar in (7, 12):
+                par_map.pop(-2)
+
+        newFig=True
+        if newFig:
+            plt.figure()
+
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1], sharex=ax1, sharey=ax1)
+
+        if not self.gp_only:
+            # plot best solution
+            P = par_map[:-1:5]
+            K = par_map[1:-1:5]
+            ecc = par_map[2:-1:5]
+            omega = par_map[3:-1:5]
+            t0 = par_map[4:-1:5]
+            par = [P, K, ecc, omega, t0, par_map[-1]]
+
+            args = [tt] + par + [vel]
+            get_rvn(*args)
+            ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
+
+        # plot GP predictions
+        if self.gp:
+            ax1.plot(self.pred_t, self.pred_y, '-k', lw=1.5, label='GP mean')
+            ax1.fill_between(self.pred_t, y1=self.pred_y-2*self.pred_std, y2=self.pred_y+2*self.pred_std,
+                                          color='k', alpha=0.3, label='2*std')
+
+        vel = np.zeros_like(t)
+        args = [t] + par + [vel]
+        get_rvn(*args)
+        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+
+            # plot each files' values
+            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
+            # plot residuals
+            if self.gp:
+                ax2.errorbar(t[:m], rv[:m]-pred[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+            else:
+                ax2.errorbar(t[:m], rv[:m]-vel[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+
+            t, rv, err = t[m:], rv[m:], err[m:]
+
+
+        ax2.axhline(y=0, ls='--', color='k')
+
+        ax2.set_xlabel('Time [days]')
+        ax1.set_ylabel('RV [km/s]')
+        ax2.set_ylabel('Residuals [km/s]')
+        ax1.legend()
+        plt.tight_layout()
+        plt.ticklabel_format(useOffset=False)
+        plt.show()
+
+
+    def do_plot_map_phased(self, system):
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        tt = system.get_time_to_plot()
+        vel = np.zeros_like(tt)
+
         if self.gp:
             self.npar
 
@@ -1334,13 +1418,19 @@ class MCMC_nest:
 
         args = [tt] + par + [vel]
         get_rvn(*args)
-        plt.plot(tt, vel, '-g', lw=2.5, label='MAP')
+        phase = ((tt - t0) / P) % 1.0
+        plt.plot(np.sort(phase), vel[np.argsort(phase)], '-g', lw=2.5, label='MAP')
 
         # plot GP predictions
         if self.gp:
-            plt.plot(self.pred_t, self.pred_y, '-k', lw=1.5, label='GP mean')
-            plt.fill_between(self.pred_t, y1=self.pred_y-2*self.pred_std, y2=self.pred_y+2*self.pred_std,
-                                          color='k', alpha=0.3, label='2*std')
+            pass
+            phase = ((self.pred_t - t0) / P) % 1.0
+            indices = np.argsort(phase)
+            plt.plot(np.sort(phase), self.pred_y[indices], '-k', lw=1.5, label='GP mean')
+            plt.fill_between(np.sort(phase), 
+                             y1=self.pred_y[indices]-2*self.pred_std[indices], 
+                             y2=self.pred_y[indices]+2*self.pred_std[indices],
+                             color='k', alpha=0.3, label='2*std')
 
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
@@ -1352,16 +1442,18 @@ class MCMC_nest:
                                 # pen={'color': 0.8, 'width': 2})
             # p.addItem(e)
             # p.plot(t[:m], rv[:m], symbol='o')
-            plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
+            phase = ((t[:m] - t0) / P) % 1.0
+            plt.errorbar(np.sort(phase), rv[np.argsort(phase)], yerr=err[np.argsort(phase)], \
                          fmt='o'+colors[i], label=os.path.basename(fname))
             t, rv, err = t[m:], rv[m:], err[m:]
         
-        plt.xlabel('Time [days]')
+        plt.xlabel('Phase')
         plt.ylabel('RV [km/s]')
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
         plt.show()
+
 
     def do_triangle_plot(self):
 
