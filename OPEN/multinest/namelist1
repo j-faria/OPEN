@@ -9,7 +9,7 @@
     ! nob is the number of observatories
     nest_context = 211
     ! nest_context has three numbers: xyz
-    !         x=1 "normal regression", x=2 gaussian process regression
+    !         x=1 "normal" regression, x=2 gaussian process regression, x=3 gaussian process without planets
     !         y= number of planets in the model
     !         z=1 don't include jitter term, z=2 include jitter term
     ! nest_context = 111   ! 1-planet model (5+nob parameters)
@@ -22,7 +22,7 @@
     nest_IS = .true.
 
     !root for saving output files; character*100
-    nest_root='chains/nest-'
+    nest_root='chains/nest-1planet-'
 
 
     !after how many iterations feedback is required and the output
@@ -32,7 +32,7 @@
     nest_updInt=100
 
     !whether to resume from a previous run
-    nest_resume=.false.
+    nest_resume=.true.
 
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
