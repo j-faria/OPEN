@@ -180,11 +180,12 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--ncpu=<cpu>]
+    nest [-u] [-r] [--gp] [--ncpu=<cpu>]
 Options
-    -u          User sets the namelist file
-    -r          Resume from a previous MultiNest run
-    -ncpu=<cpu> Number of threads to use [default: all available]
+    -u           User sets the namelist file
+    -r           Resume from a previous MultiNest run
+    --gp         Perform model selection within Gaussian Process framework
+    --ncpu=<cpu> Number of threads to use [default: all available]
 """
 
 restrict_usage = \
@@ -314,8 +315,19 @@ class EmbeddedMagics(Magics):
             except IOError:
                 return
 
+        default = local_ns['default']
+        
         if args['--verbose']:
-            local_ns['default'].stats()
+            default.stats()
+
+        if (min(default.error) < 0.01):
+            from shell_colors import blue
+            msg = blue('INFO: ') + 'Converting to m/s'
+            clogger.info(msg)
+
+            default.vrad = (default.vrad - mean(default.vrad)) * 1e3
+            default.error *= 1e3
+            default.units = 'm/s'
 
     @needs_local_scope
     @line_magic
@@ -827,6 +839,8 @@ class EmbeddedMagics(Magics):
 
         user = args['-u']
         resume = args['-r']
+        gp = args['--gp']
+
         try: 
             ncpu = int(args['--ncpu'])
         except TypeError:
@@ -840,7 +854,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user, resume=resume, ncpu=ncpu)
+        core.do_multinest(system, user, gp, resume=resume, ncpu=ncpu)
 
     @needs_local_scope
     @line_magic
