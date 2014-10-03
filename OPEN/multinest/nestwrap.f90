@@ -182,7 +182,7 @@ contains
 		!write(*,fmt) paramConstr(nPar*3+1:nPar*4)
 
 		write(*,*) ' '
-		if (nplanets == 1) then  ! 1 planet + 4 hyper
+		if (nplanets == 1 .and. using_gp) then  ! 1 planet + 4 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',nPar - 4,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*4 - 4)
@@ -190,8 +190,13 @@ contains
 			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
 			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*4 - 3:)
+
+		else if (nplanets == 1) then  ! 1 planet
+			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*4)
 		
-		else if (nplanets == 2) then  ! 2 planets + 4 hyper
+		else if (nplanets == 2 .and. using_gp) then  ! 2 planets + 4 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+5)
@@ -202,10 +207,20 @@ contains
 			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*4 - 3:)
 
-		else if (nplanets == 0) then  ! 4 hyper
+		else if (nplanets == 2) then  ! 2 planets
+			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*3+5)
+			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+6:nPar*4)
+
+		else if (nplanets == 0) then  ! 4 hyper (plus one systematic velocity)
+			write(*,'(a13)') (/" vsys" /)
+			write(fmt,'(a,i2,a)')  '(', 1, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1)
 			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
 			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+1:)
+			write(*,fmt) paramConstr(nPar*3+2:)
 
 		end if
 		write(*,*) ' '
