@@ -91,17 +91,21 @@ contains
  		slhood=-huge(1.d0)*epsilon(1.d0)
 
  		! get the radial velocity model with these parameters (in vel)
-		call get_rvN(times, &
-					 Cube(1:nest_nPar-1:5), & ! periods for all planets
-					 Cube(2:nest_nPar-1:5), & ! K for all planets
-					 Cube(3:nest_nPar-1:5), & ! ecc for all planets
-					 Cube(4:nest_nPar-1:5), & ! omega for all planets
-					 Cube(5:nest_nPar-1:5), & ! t0 for all planets
-					 Cube(nest_nPar), & ! systematic velocity
-					 vel, n, nplanets)
-    	!call get_rvN(times, &
-    	!           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
-    	!           Cube(6), vel, n, nplanets)
+ 		if (nplanets > 0) then
+			call get_rvN(times, &
+						 Cube(1:nest_nPar-1:5), & ! periods for all planets
+						 Cube(2:nest_nPar-1:5), & ! K for all planets
+						 Cube(3:nest_nPar-1:5), & ! ecc for all planets
+						 Cube(4:nest_nPar-1:5), & ! omega for all planets
+						 Cube(5:nest_nPar-1:5), & ! t0 for all planets
+						 Cube(nest_nPar), & ! systematic velocity
+						 vel, n, nplanets)
+	    	!call get_rvN(times, &
+	    	!           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
+	    	!           Cube(6), vel, n, nplanets)
+		else
+			vel = Cube(1)
+		end if
 
 	    dist = rvs - vel
 	    !call get_covmat(times, errors, observ, ss, alpha, tau, covmat, det, inv_covmat)
