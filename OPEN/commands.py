@@ -36,12 +36,13 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... [-d] [--skip=<sn>] [-v]
+    read <file>... [-d] [--skip=<sn>] [-v] [--nomps]
     read -h | --help
 Options:
     -d                  Set this as default system.
     -v --verbose        Verbose output about data just read.
     --skip=<sn>         How many header lines to skip [default: 0].
+    --nomps             Do not convert data to m/s
     -h --help           Show this help message.
 """
 
@@ -320,13 +321,15 @@ class EmbeddedMagics(Magics):
         if args['--verbose']:
             default.stats()
 
-        if (min(default.error) < 0.01):
+        if (min(default.error) < 0.01 and not args['--nomps']):
             from shell_colors import blue
-            msg = blue('INFO: ') + 'Converting to m/s'
+            msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value'
             clogger.info(msg)
 
             default.vrad = (default.vrad - mean(default.vrad)) * 1e3
             default.error *= 1e3
+            default.vrad_full = (default.vrad_full - mean(default.vrad_full)) * 1e3
+            default.error_full *= 1e3
             default.units = 'm/s'
 
     @needs_local_scope
@@ -584,7 +587,7 @@ class EmbeddedMagics(Magics):
 
         if local_ns.has_key('default'):
             system = local_ns['default']
-            system.model = {}
+            if system.model is None: system.model = {}
             system.model['k'] = k = int(args[0][1])
             system.model['d'] = d = int(args[1][1])
         else:
@@ -636,14 +639,15 @@ class EmbeddedMagics(Magics):
 
         if local_ns.has_key('default'):
             system = local_ns['default']
-            var1 = args['<var1>']
-            var2 = args['<var2>']
-            result = core.do_correlate(system, vars=(var1, var2), verbose=verb)
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
             clogger.fatal(msg)
             return
+
+        var1 = args['<var1>']
+        var2 = args['<var2>']
+        result = core.do_correlate(system, vars=(var1, var2), verbose=verb)
 
     @needs_local_scope
     @line_magic
@@ -815,6 +819,40 @@ class EmbeddedMagics(Magics):
             system.error = sqrt(system.error**2 + (noise / 1000)**2)
         else:
             system.error = sqrt(system.error**2 + noise**2)
+
+    @needs_local_scope
+    @line_magic
+    def lowpass(self, parameter_s='', local_ns=None):
+        from shell_colors import blue
+        # try:
+        #     args = parse_arg_string('add_noise', parameter_s)
+        # except DocoptExit:
+        #     print addnoise_usage.lstrip()
+        #     return
+        # except SystemExit:
+        #     return
+
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default') and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['-n']
+                system = local_ns[system_name]
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return 
+
+        f = 1./950
+
+        msg = blue('INFO: ') + 'Converting to m/s'
+        clogger.info(msg)
+
+        system.vrad = lopast(system.vrad, system.time, f)
+
 
     @needs_local_scope
     @line_magic
