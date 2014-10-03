@@ -555,8 +555,10 @@ contains
 		real(kind=8), dimension(:), intent(in), optional :: yerr
 		real(kind=8) :: lnlike
 		real(kind=8), dimension(size(y), size(y)) :: cov_cho_factor
-		real(kind=8), dimension(size(y)) :: yy, b, xsol
+		real(kind=8), dimension(size(y)) :: yy, xsol
+		real(kind=8), dimension(size(y), 1) :: yy_m  ! 2-dimensional array to go into DPOTRF, DPOTRS
 		integer :: N, rc
+		!real(kind=8) :: time1, time2
 
 		if (size(x) /= size(y)) STOP 'Dimension mismatch in get_lnlikelihood'
 		if (.not. associated(self%mean_fun)) STOP 'GP%mean_fun is not associated'
@@ -569,12 +571,23 @@ contains
 			if (size(yerr) /= N) STOP 'Dimension mismatch in get_lnlikelihood'
 			call add_array_to_diagonal(cov_cho_factor, yerr**2)
 		end if
+		!cov_cho_factor_copy = cov_cho_factor
 
 		! solve the linear system using the cholesky method
-		yy = y - self%mean_fun(x, args)  ! rhs
-		call choly(0, N, cov_cho_factor, yy, xsol, rc)
-		if (rc /= 0) STOP 'Error in choly. Matrix is not positive definite?'
+		yy = y - self%mean_fun(x, args)  ! rh
+		yy_m(:, 1) = yy
 
+		!call cpu_time(time1)
+		call DPOTRF( 'L', N, cov_cho_factor, N, rc )
+		call DPOTRS( 'L', N, 1, cov_cho_factor, N, yy_m, N, rc )
+		!call cpu_time(time2)
+		!print '("Time for cholesky = ",f6.3," seconds.")',time2-time1
+
+		!call choly(0, N, cov_cho_factor, yy, xsol, rc)
+			
+		if (rc /= 0) STOP 'Error in cholesky. Matrix is not positive definite?'
+
+		xsol = yy_m(:, 1)
 		lnlike = - sum(log(get_diagonal(cov_cho_factor)))
 		lnlike = lnlike - N*const1
 		lnlike = lnlike - 0.5d0 * dot_product(yy, xsol)
