@@ -176,7 +176,15 @@ class rvSeries:
         
         if newFig: 
             fig = plt.figure()
-        ax1 = fig.add_subplot(111)
+        ax2 = fig.add_subplot(111)
+        ax2.set_xlabel('Time [days]', labelpad=20)
+        ax2.set_ylabel('RV [%s]'%self.units)
+        
+        ny, years = self.get_years_observations()
+        ax1 = ax2.twiny()
+        ax1.xaxis.tick_bottom()
+        ax2.xaxis.tick_top()
+        ax2.plot(years, np.ones_like(years), alpha=0) # Create a dummy plot
 
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
@@ -192,16 +200,11 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
-        ax1.set_xlabel('Time [days]')
-        ax1.set_ylabel('RV [%s]'%self.units)
 
-        ny, years = self.get_years_observations()
-        ax2 = ax1.twiny()
-        ax2.plot(years, np.ones_like(years), alpha=0) # Create a dummy plot
 
         if leg: ax1.legend()
         plt.tight_layout()
-        ax1.ticklabel_format(useOffset=False)
+        ax2.ticklabel_format(useOffset=False)
         # plt.show()
         # pg.QtGui.QApplication.exec_()
 
@@ -1495,7 +1498,7 @@ class MCMC_nest:
         if self.gp:
             phase = ((self.pred_t - t0) / P) % 1.0
             indices = np.argsort(phase)
-            plt.plot(np.sort(phase), self.pred_y[indices], '-k', lw=1.5, label='GP mean')
+            plt.plot(np.sort(phase), self.pred_y[indices], '-k', lw=0.5, alpha=0.6, label='GP mean')
             # plt.fill_between(np.sort(phase), 
             #                  y1=self.pred_y[indices]-2*self.pred_std[indices], 
             #                  y2=self.pred_y[indices]+2*self.pred_std[indices],
