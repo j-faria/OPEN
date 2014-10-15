@@ -276,6 +276,10 @@ class rvSeries:
         # p = pg.plot()
         if extra == 'rhk':
             plt.errorbar(t, self.extras.rhk, yerr=self.extras.sig_rhk, fmt='o', label=extra)
+        elif extra == 'fwhm' and ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+            m, b = np.polyfit(t, self.extras[i], 1)
+            yp = np.polyval([m, b], t)
+            plt.plot(t, self.extras[i]-yp, 'o', label=extra+' (linear trend removed)')
         else:
             plt.plot(t, self.extras[i], 'o', label=extra)
         
