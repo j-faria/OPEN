@@ -12,6 +12,7 @@ from fileinput import FileInput
 from itertools import islice, chain
 from collections import namedtuple # this requires Python >= 2.6
 from string import ascii_lowercase
+from copy import copy
 # other imports
 import numpy as np
 import matplotlib.pylab as plt
@@ -32,6 +33,7 @@ from shell_colors import yellow, blue
 from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
 from ext.get_rvN import get_rvn
 from ext.gp import gp_predictor
+from ext.julian import caldat
 
 
 # if the interpreter calls open.py from another directory, matplotlib will not
@@ -99,11 +101,11 @@ class rvSeries:
 
         # time, vrad and error can change, 
         # the *_full ones correspond always to the full set
-        self.time_full = self.time
-        self.vrad_full = self.vrad
-        self.error_full = self.error
+        self.time_full = copy(self.time)
+        self.vrad_full = copy(self.vrad)
+        self.error_full = copy(self.error)
         # same for extras
-        self.extras_full = self.extras
+        self.extras_full = copy(self.extras)
 
     # associated model to be adjusted to the data
     # this will be a dictionary with the following key:value pairs:
@@ -173,7 +175,9 @@ class rvSeries:
         t, rv, err = self.time, self.vrad, self.error # temporaries
         
         if newFig: 
-            plt.figure()
+            fig = plt.figure()
+        ax1 = fig.add_subplot(111)
+
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
@@ -184,15 +188,20 @@ class rvSeries:
                                 # pen={'color': 0.8, 'width': 2})
             # p.addItem(e)
             # p.plot(t[:m], rv[:m], symbol='o')
-            plt.errorbar(t[:m], rv[:m], yerr=err[:m], \
+            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
-        plt.xlabel('Time [days]')
-        plt.ylabel('RV [%s]'%self.units)
-        if leg: plt.legend()
+        ax1.set_xlabel('Time [days]')
+        ax1.set_ylabel('RV [%s]'%self.units)
+
+        ny, years = self.get_years_observations()
+        ax2 = ax1.twiny()
+        ax2.plot(years, np.ones_like(years), alpha=0) # Create a dummy plot
+
+        if leg: ax1.legend()
         plt.tight_layout()
-        plt.ticklabel_format(useOffset=False)
+        ax1.ticklabel_format(useOffset=False)
         # plt.show()
         # pg.QtGui.QApplication.exec_()
 
@@ -219,7 +228,8 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
-        p = np.polyval(drift, self.time) # normal polynomial, for 2nd plot
+        poly = np.poly1d(drift)  # the polynomial evaluator
+        p = np.polyval(drift, self.time)  # normal polynomial, for 2nd plot
         st = np.sort(self.time) # need this otherwise the plot gets messed up
         sp = np.polyval(drift, st) # "sorted" polynomial
         ax1.plot(st, sp, 'y-')
@@ -229,7 +239,7 @@ class rvSeries:
         # plot each file's values minus the drift
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
-            ax2.errorbar(t[:m], rv[:m], yerr=err[:m], \
+            ax2.errorbar(t[:m], rv[:m]-p[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
             t, rv, err, p = t[m:], rv[m:], err[m:], p[m:]
 
@@ -243,7 +253,7 @@ class rvSeries:
     def do_plot_extras(self, extra):
         """ Plot other observed quantities as a function of time.
 
-        Parameterslistcommands
+        Parameters
         ----------
         extra: string
           One of the quantities available in system.extras
@@ -349,7 +359,7 @@ class rvSeries:
     def save_fit(self, params, chi2):
         """ Helper function to save results from a fit to the system """
         if self.fit is not None: # there is already a fit
-          clogger.warning(yellow('Warning: ')+'Replacing older fit')
+            clogger.warning(yellow('Warning: ')+'Replacing older fit')
 
         self.fit = {}
         self.fit['params'] = params
@@ -440,6 +450,11 @@ class rvSeries:
         else:
             return 0.5*1./np.mean(self.time[1::]-self.time[0:-1])
 
+    def get_years_observations(self):
+        _, _, y1 = caldat(24e5+self.time[0])
+        _, _, y2 = caldat(24e5+self.time[-1])
+        return len(np.arange(y1, y2)), np.arange(y1, y2)
+
     def get_time_to_plot(self):
         """
         Returns sufficiently resolved time vector for plots
@@ -449,6 +464,9 @@ class rvSeries:
         minim = self.time.min() - 1.*std
         maxim = self.time.max() + 1.*std
         return np.linspace(minim, maxim, 10*N)
+
+    def is_in_extras(self, extra):
+        return extra in self.extras._fields
 
 
 class BasicTimeSeries():
@@ -1091,7 +1109,9 @@ class MCMC_nest:
 
         npar = self.npar
         self.nplanets = npar/5
-        if self.gp: self.nplanets = 1
+        if self.gp and (npar == 5): 
+            self.nplanets = 0
+            self.gp_only = True
 
         try:
             self.NS_lnE = float(stats[0].split()[-3])
@@ -1187,6 +1207,45 @@ class MCMC_nest:
         for i, name in enumerate(self.trace._fields):
             print '%10s' % name,
             print '  ', 'mean:', np.mean(self.trace[i]), 'std:', np.std(self.trace[i])
+
+
+    def save_fit_to(self, system):
+        
+        if system.fit is not None: # there is already a fit
+            clogger.warning(yellow('Warning: ')+'Replacing older fit')
+
+        system.fit = {}
+        
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        vel = np.zeros_like(t)
+
+        ## MAP estimate of the parameters
+        if self.gp:
+            par_map = self.par_map[:-4] 
+            hyper_map = self.par_map[-4:]
+            if self.gp_only:
+                vel = gp_predictor(t, rv, err, par_map, hyper_map, 'constant')
+            else:
+                vel = gp_predictor(t, rv, err, par_map, hyper_map, 'keplerian')
+        else:
+            par_map = self.par_map
+            if self.npar in (7, 12):
+                par_map.pop(-2)
+
+            P = par_map[:-1:5]
+            K = par_map[1:-1:5]
+            ecc = par_map[2:-1:5]
+            omega = par_map[3:-1:5]
+            t0 = par_map[4:-1:5]
+            par = [P, K, ecc, omega, t0, par_map[-1]]
+
+            args = [t] + par + [vel]
+            get_rvn(*args)
+
+
+        system.fit['params'] = self.par_map
+        system.fit['residuals'] = system.vrad - vel
+
 
 
     def kde1d(self, parameter, ind=None, npoints=100):
@@ -1319,7 +1378,10 @@ class MCMC_nest:
         if self.gp:
             par_map = self.par_map[:-4] 
             hyper_map = self.par_map[-4:]
-            pred = gp_predictor(t, rv, err, par_map, hyper_map)
+            if self.gp_only:
+                pred = gp_predictor(t, rv, err, par_map, hyper_map, 'constant')
+            else:
+                pred = gp_predictor(t, rv, err, par_map, hyper_map, 'keplerian')
         else:
             par_map = self.par_map
             if self.npar in (7, 12):
@@ -1353,8 +1415,12 @@ class MCMC_nest:
                                           color='k', alpha=0.3, label='2*std')
 
         vel = np.zeros_like(t)
-        args = [t] + par + [vel]
-        get_rvn(*args)
+        if self.gp_only:
+            vel = par_map[0]
+        else:
+            args = [t] + par + [vel]
+            get_rvn(*args)
+
         for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
             
@@ -1423,14 +1489,13 @@ class MCMC_nest:
 
         # plot GP predictions
         if self.gp:
-            pass
             phase = ((self.pred_t - t0) / P) % 1.0
             indices = np.argsort(phase)
             plt.plot(np.sort(phase), self.pred_y[indices], '-k', lw=1.5, label='GP mean')
-            plt.fill_between(np.sort(phase), 
-                             y1=self.pred_y[indices]-2*self.pred_std[indices], 
-                             y2=self.pred_y[indices]+2*self.pred_std[indices],
-                             color='k', alpha=0.3, label='2*std')
+            # plt.fill_between(np.sort(phase), 
+            #                  y1=self.pred_y[indices]-2*self.pred_std[indices], 
+            #                  y2=self.pred_y[indices]+2*self.pred_std[indices],
+            #                  color='k', alpha=0.3, label='2*std')
 
         # plot each files' values
         for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
