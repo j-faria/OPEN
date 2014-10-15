@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from sys import float_info
 
 from .logger import clogger, logging
+from .utils import ask_yes_no
 
 from ext.blombscargle import blombscargle
 from ext.glombscargle import glombscargle
@@ -63,7 +64,12 @@ class ls_PressRybicki(PeriodogramBase):
     elif quantity == 'bis':
       self.y = rv.extras.bis_span
     elif quantity == 'fwhm':
-      self.y = rv.extras.fwhm
+      if ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+        m, b = polyfit(self.t, rv.extras.fwhm, 1)
+        yp = polyval([m, b], self.t)
+        self.y = rv.extras.fwhm - yp
+      else:
+        self.y = rv.extras.fwhm
     elif quantity == 'rhk':
       self.y = rv.extras.rhk
     elif quantity == 'contrast':
@@ -401,7 +407,12 @@ class gls(PeriodogramBase):
       self.y = rv.extras.bis_span
       self.error = 2. * rv.error #ones_like(self.y)
     elif quantity == 'fwhm':
-      self.y = rv.extras.fwhm
+      if ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+        m, b = polyfit(self.t, rv.extras.fwhm, 1)
+        yp = polyval([m, b], self.t)
+        self.y = rv.extras.fwhm - yp
+      else:
+        self.y = rv.extras.fwhm
       self.error = 2.35 * rv.error #ones_like(self.y)
     elif quantity == 'rhk':
       self.y = rv.extras.rhk
@@ -661,7 +672,12 @@ class bls(PeriodogramBase):
       self.y = rv.extras.bis_span
       self.error = 2. * rv.error #ones_like(self.y)
     elif quantity == 'fwhm':
-      self.y = rv.extras.fwhm
+      if ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+        m, b = polyfit(self.t, rv.extras.fwhm, 1)
+        yp = polyval([m, b], self.t)
+        self.y = rv.extras.fwhm - yp
+      else:
+        self.y = rv.extras.fwhm
       self.error = 2.35 * rv.error #ones_like(self.y)
     elif quantity == 'rhk':
       self.y = rv.extras.rhk
@@ -836,7 +852,12 @@ class bgls(PeriodogramBase):
       self.y = rv.extras.bis_span
       self.error = 2. * rv.error #ones_like(self.y)
     elif quantity == 'fwhm':
-      self.y = rv.extras.fwhm
+      if ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+        m, b = polyfit(self.t, rv.extras.fwhm, 1)
+        yp = polyval([m, b], self.t)
+        self.y = rv.extras.fwhm - yp
+      else:
+        self.y = rv.extras.fwhm
       self.error = 2.35 * rv.error #ones_like(self.y)
     elif quantity == 'rhk':
       self.y = rv.extras.rhk
