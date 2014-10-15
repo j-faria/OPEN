@@ -40,9 +40,16 @@ def day2year(day):
     
     
 def rms(array):
-    return sqrt(sum(n*n for n in array)/len(array))
+    """ Root mean square of array"""
+    return sqrt(sum(x*x for x in array)/len(array))
+
+def wrms(array, weights):
+    """ Root mean square of array"""
+    w = weights #/ sum(weights)
+    # return sqrt(sum(x*x for x in array*w))
+    return sqrt(sum(w*(array - np.average(array, weights=w))**2) / sum(w))
     
-    
+ 
 def stdout_write(msg):
 	""" Print to stdout (without carriage return) and flush right away.
 	Useful to print in the same line """
