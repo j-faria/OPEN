@@ -21,7 +21,7 @@ FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none -fopenmp"
 
 
 # --- targets
-all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so
+all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so lopast.so julian.so
 	@echo "Done!"
 
 
@@ -49,6 +49,13 @@ GPPATH = ../multinest
 gp.so: $(GPPATH)/gp.so
 	cp $(GPPATH)/gp.so .
 
+## compile low-pass filter function
+lopast.so: lopast.f90
+	@$(FPY) -m lopast -c $< $(FPYFLAGS)
+
+## compile Julian date conversion functions
+julian.so: julday.f caldat.f
+	@$(FPY) -m julian -c $^ $(FPYFLAGS)
 
 ## compile Dawson-Fabrycky special periodogram
 periodogram_DF.so: periodogram_DF.c
@@ -57,7 +64,7 @@ periodogram_DF.so: periodogram_DF.c
 
 # --- remove binary and executable files
 clean:
-	rm -f *.so
+	rm -f glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so lopast.so julian.so
 
 
 ## compile bayesian lomb scargle periodogram with additional outputs
