@@ -10,7 +10,7 @@ use array_utils, only: linspace, get_diagonal, sort
 use gputils
    
 implicit none
-   
+
 contains
 
 
@@ -58,6 +58,7 @@ contains
 		integer context ! additional information user wants to pass
 
 		! Local variables
+		double precision kmax
 		integer i, j
 		
 
@@ -101,16 +102,26 @@ contains
 			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 		end do
 
-		! prior for semi-amplitude(s)
-		do i = 2, nPar-nextra, 5
-			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-		end do
-
 		! priors for ecc, omega, t0
 		do i = 3, nPar-nextra, 5
 			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
 			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
 			Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
+		end do
+
+		! prior for semi-amplitude(s)
+		! this has to be set after eccentricity has been rescaled. If the ecc prior is uniform, it 
+		! does not matter but if not, we need here the rescaled value.
+		! The upper limit is set to Kmax (Pmin / P)^1/3  * (1/ sqrt(1 − e^2))
+		! see Eq. (14) of Gregory 2007 [2007MNRAS.374.1321G]
+		do i = 2, nPar-nextra, 5
+			!Cube(i+1) is this planet's eccentricity
+			!Cube(i-1) is this planet's period
+			!kmax = spriorran(i,2)
+			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
+			!print *, kmax, Cube(i+1)
+			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			!print *, Cube(i)
 		end do
 
 
@@ -214,13 +225,36 @@ contains
 			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+6:nPar*4)
 
-		else if (nplanets == 0) then  ! 4 hyper (plus one systematic velocity)
+		else if (nplanets == 3 .and. using_gp) then  ! 3 planets + 4 hyper
+			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*3+10)
+			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+11:nPar*4 - 4)
+
+			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
+			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 3:)
+
+		else if (nplanets == 3) then  ! 3 planets
+			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*3+10)
+			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+11:nPar*4)
+
+		else if (nplanets == 0 .and. using_gp) then  ! 4 hyper (plus one systematic velocity)
 			write(*,'(a13)') (/" vsys" /)
 			write(fmt,'(a,i2,a)')  '(', 1, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1)
 			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
 			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+2:)
+
+		else if (nplanets == 0) then  ! one systematic velocity
+			write(*,'(a13)') (/" vsys" /)
+			write(fmt,'(a,i2,a)')  '(', 1, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1)
 
 		end if
 		write(*,*) ' '
