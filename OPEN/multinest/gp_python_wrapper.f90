@@ -1,4 +1,4 @@
-subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, nplanets, nt)
+subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, meanf, nplanets, nt)
     use gputils
     implicit none
 
@@ -17,6 +17,7 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, nplanets,
     integer, intent(in) :: nplanets
     real(kind=8), intent(in), dimension(5*nplanets+1) :: planetpar
     real(kind=8), intent(in), dimension(4) :: hyperpar
+    character(len=*), intent(in) :: meanf
 
     !! Gaussian process variables
     !type(WhiteKernel), target :: k2
@@ -40,7 +41,12 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, nplanets,
     kernel_to_pass => k8
 
     gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
-    gp1%mean_fun => mean_fun_keplerian
+    if (meanf == 'constant') then
+        print *, 'constant'
+        gp1%mean_fun => mean_fun_constant
+    else
+        gp1%mean_fun => mean_fun_keplerian
+    endif
 
     gp_n_planets = nplanets
     gp_n_planet_pars = 5*nplanets + 1
