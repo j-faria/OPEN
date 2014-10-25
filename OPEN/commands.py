@@ -28,6 +28,7 @@ from .utils import stdout_write, selectable_plot, write_yorbit_macro
 from .logger import clogger, logging
 import core
 import periodograms
+from .ext.lopast import lopast
 
 ################################################################################
 ################################################################################
@@ -58,33 +59,34 @@ Options:
 plot_usage = \
 """
 Usage:
-    plot (obs | fwhm | rhk | s | bis | contrast) [--save=filename]
+    plot (obs | fwhm | rhk | s | bis | contrast | resid) [--save=filename]
     plot -n SYSTEM
     plot -h | --help
 Options:
-    -n SYSTEM   Specify name of system (else use default)
-    -h --help   Show this help message
+    -n SYSTEM        Specify name of system (else use default)
+    --save=filename  Save figure as filename
+    -h --help        Show this help message
 """
 
 per_usage = \
 """
 Usage:
-    per obs
     per -n SYSTEM
-    per (obs |bis |fwhm |rhk |contrast |resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap]
+    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--save=filename]
     per -h | --help
 Options:
-    -n SYSTEM     Specify name of system (else use default)
-    -g --gls      Calculate the Generalized Lomb-Scargle periodogram (default)
-    -m --bgls     Calculate the Bayesian Generalized Lomb-Scargle periodogram
-    -b --bayes    Calculate the Bayesian LS periodogram
-    -l --ls       Calculate the Lomb-Scargle periodogram with fast algorithm
-    -f --force    Force recalculation
-    --hifac=<hf>  hifac * Nyquist is lowest frequency used [default: 40]
-    --ofac=<of>   Oversampling factor [default: 6]
-    --fap         Plot false alarm probabilities
-    -v --verbose  Verbose statistical output 
-    -h --help   Show this help message
+    -n SYSTEM        Specify name of system (else use default)
+    -g --gls         Calculate the Generalized Lomb-Scargle periodogram (default)
+    -m --bgls        Calculate the Bayesian Generalized Lomb-Scargle periodogram
+    -b --bayes       Calculate the Bayesian LS periodogram
+    -l --ls          Calculate the Lomb-Scargle periodogram with fast algorithm
+    -f --force       Force recalculation
+    --hifac=<hf>     hifac * Nyquist is lowest frequency used [default: 40]
+    --ofac=<of>      Oversampling factor [default: 6]
+    --fap            Plot false alarm probabilities
+    --save=filename  Save figure as filename
+    -v --verbose     Verbose statistical output 
+    -h --help        Show this help message
 """
 
 
@@ -124,9 +126,10 @@ Options:
 correlate_usage = \
 """
 Usage:
-    correlate <var1> <var2> [-v] 
+    correlate <var1> <var2> [-v] [-r]
 Options:
     -v --verbose  Verbose statistical output 
+    -r --remove   Remove linear dependence from RV
 """
 
 
@@ -181,12 +184,16 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [--ncpu=<cpu>]
+    nest [-u] [-r] [--gp] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
 Options
-    -u           User sets the namelist file
-    -r           Resume from a previous MultiNest run
-    --gp         Perform model selection within Gaussian Process framework
-    --ncpu=<cpu> Number of threads to use [default: all available]
+    -u            User sets the namelist file
+    -r            Resume from a previous MultiNest run
+    --gp          Perform model selection within Gaussian Process framework
+    --train=None  Train the GP on quantity before using it in the RVs
+    --lin=None    Include linear dependence on quantity in the model
+    --ncpu=<cpu>  Number of threads to use [default: all available]
+    --noplot      Do not produce result plots
+    --feed        Force progress feedback
 """
 
 restrict_usage = \
@@ -392,7 +399,10 @@ class EmbeddedMagics(Magics):
         
         # plot the observed radial velocities
         if args['obs']:
-            system.do_plot_obs()
+            system.do_plot_obs(save=args['--save'])
+        # plot residuals from fit
+        if args['resid']:
+            system.do_plot_resid(save=args['--save'])
 
         # plot other quantities
         extras_available = ['fwhm', 'contrast', 'bis_span', 'noise', 
@@ -404,7 +414,7 @@ class EmbeddedMagics(Magics):
         for i, e in enumerate(extras_available):
             try:
                 if args[extras_mapping[i]]: 
-                    system.do_plot_extras(e)
+                    system.do_plot_extras(e, save=args['--save'])
                     return
             except KeyError:
                 pass
@@ -422,7 +432,7 @@ class EmbeddedMagics(Magics):
             return
         except SystemExit:
             return
-        #print args
+        # print args
         
         # use default system or user defined
         try:
@@ -471,27 +481,27 @@ class EmbeddedMagics(Magics):
                 if system.per.name != name:
                     raise AttributeError
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=args['--fap'])
+                system.per._plot(doFAP=args['--fap'], save=args['--save'])
             except AttributeError:
                 system.per = per_fcn(system, hifac=hf, ofac=of)
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=args['--fap'])
+                system.per._plot(doFAP=args['--fap'], save=args['--save'])
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
             system.bis_per = per_fcn(system, hifac=hf, ofac=of, quantity='bis')
-            system.bis_per._plot()
+            system.bis_per._plot(save=args['--save'])
 
         if args['fwhm']: # periodogram of the CCF's fwhm
             system.fwhm_per = per_fcn(system, hifac=hf, ofac=of, quantity='fwhm')
-            system.fwhm_per._plot()
+            system.fwhm_per._plot(save=args['--save'])
 
         if args['rhk']: # periodogram of rhk
             system.rhk_per = per_fcn(system, hifac=hf, ofac=of, quantity='rhk')
-            system.rhk_per._plot()
+            system.rhk_per._plot(save=args['--save'])
 
         if args['contrast']: # periodogram of contrast
             system.contrast_per = per_fcn(system, hifac=hf, ofac=of, quantity='contrast')
-            system.contrast_per._plot()
+            system.contrast_per._plot(save=args['--save'])
 
 
         if args['resid']: # periodogram of the residuals of the current fit
@@ -635,7 +645,8 @@ class EmbeddedMagics(Magics):
         if args == 1: return
         #print args
 
-        verb = True if args['--verbose'] else False
+        verb = args['--verbose']
+        rem = args['--remove']
 
         if local_ns.has_key('default'):
             system = local_ns['default']
@@ -647,7 +658,7 @@ class EmbeddedMagics(Magics):
 
         var1 = args['<var1>']
         var2 = args['<var2>']
-        result = core.do_correlate(system, vars=(var1, var2), verbose=verb)
+        result = core.do_correlate(system, vars=(var1, var2), verbose=verb, remove=rem)
 
     @needs_local_scope
     @line_magic
@@ -834,11 +845,11 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if local_ns.has_key('default'):
                 system = local_ns['default']
-            else:
-                system_name = args['-n']
-                system = local_ns[system_name]
+            # else:
+            #     system_name = args['-n']
+            #     system = local_ns[system_name]
         except KeyError:
             from shell_colors import red
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -846,12 +857,13 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return 
 
-        f = 1./950
+        f = 1./60
 
         msg = blue('INFO: ') + 'Converting to m/s'
         clogger.info(msg)
 
-        system.vrad = lopast(system.vrad, system.time, f)
+        temp = lopast(system.extras.rhk, system.time, f)
+        system.vrad = system.vrad - temp
 
 
     @needs_local_scope
@@ -874,15 +886,7 @@ class EmbeddedMagics(Magics):
             return
         except SystemExit:
             return
-
-        user = args['-u']
-        resume = args['-r']
-        gp = args['--gp']
-
-        try: 
-            ncpu = int(args['--ncpu'])
-        except TypeError:
-            ncpu = None
+        # print args
 
         if local_ns.has_key('default'):
             system = local_ns['default']
@@ -892,7 +896,29 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user, gp, resume=resume, ncpu=ncpu)
+        user = args['-u']
+        resume = args['-r']
+        gp = args['--gp']
+        doplot = not args['--noplot']
+        dofeedback = args['--feed']
+
+        try: 
+            ncpu = int(args['--ncpu'])
+        except TypeError:
+            ncpu = None
+
+        train_quantity = args['--train'] if bool(args['--train']) else None
+        lin_quantity = args['--lin'] if bool(args['--lin']) else None
+
+        if bool(args['--train']) and not system.is_in_extras(train_quantity):
+            msg = red('ERROR: ') + 'The name "%s" is not available in extras.\n' % train_quantity
+            clogger.fatal(msg)
+            return
+
+        core.do_multinest(system, user, gp,
+                          resume=resume, ncpu=ncpu, training=train_quantity,
+                          lin=lin_quantity, doplot=doplot, feed=dofeedback)
+
 
     @needs_local_scope
     @line_magic

@@ -133,7 +133,11 @@ class rvSeries:
         tspan = max(t) - min(t)
         rvspan = max(rv) - min(rv)
         stats = '\n'
-        stats += info + "Timespan : %f days = %f years   ---   %f JD, %f JD\n" % (tspan, day2year(tspan), min(t), max(t))
+        if len(self.provenance) > 1:
+            stats += info + "Total number of measurements: %d\n" % sum([i[0] for i in self.provenance.values()])
+            stats += sinfo + "Timespan : %f days = %f years   ---   %f JD, %f JD\n" % (tspan, day2year(tspan), min(t), max(t))
+        else:
+            stats += info + "Timespan : %f days = %f years   ---   %f JD, %f JD\n" % (tspan, day2year(tspan), min(t), max(t))
         stats += sinfo + "RV span  : %f km/s = %f m/s\n" % (rvspan, rvspan*1e3)
         stats += sinfo + "RV rms [m/s] : %f\n\n" % rms(rv*1e3)
         stats += sinfo + "{:14s} : {:10.3f}\n".format('<RV> [m/s]', np.mean(rv*1e3))
@@ -166,7 +170,7 @@ class rvSeries:
 
             
 
-    def do_plot_obs(self, newFig=True, leg=True):
+    def do_plot_obs(self, newFig=True, leg=True, save=None):
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled.
         """
@@ -200,11 +204,15 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
-
-
         if leg: ax1.legend()
         plt.tight_layout()
         ax2.ticklabel_format(useOffset=False)
+
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
+
         # plt.show()
         # pg.QtGui.QApplication.exec_()
 
@@ -253,13 +261,15 @@ class rvSeries:
         plt.ticklabel_format(useOffset=False)
         plt.show()
 
-    def do_plot_extras(self, extra):
+    def do_plot_extras(self, extra, save=None):
         """ Plot other observed quantities as a function of time.
 
         Parameters
         ----------
         extra: string
           One of the quantities available in system.extras
+        save: None or string
+          If not None, save figure with filename save (can have extension; default:png)
         """
         # import pyqtgraph as pg
 
@@ -292,6 +302,11 @@ class rvSeries:
         plt.minorticks_on()
         plt.tight_layout()
         plt.show()
+
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
         # pg.QtGui.QApplication.exec_()
 
     def do_plot_fit(self):
@@ -362,6 +377,56 @@ class rvSeries:
         #   ax.plot( np.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
 
         plt.show()
+
+    def do_plot_resid(self, newFig=True, leg=True, save=None):
+        """ Plot the residuals from a fit as a function of time.
+        Data from each file are color coded and labeled.
+        """
+        if self.fit is None:  # there is no fit yet
+            clogger.warning(yellow('Warning: ')+'This system does not have a fit')
+            return
+
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t, err = self.time, self.error # temporaries
+        r = self.fit['residuals']
+        
+        if newFig: 
+            fig = plt.figure()
+        ax2 = fig.add_subplot(111)
+        ax2.set_xlabel('Time [days]', labelpad=20)
+        ax2.set_ylabel('Residuals [%s]'%self.units)
+        
+        ny, years = self.get_years_observations()
+        ax1 = ax2.twiny()
+        ax1.xaxis.tick_bottom()
+        ax2.xaxis.tick_top()
+        ax2.plot(years, np.ones_like(years), alpha=0) # Create a dummy plot
+
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+            ax1.errorbar(t[:m], r[:m], yerr=err[:m], \
+                         fmt='o'+colors[i], label=os.path.basename(fname))
+            t, err = t[m:], err[m:]
+        
+        ax1.axhline(y=0, ls='--', color='k')
+
+        if leg: ax1.legend()
+        plt.tight_layout()
+        ax2.ticklabel_format(useOffset=False)
+
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
+        # plt.show()
+        # pg.QtGui.QApplication.exec_()
 
     def save_fit(self, params, chi2):
         """ Helper function to save results from a fit to the system """
@@ -458,8 +523,12 @@ class rvSeries:
             return 0.5*1./np.mean(self.time[1::]-self.time[0:-1])
 
     def get_years_observations(self):
-        _, _, y1 = caldat(24e5+self.time[0])
-        _, _, y2 = caldat(24e5+self.time[-1])
+        if self.time[0] / 24e5 > 1:
+            bjd0 = 0
+        else:
+            bjd0 = 24e5
+        _, _, y1 = caldat(bjd0+self.time[0])
+        _, _, y2 = caldat(bjd0+self.time[-1])
         return len(np.arange(y1, y2)), np.arange(y1, y2)
 
     def get_time_to_plot(self):
@@ -651,52 +720,56 @@ class PeriodogramBase:
         # #       print k
         #         maxPowers.append(powermaxP)
 
-    def _plot(self, doFAP=False, faps=None, verts=None, newFig=True, axes=None, **kwargs):
-      """
-        Create a plot.
-      """
-      xlabel = 'Period [d]'
-      ylabel = 'Power'
+    def _plot(self, doFAP=False, faps=None, verts=None, newFig=True, axes=None, save=None, **kwargs):
+        """
+        Plot this periodogram.
+        """
+        xlabel = 'Period [d]'
+        ylabel = 'Power'
 
-      if newFig: 
-        self.fig = plt.figure()
+        if newFig: 
+            self.fig = plt.figure()
 
-      if axes is None:
-        self.ax = self.fig.add_subplot(1,1,1)
-      else:
-        self.ax = axes
+        if axes is None:
+            self.ax = self.fig.add_subplot(1,1,1)
+        else:
+            self.ax = axes
 
-      self.ax.set_title("Normalized periodogram")
-      self.ax.set_xlabel(xlabel)
-      self.ax.set_ylabel(ylabel)
-      if self.power.max() < 1e-300:  # apparently, Metplotlib can't plot these small values
-        clogger.warning(yellow('Warning: ')+'Max value < 1e-300, plotting normalized periodogram')
-        self.ax.semilogx(1./self.freq, self.power/self.power.max(), 'b-', **kwargs)
-      else:
-        self.ax.semilogx(1./self.freq, self.power, 'b-', **kwargs)
-      # plot FAPs
-      if doFAP and (faps is None):
-        clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
-      if doFAP: # do default FAPs of 10%, 1% and 0.1%
-        pmin = 1./self.freq.min()
-        pmax = 1./self.freq.max()
-        plvl1 = self.powerLevel(0.1) # 10% FAP
-        plvl2 = self.powerLevel(0.01) # 1% FAP
-        plvl3 = self.powerLevel(0.001) # 0.1% FAP
-        self.ax.axhline(y=plvl1, color='k', ls='-', label='10%')
-        self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
-        self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
-        self.ax.legend(frameon=True)
+        self.ax.set_title("Normalized periodogram")
+        self.ax.set_xlabel(xlabel)
+        self.ax.set_ylabel(ylabel)
+        if self.power.max() < 1e-300:  # apparently, Metplotlib can't plot these small values
+            clogger.warning(yellow('Warning: ')+'Max value < 1e-300, plotting normalized periodogram')
+            self.ax.semilogx(1./self.freq, self.power/self.power.max(), 'b-', **kwargs)
+        else:
+            self.ax.semilogx(1./self.freq, self.power, 'b-', **kwargs)
+        # plot FAPs
+        if doFAP and (faps is None):
+            clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
+        if doFAP: # do default FAPs of 10%, 1% and 0.1%
+            pmin = 1./self.freq.min()
+            pmax = 1./self.freq.max()
+            plvl1 = self.powerLevel(0.1) # 10% FAP
+            plvl2 = self.powerLevel(0.01) # 1% FAP
+            plvl3 = self.powerLevel(0.001) # 0.1% FAP
+            self.ax.axhline(y=plvl1, color='k', ls='-', label='10%')
+            self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
+            self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
+            self.ax.legend(frameon=True)
 
-      # plot vertical lines
-      if verts is not None:
-        for v in verts:
-          self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5) 
-          # if v==18:
-          #   self.ax.axvline(x=v, color='r', ls='--', lw=2) 
+        # plot vertical lines
+        if verts is not None:
+            for v in verts:
+                self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5) 
+                # if v==18:
+                #   self.ax.axvline(x=v, color='r', ls='--', lw=2) 
 
+        plt.tight_layout()
 
-      plt.tight_layout()
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
 
     def _plot_pg(self, doFAP=False, verts=None, newFig=True, axes=None):
 
@@ -1123,11 +1196,12 @@ class MCMC_nest:
         try:
             self.NS_lnE = float(stats[0].split()[-3])
             self.NS_lnE_error = float(stats[0].split()[-1])
-
+        except ValueError:
+            self.NS_lnE, self.NS_lnE_error = 0, 0
+        try:
             self.INS_lnE = float(stats[1].split()[-3])
             self.INS_lnE_error = float(stats[1].split()[-1])
         except ValueError:
-            self.NS_lnE, self.NS_lnE_error = 0, 0
             self.INS_lnE, self.INS_lnE_error = 0, 0
 
         ## mean params
@@ -1226,8 +1300,11 @@ class MCMC_nest:
         t, rv, err = system.time, system.vrad, system.error # temporaries
         vel = np.zeros_like(t)
 
+        if self.npar == 1:  # systematic velocity only
+            vel = self.par_map[0]
+
         ## MAP estimate of the parameters
-        if self.gp:
+        elif self.gp:
             par_map = self.par_map[:-4] 
             hyper_map = self.par_map[-4:]
             if self.gp_only:
@@ -1351,7 +1428,7 @@ class MCMC_nest:
             t, rv, err = t[m:], rv[m:], err[m:]
         
         plt.xlabel('Time [days]')
-        plt.ylabel('RV [km/s]')
+        plt.ylabel('RV [%s]'%system.units)
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
@@ -1376,13 +1453,15 @@ class MCMC_nest:
             plt.plot(t[j*s : (j+1)*s])
 
     def do_plot_map(self, system):
-        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         tt = system.get_time_to_plot()
         vel = np.zeros_like(tt)
 
         ## MAP estimate of the parameters
-        if self.gp:
+        if self.npar == 1:  # systematic velocity only
+            vel = self.par_map[0] * np.ones_like(tt)
+        elif self.gp:
             par_map = self.par_map[:-4] 
             hyper_map = self.par_map[-4:]
             if self.gp_only:
@@ -1402,7 +1481,9 @@ class MCMC_nest:
         ax1 = plt.subplot(gs[0])
         ax2 = plt.subplot(gs[1], sharex=ax1, sharey=ax1)
 
-        if not self.gp_only:
+        if self.npar == 1:  # systematic velocity only
+            ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
+        elif not self.gp_only:
             # plot best solution
             P = par_map[:-1:5]
             K = par_map[1:-1:5]
@@ -1422,8 +1503,8 @@ class MCMC_nest:
                                           color='k', alpha=0.3, label='2*std')
 
         vel = np.zeros_like(t)
-        if self.gp_only:
-            vel = par_map[0]
+        if self.gp_only or self.npar == 1:
+            vel = self.par_map[0] * np.ones_like(tt)
         else:
             args = [t] + par + [vel]
             get_rvn(*args)
@@ -1452,16 +1533,16 @@ class MCMC_nest:
         ax2.axhline(y=0, ls='--', color='k')
 
         ax2.set_xlabel('Time [days]')
-        ax1.set_ylabel('RV [km/s]')
-        ax2.set_ylabel('Residuals [km/s]')
+        ax1.set_ylabel('RV [%s]'%system.units)
+        ax2.set_ylabel('Residuals [%s]'%system.units)
         ax1.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
         plt.show()
 
 
-    def do_plot_map_phased(self, system):
-        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+    def do_plot_map_phased(self, system, noname=False, plot_gp=True):
+        colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         tt = system.get_time_to_plot()
         vel = np.zeros_like(tt)
@@ -1493,9 +1574,11 @@ class MCMC_nest:
         get_rvn(*args)
         phase = ((tt - t0) / P) % 1.0
         plt.plot(np.sort(phase), vel[np.argsort(phase)], '-g', lw=2.5, label='MAP')
+        plt.plot(np.sort(phase)+1, vel[np.argsort(phase)], '-g', lw=2.5)
+        plt.plot(np.sort(phase)-1, vel[np.argsort(phase)], '-g', lw=2.5)
 
         # plot GP predictions
-        if self.gp:
+        if self.gp and plot_gp:
             phase = ((self.pred_t - t0) / P) % 1.0
             indices = np.argsort(phase)
             plt.plot(np.sort(phase), self.pred_y[indices], '-k', lw=0.5, alpha=0.6, label='GP mean')
@@ -1517,11 +1600,16 @@ class MCMC_nest:
             phase = ((t[:m] - t0) / P) % 1.0
             plt.errorbar(np.sort(phase), rv[np.argsort(phase)], yerr=err[np.argsort(phase)], \
                          fmt='o'+colors[i], label=os.path.basename(fname))
+            plt.errorbar(np.sort(phase)+1, rv[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                         fmt='o'+colors[i])
+            plt.errorbar(np.sort(phase)-1, rv[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                         fmt='o'+colors[i])
             t, rv, err = t[m:], rv[m:], err[m:]
         
+        plt.xlim([-0.2, 1.2])
         plt.xlabel('Phase')
-        plt.ylabel('RV [km/s]')
-        plt.legend()
+        plt.ylabel('RV [%s]'%system.units)
+        if not noname: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
         plt.show()
