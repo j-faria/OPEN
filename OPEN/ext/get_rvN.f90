@@ -36,7 +36,7 @@ subroutine get_rvN(time, P, K, ecc, omega, t0, vsys, vel, nt, np)
 
     vel = vsys
     do i=1,np
-      vel = vel - rv_curve(time, P(i), K(i), ecc(i), omega(i), t0(i))
+      vel = vel + rv_curve(time, P(i), K(i), ecc(i), omega(i), t0(i))
     end do 
     
 

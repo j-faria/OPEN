@@ -43,6 +43,9 @@ all:
 # all: nest get_rv1.so get_rvN.so # covmat
 fortran: nest
 
+get_rvN.f90: ../ext/get_rvN.f90
+	ln -s ../ext/get_rvN.f90 get_rvN.f90
+
 test: get_rv1.so get_rvN.so
 	python test.py
 	ndiff test/out_test.txt test/out_normal.txt -relerr 1.0e-5
