@@ -509,6 +509,26 @@ class EmbeddedMagics(Magics):
 
     @needs_local_scope
     @line_magic
+    def clean(self, parameter_s='', local_ns=None):
+        """ 
+        Deconvolves the LS periodogram from the window function 
+        using the CLEAN algorithm (Roberts et al. 1985)
+        """
+        # use default system or user defined
+        try:
+            if local_ns.has_key('default'):
+                system = local_ns['default']
+        except KeyError:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.do_clean(system)
+
+    @needs_local_scope
+    @line_magic
     def wf(self, parameter_s='', local_ns=None):
         """ Calculate the spectral window function of the observations. 
         Type 'wf -h' for more help. """

@@ -39,6 +39,12 @@ try:
 	periodogram_DF_available = True
 except ImportError:
 	periodogram_DF_available = False
+try:
+	from ext.periodogram_CLEAN import clean
+	periodogram_CLEAN_available = True
+except ImportError:
+	periodogram_CLEAN_available = False
+
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date, ask_yes_no, get_number_cores
 
@@ -736,7 +742,7 @@ def do_lm(system, x0):
 def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=None, doplot=True, feed=False):
 	from time import sleep, time
 
-	def get_multinest_output(root, nplanets, gp_context=1):
+	def get_multinest_output(root, nplanets, context='111'):
 		msg = blue('INFO: ') + 'Analysing output...'
 		clogger.info(msg)
 
@@ -745,7 +751,7 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 			nlines = len(stats)
 
 		npar = (nlines - 10) / 3
-		if gp_context == 3: return
+		if context[2] == '3': return
 
 		try:
 			NS_lnE = float(stats[0].split()[-3])
@@ -787,13 +793,13 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('omega', par_mean[5*i+3], par_sigma[5*i+3], par_mle[5*i+3], par_map[5*i+3])
 			print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
 		print yellow('system')
-		if npar in (7, 12):
+		if context[2] == '2':
 			# jitter parameter
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])
-		if gp_context == 1:
+		if context[0] == '1':
 			# in this case, the vsys parameters is the last one
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
-		elif gp_context == 2:
+		elif context[0] == '2':
 			# in this case, the vsys is before the hyperparameters
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
 
@@ -873,8 +879,12 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 		l1 = [line for line in namelist_lines 
 		             if ('nest_context' in line) and not line.strip().startswith('!')][0]
 		user_gp_context = int(l1.split('=')[1].strip()[0])
+
 		# how many planets are in the model
 		nplanets = int(l1.split('=')[1].strip()[1])
+
+		# the full context
+		full_context = l1.split('=')[1].strip()
 
 		# if resuming from a previous run, set the appropriate namelist flag
 		if resume:
@@ -922,8 +932,9 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
 		clogger.info(msg)
 
-		get_multinest_output(root_path, nplanets, gp_context=user_gp_context)
-		system.results = MCMC_nest(root_path, gp_context=user_gp_context)
+		# return
+		get_multinest_output(root_path, nplanets, context=full_context)
+		system.results = MCMC_nest(root_path, context=full_context)
 
 		if doplot:
 			system.results.do_plot_map(system)
@@ -1210,6 +1221,9 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 	return
 
 def do_correlate(system, vars=(), verbose=False, remove=False):
+	"""
+	Correlations between radial velocities and/or other diagnostics
+	"""
 	# just to be sure, but this should not pass through docopt in commands.py
 	if len(vars) != 2: return
 
@@ -1758,6 +1772,51 @@ def do_Dawson_Fabrycky(system):
 
 	# savefig(name+'_DF.ps',orientation = 'Landscape')
 	show()
+
+
+def do_clean(system):
+	""" Run the CLEAN algorithm """
+
+	if not periodogram_CLEAN_available:
+		msg = red('ERROR: ') + 'This extension is not available. Something went wrong on install...'
+		clogger.fatal(msg)
+		return
+
+	time, rv, err = system.time, system.vrad, system.error
+	plow = 1.0
+
+	msg = blue('INFO: ') + 'Running CLEAN...'
+	clogger.info(msg)
+
+	# run CLEAN
+	df, Nf, niter, D_r, D_i, W_r, W_i, C_r, C_i = clean(time, rv, err, plow)
+
+	# get the amplitudes of the complex CLEANed spectrum
+	C = C_r * C_r + C_i * C_i
+
+	msg = yellow('    : ') + 'number of iterations: %d\n' % niter
+	msg += yellow('    : ') + 'CLEAN spectrum resolution: %8.3e [day^-1]\n' % df
+	msg += yellow('    : ') + 'CLEAN spectrum Pmin: %5.3f [days]\n' % plow
+	msg += yellow('    : ') + 'Normalizing CLEAN spectrum by %8.3e\n' % (max(C),)
+	clogger.info(msg)
+
+	# Define the frequency ranges for Dnu/Cnu and Wnu
+	nu1 = np.arange(-Nf*df, Nf*df+df, df)
+	# nu2 = np.arange(-Nf*df*2, 2*Nf*df+df, df)
+
+	if len(nu1) == len(C) + 1:
+		nu1 = nu1[:-1]
+
+	# (arbitrary) renormalization
+	C = C / max(C)
+
+	plt.figure()
+	ax1 = plt.subplot(111)
+	ax1.semilogx((1./nu1), C,'k-')
+	ax1.set_xlabel('Period [d]')
+	ax1.set_ylabel('Arbitrary power')
+	plt.show()
+
 
 
 def do_create_planets(s):
