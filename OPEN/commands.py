@@ -16,15 +16,14 @@ from itertools import chain
 from IPython.core.magic import (Magics, magics_class, line_magic, 
                                 needs_local_scope)
 from IPython.core.magic_arguments import argument
-from IPython.utils.io import ask_yes_no
 
 # other imports
-from numpy import sqrt, mean, min
+from numpy import sqrt, mean, min, delete
 
 # intra-package imports
 from .docopt import docopt, DocoptExit
 from .classes import rvSeries
-from .utils import stdout_write, selectable_plot, write_yorbit_macro
+from .utils import stdout_write, ask_yes_no, selectable_plot, write_yorbit_macro
 from .logger import clogger, logging
 import core
 import periodograms
@@ -261,24 +260,24 @@ command_list = \
 @magics_class
 class EmbeddedMagics(Magics):
 
-    @line_magic
-    def kill_embedded(self, parameter_s=''):
-        """%kill_embedded : deactivate for good the current embedded IPython.
+    # @line_magic
+    # def kill_embedded(self, parameter_s=''):
+    #     """%kill_embedded : deactivate for good the current embedded IPython.
 
-        This function (after asking for confirmation) sets an internal flag so
-        that an embedded IPython will never activate again.  This is useful to
-        permanently disable a shell that is being called inside a loop: once
-        you've figured out what you needed from it, you may then kill it and
-        the program will then continue to run without the interactive shell
-        interfering again.
-        """
+    #     This function (after asking for confirmation) sets an internal flag so
+    #     that an embedded IPython will never activate again.  This is useful to
+    #     permanently disable a shell that is being called inside a loop: once
+    #     you've figured out what you needed from it, you may then kill it and
+    #     the program will then continue to run without the interactive shell
+    #     interfering again.
+    #     """
 
-        kill = ask_yes_no("Are you sure you want to kill this embedded instance "
-                         "(y/n)? [y/N] ",'n')
-        if kill:
-            self.shell.embedded_active = False
-            print ("This embedded IPython will not reactivate anymore "
-                   "once you exit.")
+    #     kill = ask_yes_no("Are you sure you want to kill this embedded instance "
+    #                      "(y/n)? [y/N] ",'n')
+    #     if kill:
+    #         self.shell.embedded_active = False
+    #         print ("This embedded IPython will not reactivate anymore "
+    #                "once you exit.")
 
 
     @line_magic
@@ -986,7 +985,24 @@ class EmbeddedMagics(Magics):
             core.do_restrict(system, 'years', yr1, yr2)
 
         if args['--gui']:
-            selectable_plot([1,2,3], [4, 16, 32], 'ro')
+            ind_to_remove = selectable_plot(system, style='ro')
+            n = len(ind_to_remove)
+            if n == 0:
+                msg = blue('    : ') + 'Not removing any observations'
+                clogger.info(msg)
+                return
+
+            if ask_yes_no('Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
+                # remove observations with indices ind_to_remove from
+                # system.(time,vrad,error); leave *_full arrays intact
+                system.time = delete(system.time, ind_to_remove)
+                system.vrad = delete(system.vrad, ind_to_remove)
+                system.error = delete(system.error, ind_to_remove)
+                msg = blue('    : ') + 'Done'
+                clogger.info(msg)                
+            else:
+                msg = blue('    : ') + 'Not removing any observations.'
+                clogger.info(msg)                
 
 
     @needs_local_scope
