@@ -10,6 +10,10 @@ module gputils
 	integer, save :: gp_n_planets
 	integer, save :: gp_n_planet_pars ! this should be 5*nplanets + 1*nobservatories
 
+	! arrays holding variables on which the RVs depend linearly - used in mean_fun_keplerian_plus_lin
+	real(kind=8), allocatable, dimension(:), save :: linvar1, linvar2, linvar3
+
+
 	! base type for Gaussian Process kernels
 	type Kernel
 		real(kind=8), dimension(:), allocatable :: pars
@@ -517,7 +521,6 @@ contains
 		n = size(x)
 
 		! ATTENTION: the systematic velocity argument below only allows for one observatory!!!
-
 		call get_rvN(x, &
 					 args(1:gp_n_planet_pars-1:5), & ! periods for all planets
 					 args(2:gp_n_planet_pars-1:5), & ! K for all planets
@@ -528,6 +531,29 @@ contains
 					 mean, n, gp_n_planets)
 
 	end function mean_fun_keplerian
+
+	function mean_fun_keplerian_plus_lin(x, args) result(mean)
+		! Keplerian mean function plus linear dependence on other variables
+		!  args should contain [ (P,K,ecc,omega,t0)*nplanets, vsys ]
+		real(kind=8), dimension(:), intent(in) :: x, args
+		real(kind=8), dimension(size(x)) :: mean
+		integer :: n
+		n = size(x)
+
+		! ATTENTION: the systematic velocity argument below only allows for one observatory!!!
+		call get_rvN(x, &
+					 args(1:gp_n_planet_pars-1:5), & ! periods for all planets
+					 args(2:gp_n_planet_pars-1:5), & ! K for all planets
+					 args(3:gp_n_planet_pars-1:5), & ! ecc for all planets
+					 args(4:gp_n_planet_pars-1:5), & ! omega for all planets
+					 args(5:gp_n_planet_pars-1:5), & ! t0 for all planets
+					 args(gp_n_planet_pars), & ! systematic velocity
+					 mean, n, gp_n_planets)
+
+		mean = mean + 1.0d0 * linvar1
+
+	end function mean_fun_keplerian_plus_lin
+
 
 	function is_posdef(self) result(is)
 		class(GP), intent(in) :: self
