@@ -44,7 +44,7 @@ all:
 fortran: nest
 
 get_rvN.f90: ../ext/get_rvN.f90
-	ln -s ../ext/get_rvN.f90 get_rvN.f90
+	ln -s -f $< $@
 
 test: get_rv1.so get_rvN.so
 	python test.py
@@ -76,7 +76,7 @@ gp.so: gp_python_wrapper.f90 gp_utils.o array_utils.o get_rvN.o
 
 
 clean: 
-	rm -f nest *.so *.o $(MN_OBJ) 
+	rm -f nest *.so *.o $(MN_OBJ) *.mod
 
 cleanall:
 	rm -f nest *.so *.o *.mod $(MN_OBJ) chains/* covmat

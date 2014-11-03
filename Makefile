@@ -16,7 +16,7 @@ FCPATH = /opt/mesasdk/bin/gfortran
 LAPACKLIB = -llapack 
 # LAPACKLIB = -L/data/jfaria/mesasdk/mesasdk -llapack 
 
-PROFFILING = "true"
+PROFFILING = "false"
 
 
 NO_COLOR=\033[0m
@@ -63,7 +63,7 @@ nest: MultiNest
 	@echo "Compiling OPEN-MultiNest interface..."
 	@make clean -C ./OPEN/multinest --quiet 
 ifdef mpif90_version
-	@make nest -C ./OPEN/multinest --quiet
+	make nest -C ./OPEN/multinest
 	@make gp.so -C ./OPEN/multinest --quiet
 else
 	@make nest -C ./OPEN/multinest WITHOUT_MPI=1 --quiet
