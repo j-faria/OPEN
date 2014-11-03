@@ -24,7 +24,9 @@ program main
 
     namelist /NEST_parameters/ sdim, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, &
-                               nest_root, nest_context
+                               nest_root, nest_context, &
+                               training, train_variable, &
+                               lin_dep, n_lin_dep
     ! read configuration values from namelist
     iou = 8
     open(unit=iou, file="./OPEN/multinest/namelist1", status='old', action='read', delim='quote', iostat=ierr)
@@ -45,16 +47,11 @@ program main
 
     if (mod(nest_context, 10) == 2) then
     	if (nest_context / 100 == 2) then
-!#ifdef MPI
     		call MPI_INIT(ierr)
     		call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
     		if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
     		call MPI_BARRIER(MPI_COMM_WORLD, ierr)
     		call MPI_ABORT(MPI_COMM_WORLD,1)
-!#else
-!			print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
-!			STOP 1
-!#endif
     	end if
     	using_jitter = .true.
     	nextra = 1
@@ -104,11 +101,41 @@ program main
     allocate(nest_pWrap(sdim))
     nest_nPar=sdim
 
+    !! the number of parameters to cluster is usually set to 3
+    !! but it cannot be greater than sdim
+    if (sdim==1) then
+        nest_nClsPar=1
+    else
+        nest_nClsPar=3
+    end if
+
 
 	!! initialize data size dependant variables
 	call likelihood_init(n)
-	do i = 1, n
-        read(15, *) times(i), rvs(i), errors(i)
+
+    !include linear dependences in the model
+    if (lin_dep) then
+        !nextra = nextra + n_lin_dep
+        if (n_lin_dep == 1) then
+            allocate(linvar1(n))
+        else if (n_lin_dep == 2) then
+            allocate(linvar1(n))
+            allocate(linvar2(n))
+        else if (n_lin_dep == 3) then
+            allocate(linvar1(n))
+            allocate(linvar2(n))
+            allocate(linvar3(n))
+        end if
+    end if
+	
+    do i = 1, n
+        if (lin_dep) then
+            if (n_lin_dep == 1) read(15, *) times(i), rvs(i), errors(i), linvar1(i)
+            if (n_lin_dep == 2) read(15, *) times(i), rvs(i), errors(i), linvar1(i), linvar2(i)
+            if (n_lin_dep == 3) read(15, *) times(i), rvs(i), errors(i), linvar1(i), linvar2(i), linvar3(i)
+        else
+            read(15, *) times(i), rvs(i), errors(i)
+        end if
     end do
     
     if (nobserv == 1) then ! if only one observatory, observ is always 1
@@ -137,7 +164,11 @@ program main
         kernel_to_pass => k8
 
     	gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
-    	gp1%mean_fun => mean_fun_keplerian
+        if (nest_context / 100 == 2) then
+            gp1%mean_fun => mean_fun_keplerian
+        else
+            gp1%mean_fun => mean_fun_constant
+        endif
         !print *, gp1%gp_kernel%pars
 		gp_n_planets = nplanets
 		gp_n_planet_pars = 5*nplanets + nobserv
@@ -160,13 +191,16 @@ program main
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1d0
-		! since the upper limit depends on e and P, it can only be set
-		! when rescaling. We just initialize it here to a big number
-		spriorran(i+1,2)=500d0
+        !spriorran(i+1,1)= maxval(rvs) - minval(rvs)
+		! the true upper limit depends on e and P, and it will only be set when rescaling.
+		spriorran(i+1,2)=kmax
 
 		!! eccentricity, Uniform, 0-1
-		spriorran(i+2,1)=0d0
-		spriorran(i+2,2)=1d0
+		!spriorran(i+2,1)=0d0
+		!spriorran(i+2,2)=1d0
+        !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
+        spriorran(i+2,1)=0.867d0
+        spriorran(i+2,2)=3.03d0
 
 		!! long. periastron, Uniform, 0-2pi rad
 		spriorran(i+3,1)=0d0
@@ -194,34 +228,31 @@ program main
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2], hyperpar1, hyperpar2
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+1
-        spriorran(i:,1)= -kmax
-        spriorran(i:,2)= kmax
+        spriorran(i,1)= -kmax
+        spriorran(i,2)= kmax
 
         !! hyperparameters
         ! amplitude of GP
         i = sdim-nextra+nobserv+1
-        spriorran(i,1)= 0.1d0
-        spriorran(i,2)= 20d0
+        spriorran(i,1)= 0.d0
+        spriorran(i,2)= 10d0
         ! timescale for growth / decay of active regions (d)
-        spriorran(i+1:,1)= 10.d0
-        spriorran(i+1:,2)= 50.d0
+        spriorran(i+1,1)= 20d0
+        spriorran(i+1,2)= 50.d0
         ! periodicity (recurrence) timescale -> rotation period of the star
-        spriorran(i+2:,1)= 17.d0
-        spriorran(i+2:,2)= 23.d0
+        spriorran(i+2,1)= 10.d0
+        spriorran(i+2,2)= 20.d0
         ! smoothing parameter (?)
-        spriorran(i+3:,1)= 0.1d0
-        spriorran(i+3:,2)= 10d0
+        spriorran(i+3,1)= 0.1d0
+        spriorran(i+3,2)= 10d0
         
-        
-
-
 	else
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2]
 		!! systematic velocity(ies), Uniform, -kmax - kmax
 		i = sdim-nextra+1
-		spriorran(i:,1)= -kmax
-		spriorran(i:,2)= kmax
+		spriorran(i:,1)= -500.d0
+		spriorran(i:,2)= 500.d0
 
 	end if	
 
@@ -231,9 +262,11 @@ program main
 !        write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
 !        write(*, fmt) spriorran(:,1)
 !        write(*, fmt) spriorran(:,2)
+!        write(*,*) observ
 !    end if
 !    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 !
+!    print *, training, train_variable
 ! 	stop "we have to stop here"
 
    	call nest_Sample

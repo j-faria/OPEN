@@ -7,6 +7,7 @@ module params
 
 ! Data
     real(kind=8), allocatable, dimension(:) :: times, rvs, errors
+    real(kind=8), allocatable, dimension(:) :: train_var
 
 ! Model Parameters
    	
@@ -19,6 +20,13 @@ module params
     !considering a jitter parameter
     !using the gaussian process thing
     logical using_jitter, using_gp
+    !train the gaussian process beforehand
+    logical training
+    character(len=10) train_variable
+    !extra linear dependence in the model
+    !how many variables
+    logical lin_dep
+    integer n_lin_dep
 
     !priors on the parameters are set in main.f90
     real(kind=8), allocatable, dimension(:,:) :: spriorran  !(sdim,2)
@@ -59,7 +67,7 @@ module params
     ! is as close to the target efficiency (set by efr) as possible. 
     ! This does mean however, that the evidence value may not be accurate.
 	logical nest_ceff
- 	parameter(nest_ceff=.false.)
+ 	parameter(nest_ceff=.true.)
 	
     !max no. of live points
     integer nest_nlive
@@ -83,7 +91,7 @@ module params
     ! defines the sampling efficiency. 0.8 and 0.3 are recommended for 
     ! parameter estimation & evidence evaluation respectively.
     double precision nest_efr
-    parameter(nest_efr=0.3d0)
+    parameter(nest_efr=0.8d0)
       
     !root for saving posterior files
     character*100 nest_root
@@ -104,8 +112,7 @@ module params
     parameter(nest_maxModes=10)
       
     !number of parameters to cluster (for mode detection)
-    integer nest_nClsPar
-    parameter(nest_nClsPar=2)
+    integer nest_nClsPar  ! usually set to 3
 
     !whether to resume from a previous run
     logical nest_resume

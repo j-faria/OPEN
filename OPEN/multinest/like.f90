@@ -22,6 +22,7 @@ contains
 		allocate(ss(N), alpha(N), tau(N))
 		allocate(observ(N))
 		allocate(times(N), rvs(N), errors(N))
+		allocate(train_var(N))
 		allocate(vel(N), dist(N), sigma(N))
 		allocate(covmat(N,N), inv_covmat(N,N))
 	end subroutine likelihood_init
@@ -46,13 +47,12 @@ contains
 		real(kind=8), intent(out) :: slhood
 		integer, intent(in) :: context
 		real(kind=8) :: lhood, lhood_test(1,1), det, jitter
-		integer :: i, n, ierr
+		integer :: i, n, ierr, iendpar
 		character(len=100) :: fmt
 
 		! times, rvs and errors are defined in params and initialized/read in main
 		! Cube(1:nest_nPar) = P, K, ecc, omega, t0, Vsys
 		!write(*,*) Cube(3)
- 		observ = 1
  		ss = 1.d0
  		alpha = 1.d0
  		tau = 1.d0
@@ -92,6 +92,7 @@ contains
 
  		! get the radial velocity model with these parameters (in vel)
  		if (nplanets > 0) then
+ 			! this works for one observatory using OPEN/ext/get_rvN.f90
 			call get_rvN(times, &
 						 Cube(1:nest_nPar-1:5), & ! periods for all planets
 						 Cube(2:nest_nPar-1:5), & ! K for all planets
@@ -100,6 +101,21 @@ contains
 						 Cube(5:nest_nPar-1:5), & ! t0 for all planets
 						 Cube(nest_nPar), & ! systematic velocity
 						 vel, n, nplanets)
+
+			! this works from more than one observatory using OPEN/ext/get_rvN_MultiSite.f90
+			! well not just yet
+		!	iendpar = nest_nPar - nobserv
+		!	call get_rvN(times, &
+		!				 Cube(1:iendpar:5), & ! periods for all planets
+		!				 Cube(2:iendpar:5), & ! K for all planets
+		!				 Cube(3:iendpar:5), & ! ecc for all planets
+		!				 Cube(4:iendpar:5), & ! omega for all planets
+		!				 Cube(5:iendpar:5), & ! t0 for all planets
+		!				 Cube(iendpar+1:), & ! systematic velocity
+		!				 observ, & ! array with observatory indices
+		!				 vel, n, nplanets, nobserv)
+
+			! this doesn't work...
 	    	!call get_rvN(times, &
 	    	!           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
 	    	!           Cube(6), vel, n, nplanets)

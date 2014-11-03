@@ -7,7 +7,7 @@
     ! additional information to pass to low-level routines
     ! we use this to set the problem
     ! nob is the number of observatories
-    nest_context = 211
+    nest_context = 121
     ! nest_context has three numbers: xyz
     !         x=1 "normal" regression, x=2 gaussian process regression, x=3 gaussian process without planets
     !         y= number of planets in the model
@@ -22,24 +22,35 @@
     nest_IS = .true.
 
     !root for saving output files; character*100
-    nest_root='chains/nest-1planet-'
+    nest_root='chains/nest-2planet-'
 
 
     !after how many iterations feedback is required and the output
     !files should be updated 
     !posterior files are updated and dumper routine is called
     !after every updInt*10 iterations
-    nest_updInt=100
+    nest_updInt=50
 
     !whether to resume from a previous run
-    nest_resume=.true.
+    nest_resume=.false.
 
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
     !iterations or convergence criterion has been satisfied
-    nest_maxIter=5000
+    nest_maxIter=6000
     
     !feedback on the sampling progress?
     nest_fb=.true.
+
+
+    !train the gaussian process beforehand (only effective if nest_context = 2yz)
+    training = .false.
+    !on this variable
+    train_variable = 'NONE'
+
+
+    !extra linear dependeces in the model
+    lin_dep = .false.
+    n_lin_dep = 0
 
 /

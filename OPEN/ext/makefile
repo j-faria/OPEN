@@ -20,8 +20,17 @@ FPYFLAGS += --opt="-O3" --fcompiler=gnu95 -lgomp
 FPYFLAGS += --f90flags="-fPIC -ffree-line-length-none -fopenmp"
 
 
+SOS = glombscargle.so \
+      blombscargle.so \
+      get_rv.so \
+      get_rvN.so \
+      periodogram_DF.so \
+      periodogram_CLEAN.so \
+      lopast.so \
+      julian.so
+
 # --- targets
-all: glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so lopast.so julian.so
+all: $(SOS)
 	@echo "Done!"
 
 
@@ -62,9 +71,13 @@ periodogram_DF.so: periodogram_DF.c
 	# echo $(PYTHON)
 	@$(PYTHON) setup_periodogram_DF.py build_ext --inplace
 
+## compile CLEAN algorithm periodogram
+periodogram_CLEAN.so: periodogram_CLEAN.c
+	@$(PYTHON) setup_periodogram_CLEAN.py build_ext --inplace	
+
 # --- remove binary and executable files
 clean:
-	rm -f glombscargle.so blombscargle.so get_rv.so get_rvN.so periodogram_DF.so lopast.so julian.so
+	rm -f $(SOS)
 
 
 ## compile bayesian lomb scargle periodogram with additional outputs

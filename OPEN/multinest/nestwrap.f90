@@ -94,8 +94,10 @@ contains
 		else
 			! prior for systematic velocity
 			i = npar-nextra+1 ! index of systematic velocity
-			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))			
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			!Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2))
 		end if
+
 
 		! prior for period(s)
 		do i = 1, nPar-nextra, 5
@@ -104,7 +106,8 @@ contains
 
 		! priors for ecc, omega, t0
 		do i = 3, nPar-nextra, 5
-			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			!Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			Cube(i) = BetaPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
 			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
 			Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
 		end do
@@ -120,43 +123,10 @@ contains
 			!kmax = spriorran(i,2)
 			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
 			!print *, kmax, Cube(i+1)
-			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), kmax)
 			!print *, Cube(i)
 		end do
 
-
-		!if (nest_context == 11) then  ! 1 planet
-		!	P = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
-		!	ecc = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
-		!	omega = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
-		!	t0 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
-		!	K = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now
-		!
-		!	Vsys = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
-		!
-		!	Cube(1:nPar) = (/P, K, ecc, omega, t0, Vsys/)
-		!
-		!else if (nest_context == 21) then
-		!	P1 = UniformPrior(Cube(1), spriorran(1,1), spriorran(1,2))
-		!	ecc1 = UniformPrior(Cube(3), spriorran(3,1), spriorran(3,2))
-		!	omega1 = UniformPrior(Cube(4), spriorran(4,1), spriorran(4,2))
-		!	t01 = UniformPrior(Cube(5), spriorran(5,1), spriorran(5,2))
-		!	K1 = UniformPrior(Cube(2), spriorran(2,1), spriorran(2,2)) ! for now !!!!!
-		!
-		!	P2 = UniformPrior(Cube(6), spriorran(6,1), spriorran(6,2))
-		!	ecc2 = UniformPrior(Cube(8), spriorran(8,1), spriorran(8,2))
-		!	omega2 = UniformPrior(Cube(9), spriorran(9,1), spriorran(9,2))
-		!	t02 = UniformPrior(Cube(10), spriorran(10,1), spriorran(10,2))
-		!	K2 = UniformPrior(Cube(7), spriorran(7,1), spriorran(7,2)) ! for now !!!!!		
-		!
-		!	Vsys = UniformPrior(Cube(11), spriorran(11,1), spriorran(11,2))
-		!
-		!	Cube(1:nPar) = (/P1, K1, ecc1, omega1, t01, &
-		!	                 P2, K2, ecc2, omega2, t02, &
-		!	                 Vsys/)
-		!
-		!end if
-		!write(unit=*, fmt=*) '+++', Cube(1:nPar)
 
 		!call loglike function here 
 		call slikelihood(Cube,lnew,context)
