@@ -423,7 +423,7 @@ def do_demc(system, zfile, burnin=0):
 	# p = results.kde1d('period_0', npoints=300)
 	# ind = np.linspace(0.2, 5000, 300)
 
-	results.do_plot_some_solutions(system)
+	results.do_plot_best(system)
 
 	return results
 
@@ -1003,9 +1003,8 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
 		clogger.info(msg)
 
-		gp_context = {False: 1, True: 2}
-		get_multinest_output(root, nplanets, gp_context=gp_context[gp])
-		results_constant = MCMC_nest(root, gp_context=gp_context[gp])
+		get_multinest_output(root, nplanets, context=str(context))
+		results_constant = MCMC_nest(root, context=str(context))
 		if doplot:
 			results_constant.do_plot_map(system)
 
@@ -1072,9 +1071,8 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
 		clogger.info(msg)
 
-		gp_context = {False: 1, True: 2}
-		get_multinest_output(root, nplanets, gp_context=gp_context[gp])
-		results_one_planet = MCMC_nest(root, gp_context=gp_context[gp])
+		get_multinest_output(root, nplanets, context=str(context))
+		results_one_planet = MCMC_nest(root, context=str(context))
 		if doplot:
 			results_one_planet.do_plot_map(system)
 
@@ -1128,9 +1126,8 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 		clogger.info(msg)
 
 
-		gp_context = {False: 1, True: 2}
-		get_multinest_output(root, nplanets, gp_context=gp_context[gp])
-		results_two_planet = MCMC_nest(root, gp_context=gp_context[gp])
+		get_multinest_output(root, nplanets, context=str(context))
+		results_two_planet = MCMC_nest(root, context=str(context))
 		if doplot:
 			results_two_planet.do_plot_map(system)
 
