@@ -31,7 +31,8 @@ from .utils import unique
 from .logger import clogger, logging
 from shell_colors import yellow, blue
 from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
-from ext.get_rvN import get_rvn
+from ext.get_rvN import get_rvn as get_rvn_os
+from ext.get_rvN_MultiSite import get_rvn as get_rvn_ms
 from ext.gp import gp_predictor
 from ext.julian import caldat
 
@@ -328,6 +329,7 @@ class rvSeries:
         P, K, ecc, omega, T0, gam = [par[j::6] for j in range(6)]
         gam = gam[0]
 
+        get_rvn = get_rvn_os
         get_rvn(tt, P, K, ecc, omega, T0, gam, final)
 
         ### observations + fitted curve + residuals
@@ -440,6 +442,7 @@ class rvSeries:
         gam = gam[0]
 
         final = np.zeros_like(self.time)
+        get_rvn = get_rvn_os
         get_rvn(self.time, P, K, ecc, omega, T0, gam, final)
         self.fit['residuals'] = self.vrad - final
         self.fit['chi2'] = sum((self.fit['residuals'] / self.error)**2)
@@ -527,9 +530,14 @@ class rvSeries:
             bjd0 = 0
         else:
             bjd0 = 24e5
-        _, _, y1 = caldat(bjd0+self.time[0])
-        _, _, y2 = caldat(bjd0+self.time[-1])
-        return len(np.arange(y1, y2)), np.arange(y1, y2)
+        m1, _, y1 = caldat(bjd0+self.time[0])
+        m2, _, y2 = caldat(bjd0+self.time[-1])
+        # print m1, y1
+        # print m2, y2
+        # return len(np.arange(y1, y2)), np.arange(y1, y2)
+        r = np.arange(y1,y2+1)
+        # print min(r), max(r)
+        return len(r), r
 
     def get_time_to_plot(self):
         """
@@ -921,6 +929,8 @@ class MCMC_dream:
         self.nchains = len(self.chain_filenames)
         self.burnin = burnin
 
+        self.get_rvn = get_rvn_os
+
         self.read_chains()
 
     def reset_burnin(self, burnin):
@@ -1057,7 +1067,7 @@ class MCMC_dream:
         for i in range(n_solutions):
             p = par[:,i]
             args = [tt] + list(p) + [vel]
-            get_rvn(*args)
+            self.get_rvn(*args)
             if i == 0:
                 plt.plot(tt, vel, '-k', alpha=0.5, label='random')
             else:
@@ -1065,7 +1075,7 @@ class MCMC_dream:
 
         # plot best solution
         args = [tt] + list(par_best) + [vel]
-        get_rvn(*args)
+        self.get_rvn(*args)
         plt.plot(tt, vel, '-g', lw=2.5, label='best')
 
         # plot each files' values
@@ -1107,7 +1117,7 @@ class MCMC_dream:
         for j in range(self.nchains):
             plt.plot(t[j*s : (j+1)*s])
 
-    def do_plot_best(self):
+    def do_plot_best(self, system):
         colors = 'bgrcmykw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         tt = system.get_time_to_plot()
@@ -1123,7 +1133,7 @@ class MCMC_dream:
 
         # plot best solution
         args = [tt] + list(par_best) + [vel]
-        get_rvn(*args)
+        self.get_rvn(*args)
         plt.plot(tt, vel, '-g', lw=2.5, label='best')
 
         # plot each files' values
@@ -1162,20 +1172,22 @@ class MCMC_nest:
     """
     Base class for MCMC analysis, adapted for MultiNest output
     """
-    def __init__(self, root, gp_context=1):
+    def __init__(self, root, context='111'):
         self.root = root
         with open(root+'stats.dat') as f:
             for line in f: pass  # loop over the file
             last = line  # to get the last line
 
+        self.context = context
+
         # this seems like the easiest way to get the number of parameters
         self.npar = int(last.split()[0])
 
         self.gp = self.gp_only = False
-        if (gp_context in (2, 3)):
+        if (context[0] in ('2', '3')):
             self.gp = True
             self.read_gp_file()
-            if gp_context == 3: 
+            if context[0] == '3': 
                 self.gp_only = True
 
         self.read_stats_file()
@@ -1230,31 +1242,23 @@ class MCMC_nest:
 
     def read_iterations(self):
         """
+        Read the [root].txt file.
+        Columns have sample probability, -2*loglikehood, parameter values. 
+        Sample probability is the sample prior mass multiplied by its 
+        likelihood and normalized by the evidence.
         """
-        nc = self.nchains
-        # black magic to build input from file list while skipping headers
-        finput = [FileInput(f) for f in sorted(self.chain_filenames)]
-        iterables = [islice(f, self.burnin+1, None) for f in finput]
-        files = chain(*iterables)
+        filename = self.root + '.txt'
 
-        chains = np.loadtxt(files, unpack=True)
-
-        self.nplanets = (chains.shape[0]-3)/5
-        self.nsamples = chains.shape[1] / nc  # number of samples per chain
-
-        self.chains = np.array(chains)
-        self.chains = np.ma.masked_invalid(self.chains) # remove NaNs
+        data = np.loadtxt(filename, unpack=True)
+        self.posterior_samples = data
 
         parameter_names = ['period', 'K', 'ecc', 'omega', 't0']
         parameter_names = np.array([[par + '_'+str(i) for par in parameter_names] for i in range(self.nplanets)])
 
         p = namedtuple('parameter', parameter_names.flat)
 
-        # this makes a namedtuple of the ith chain
-        # self.trace = p._make(self.chains[i,2:-1,:])
-
-        # this makes a namedtuple of all the chains together
-        self.trace = p._make(self.chains[2:-1,:])
+        # this makes a namedtuple of all the parameter values
+        self.trace = p._make(data[2:-1,:])
 
     def compress_chains(self):
         tstr = strftime("%Y%m%d-%H%M%S")
@@ -1300,6 +1304,14 @@ class MCMC_nest:
         t, rv, err = system.time, system.vrad, system.error # temporaries
         vel = np.zeros_like(t)
 
+        nobserv = len(system.provenance)  # number of observatories
+        if nobserv > 1:
+            vsys = self.par_map[-nobserv+1:]
+            get_rvn = get_rvn_ms
+        else:
+            vsys = self.par_map[-1]
+            get_rvn = get_rvn_os
+
         if self.npar == 1:  # systematic velocity only
             vel = self.par_map[0]
 
@@ -1313,15 +1325,13 @@ class MCMC_nest:
                 vel = gp_predictor(t, rv, err, par_map, hyper_map, 'keplerian')
         else:
             par_map = self.par_map
-            if self.npar in (7, 12):
-                par_map.pop(-2)
 
             P = par_map[:-1:5]
             K = par_map[1:-1:5]
             ecc = par_map[2:-1:5]
             omega = par_map[3:-1:5]
             t0 = par_map[4:-1:5]
-            par = [P, K, ecc, omega, t0, par_map[-1]]
+            par = [P, K, ecc, omega, t0, vsys]
 
             args = [t] + par + [vel]
             get_rvn(*args)
@@ -1441,22 +1451,28 @@ class MCMC_nest:
             return
 
         i = self.trace._fields.index(parameter)
-        s = self.nsamples
-
         t = self.trace[i]
 
         newFig=True        
         if newFig: 
             plt.figure()
 
-        for j in range(self.nchains):
-            plt.plot(t[j*s : (j+1)*s])
+        plt.plot(t)
+        plt.ylabel(self.trace._fields[i])
 
     def do_plot_map(self, system):
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         tt = system.get_time_to_plot()
         vel = np.zeros_like(tt)
+
+        nobserv = len(system.provenance)  # number of observatories
+        if nobserv > 1:
+            vsys = self.par_map[-nobserv+1:]
+            get_rvn = get_rvn_ms
+        else:
+            vsys = self.par_map[-1]
+            get_rvn = get_rvn_os
 
         ## MAP estimate of the parameters
         if self.npar == 1:  # systematic velocity only
@@ -1470,8 +1486,6 @@ class MCMC_nest:
                 pred = gp_predictor(t, rv, err, par_map, hyper_map, 'keplerian')
         else:
             par_map = self.par_map
-            if self.npar in (7, 12):
-                par_map.pop(-2)
 
         newFig=True
         if newFig:
@@ -1490,9 +1504,14 @@ class MCMC_nest:
             ecc = par_map[2:-1:5]
             omega = par_map[3:-1:5]
             t0 = par_map[4:-1:5]
-            par = [P, K, ecc, omega, t0, par_map[-1]]
+            par = [P, K, ecc, omega, t0, vsys]
+            # print par
 
-            args = [tt] + par + [vel]
+            if nobserv > 1:
+                observ = np.ones_like(vel)
+                args = [tt] + par + [observ] + [vel]
+            else:
+                args = [tt] + par + [vel]
             get_rvn(*args)
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
 
@@ -1542,6 +1561,7 @@ class MCMC_nest:
 
 
     def do_plot_map_phased(self, system, noname=False, plot_gp=True):
+        get_rvn = get_rvn_os
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         tt = system.get_time_to_plot()
@@ -1617,12 +1637,12 @@ class MCMC_nest:
 
     def do_triangle_plot(self):
 
-        triangle_plot(self.chains[2:].T, quantiles=[0.5])
+        triangle_plot(self.posterior_samples[2:,:].T, quantiles=[0.5])
 
 
     def do_triangle_plot_kde(self):
 
-        triangle_plot_kde(self.chains[2:].T)
+        triangle_plot_kde(self.posterior_samples[2:,:].T)
 
 
 
