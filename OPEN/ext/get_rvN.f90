@@ -50,17 +50,27 @@ contains
 
     M = twopi * (time-t0)/P
     f = true_anom(M, ecc)
-    vel = K * (sin(f+omega) + ecc*sin(omega))
+    !vel = K * (sin(f+omega) + ecc*sin(omega))
+    vel = K * (cos(omega+f) + ecc*cos(omega))
 
   end function rv_curve
 
 
   elemental real(dp) function true_anom(M, ecc) result(nu)
     real(dp), intent(in) :: M, ecc
-    real(dp) :: E
+    real(dp) :: E, cosE
 
     E = ecc_anom(M, ecc)
-    nu = atan2(sqrt(1._dp-ecc*ecc)*sin(E),cos(E)-ecc)
+
+    !! eq 2.6 of Perryman 2011
+    !cosE = cos(E)
+    !nu = acos((cosE-ecc) / (1._dp-ecc*cosE))
+
+    !! eq 2.7 of Perryman 2011 (seems a tiny bit faster)
+    nu = 2.d0 * atan( sqrt((1.d0 + ecc)/(1.d0 - ecc)) * tan(E/2.d0))
+
+    !! old version
+    !nu = atan2(sqrt(1._dp-ecc*ecc)*sin(E), cos(E)-ecc)
   
   end function true_anom
   
@@ -68,7 +78,7 @@ contains
 
   elemental real(dp) function ecc_anom(M, ecc) result(E)
     real(dp), intent(in) :: M, ecc
-    real(dp), parameter :: derror = 1.0d-3
+    real(dp), parameter :: derror = 1.0d-7
     integer :: iter
     real(dp) :: EA_new, EA_old
     
