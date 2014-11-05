@@ -1582,53 +1582,72 @@ class MCMC_nest:
         if newFig:
             plt.figure()
 
-        # plot best solution
+        # map parameters
         P = par_map[:-1:5]
         K = par_map[1:-1:5]
         ecc = par_map[2:-1:5]
         omega = par_map[3:-1:5]
         t0 = par_map[4:-1:5]
-        par = [P, K, ecc, omega, t0, par_map[-1]]
+        vsys = par_map[-1]
 
-        args = [tt] + par + [vel]
-        get_rvn(*args)
-        phase = ((tt - t0) / P) % 1.0
-        plt.plot(np.sort(phase), vel[np.argsort(phase)], '-g', lw=2.5, label='MAP')
-        plt.plot(np.sort(phase)+1, vel[np.argsort(phase)], '-g', lw=2.5)
-        plt.plot(np.sort(phase)-1, vel[np.argsort(phase)], '-g', lw=2.5)
+        for planeti in range(self.nplanets):
+            if self.nplanets > 1:
+                # index of the other planet
+                otherplaneti = int(not bool(planeti))
+                otheri = otherplaneti
 
-        # plot GP predictions
-        if self.gp and plot_gp:
-            phase = ((self.pred_t - t0) / P) % 1.0
-            indices = np.argsort(phase)
-            plt.plot(np.sort(phase), self.pred_y[indices], '-k', lw=0.5, alpha=0.6, label='GP mean')
-            # plt.fill_between(np.sort(phase), 
-            #                  y1=self.pred_y[indices]-2*self.pred_std[indices], 
-            #                  y2=self.pred_y[indices]+2*self.pred_std[indices],
-            #                  color='k', alpha=0.3, label='2*std')
+            t, rv, err = system.time, system.vrad, system.error # temporaries
+            tt = system.get_time_to_plot()
+            vel = np.zeros_like(tt)
+            vel_other = np.zeros_like(t)
 
-        # plot each files' values
-        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
-            m = n-nout # how many values are there after restriction
+            ax = plt.subplot(self.nplanets, 1, planeti+1)
+            i = planeti
+
+            print P[i]
+            par = [P[i], K[i], ecc[i], omega[i], t0[i], vsys]
+            args = [tt] + par + [vel]
+            get_rvn(*args)
+            phase = ((tt - t0[i]) / P[i]) % 1.0
+
+            ax.plot(np.sort(phase), vel[np.argsort(phase)], '-g', lw=2.5, label='MAP')
+            ax.plot(np.sort(phase)+1, vel[np.argsort(phase)], '-g', lw=2.5)
+            ax.plot(np.sort(phase)-1, vel[np.argsort(phase)], '-g', lw=2.5)
+
+            # plot GP predictions
+            # if self.gp and plot_gp:
+            #     phase = ((self.pred_t - t0) / P) % 1.0
+            #     indices = np.argsort(phase)
+            #     plt.plot(np.sort(phase), self.pred_y[indices], '-k', lw=0.5, alpha=0.6, label='GP mean')
+                # plt.fill_between(np.sort(phase), 
+                #                  y1=self.pred_y[indices]-2*self.pred_std[indices], 
+                #                  y2=self.pred_y[indices]+2*self.pred_std[indices],
+                #                  color='k', alpha=0.3, label='2*std')
+
+            if self.nplanets > 1:
+                par = [P[otheri], K[otheri], ecc[otheri], omega[otheri], t0[otheri], vsys]
+                args = [t] + par + [vel_other]
+                get_rvn(*args)
+            else:
+                vel_other = np.zeros_like(ta)
+
+            # plot each files' values
+            for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+                m = n-nout # how many values are there after restriction
+
+                phase = ((t[:m] - t0[i]) / P[i]) % 1.0
+                plt.errorbar(np.sort(phase), rv[np.argsort(phase)] - vel_other[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                             fmt='o'+colors[i], label=os.path.basename(fname))
+                plt.errorbar(np.sort(phase)+1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                             fmt='o'+colors[i])
+                plt.errorbar(np.sort(phase)-1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                             fmt='o'+colors[i])
+                t, rv, err = t[m:], rv[m:], err[m:]
             
-            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
-            #                     height=err[:m], beam=0.5,\
-            #                     pen=pg.mkPen(None))
-                                # pen={'color': 0.8, 'width': 2})
-            # p.addItem(e)
-            # p.plot(t[:m], rv[:m], symbol='o')
-            phase = ((t[:m] - t0) / P) % 1.0
-            plt.errorbar(np.sort(phase), rv[np.argsort(phase)], yerr=err[np.argsort(phase)], \
-                         fmt='o'+colors[i], label=os.path.basename(fname))
-            plt.errorbar(np.sort(phase)+1, rv[np.argsort(phase)], yerr=err[np.argsort(phase)], \
-                         fmt='o'+colors[i])
-            plt.errorbar(np.sort(phase)-1, rv[np.argsort(phase)], yerr=err[np.argsort(phase)], \
-                         fmt='o'+colors[i])
-            t, rv, err = t[m:], rv[m:], err[m:]
-        
-        plt.xlim([-0.2, 1.2])
-        plt.xlabel('Phase')
-        plt.ylabel('RV [%s]'%system.units)
+            ax.set_xlim([-0.2, 1.2])
+            ax.set_xlabel('Phase (P=%5.2f)' % P[i])
+            ax.set_ylabel('RV [%s]'%system.units)
+
         if not noname: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
