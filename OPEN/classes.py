@@ -545,8 +545,8 @@ class rvSeries:
         """
         std = self.time.std()
         N = len(self.time)
-        minim = self.time.min() - 1.*std
-        maxim = self.time.max() + 1.*std
+        minim = self.time.min() - 2.*std
+        maxim = self.time.max() + 2.*std
         return np.linspace(minim, maxim, 10*N)
 
     def is_in_extras(self, extra):
@@ -1594,14 +1594,14 @@ class MCMC_nest:
             vel = np.zeros_like(tt)
             vel_other = np.zeros_like(t)
 
+            # one subplot per planet
             ax = plt.subplot(self.nplanets, 1, planeti+1)
-            i = planeti
 
-            print P[i]
-            par = [P[i], K[i], ecc[i], omega[i], t0[i], vsys]
+            # print P[planeti]
+            par = [P[planeti], K[planeti], ecc[planeti], omega[planeti], t0[planeti], vsys]
             args = [tt] + par + [vel]
             get_rvn(*args)
-            phase = ((tt - t0[i]) / P[i]) % 1.0
+            phase = ((tt - t0[planeti]) / P[planeti]) % 1.0
 
             ax.plot(np.sort(phase), vel[np.argsort(phase)], '-g', lw=2.5, label='MAP')
             ax.plot(np.sort(phase)+1, vel[np.argsort(phase)], '-g', lw=2.5)
@@ -1628,15 +1628,21 @@ class MCMC_nest:
             for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
                 m = n-nout # how many values are there after restriction
 
-                phase = ((t[:m] - t0[i]) / P[i]) % 1.0
-                plt.errorbar(np.sort(phase), rv[np.argsort(phase)] - vel_other[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                phase = ((t[:m] - t0[planeti]) / P[planeti]) % 1.0
+                ax.errorbar(np.sort(phase), rv[np.argsort(phase)] - vel_other[np.argsort(phase)] + vsys,
+                             yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i], label=os.path.basename(fname))
-                plt.errorbar(np.sort(phase)+1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                ax.errorbar(np.sort(phase)+1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)] + vsys,
+                             yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i])
-                plt.errorbar(np.sort(phase)-1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)], yerr=err[np.argsort(phase)], \
+                ax.errorbar(np.sort(phase)-1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)] + vsys,
+                             yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i])
                 t, rv, err = t[m:], rv[m:], err[m:]
-            
+
+            # plot systematic velocity
+            ax.axhline(y=vsys, ls='--', color='k', alpha=0.3)
+
             ax.set_xlim([-0.2, 1.2])
             ax.set_xlabel('Phase (P=%5.2f)' % P[planeti])
             ax.set_ylabel('RV [%s]'%system.units)
