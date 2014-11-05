@@ -1232,7 +1232,6 @@ class MCMC_nest:
         self.par_map = [float(s.split()[1]) for s in stats[start:end]]
         # P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
 
-
     def read_gp_file(self):
         filename = self.root+'gp.dat'
         try:
@@ -1271,7 +1270,6 @@ class MCMC_nest:
 
         print 'done!'
 
-
     def print_best_solution(self):
         ## output best solution
         best_ind = np.argmax(self.chains[1, :])
@@ -1287,12 +1285,10 @@ class MCMC_nest:
             print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % 
                                 (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 
-
     def confidence_intervals(self):
         for i, name in enumerate(self.trace._fields):
             print '%10s' % name,
             print '  ', 'mean:', np.mean(self.trace[i]), 'std:', np.std(self.trace[i])
-
 
     def save_fit_to(self, system):
         
@@ -1339,8 +1335,6 @@ class MCMC_nest:
 
         system.fit['params'] = self.par_map
         system.fit['residuals'] = system.vrad - vel
-
-
 
     def kde1d(self, parameter, ind=None, npoints=100):
         try:
@@ -1559,7 +1553,6 @@ class MCMC_nest:
         plt.ticklabel_format(useOffset=False)
         plt.show()
 
-
     def do_plot_map_phased(self, system, noname=False, plot_gp=True):
         get_rvn = get_rvn_os
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
@@ -1629,7 +1622,7 @@ class MCMC_nest:
                 args = [t] + par + [vel_other]
                 get_rvn(*args)
             else:
-                vel_other = np.zeros_like(ta)
+                vel_other = np.zeros_like(t)
 
             # plot each files' values
             for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
@@ -1645,7 +1638,7 @@ class MCMC_nest:
                 t, rv, err = t[m:], rv[m:], err[m:]
             
             ax.set_xlim([-0.2, 1.2])
-            ax.set_xlabel('Phase (P=%5.2f)' % P[i])
+            ax.set_xlabel('Phase (P=%5.2f)' % P[planeti])
             ax.set_ylabel('RV [%s]'%system.units)
 
         if not noname: plt.legend()
