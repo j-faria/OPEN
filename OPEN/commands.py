@@ -183,10 +183,11 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
+    nest [-u] [-r] [--gp] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
 Options
     -u            User sets the namelist file
     -r            Resume from a previous MultiNest run
+    -v            Be verbose on output and plots
     --gp          Perform model selection within Gaussian Process framework
     --train=None  Train the GP on quantity before using it in the RVs
     --lin=None    Include linear dependence on quantity in the model
@@ -450,6 +451,7 @@ class EmbeddedMagics(Magics):
         verb = True if args['--verbose'] else False
         hf = float(args.pop('--hifac'))
         of = float(args.pop('--ofac'))
+        fap = args['--fap']
 
         # which periodogram should be calculated?
         per_fcn = None
@@ -480,27 +482,27 @@ class EmbeddedMagics(Magics):
                 if system.per.name != name:
                     raise AttributeError
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=args['--fap'], save=args['--save'])
+                system.per._plot(doFAP=fap, save=args['--save'])
             except AttributeError:
                 system.per = per_fcn(system, hifac=hf, ofac=of)
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=args['--fap'], save=args['--save'])
+                system.per._plot(doFAP=fap, save=args['--save'])
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
             system.bis_per = per_fcn(system, hifac=hf, ofac=of, quantity='bis')
-            system.bis_per._plot(save=args['--save'])
+            system.bis_per._plot(doFAP=fap, save=args['--save'])
 
         if args['fwhm']: # periodogram of the CCF's fwhm
             system.fwhm_per = per_fcn(system, hifac=hf, ofac=of, quantity='fwhm')
-            system.fwhm_per._plot(save=args['--save'])
+            system.fwhm_per._plot(doFAP=fap, save=args['--save'])
 
         if args['rhk']: # periodogram of rhk
             system.rhk_per = per_fcn(system, hifac=hf, ofac=of, quantity='rhk')
-            system.rhk_per._plot(save=args['--save'])
+            system.rhk_per._plot(doFAP=fap, save=args['--save'])
 
         if args['contrast']: # periodogram of contrast
             system.contrast_per = per_fcn(system, hifac=hf, ofac=of, quantity='contrast')
-            system.contrast_per._plot(save=args['--save'])
+            system.contrast_per._plot(doFAP=fap, save=args['--save'])
 
 
         if args['resid']: # periodogram of the residuals of the current fit
@@ -917,6 +919,7 @@ class EmbeddedMagics(Magics):
 
         user = args['-u']
         resume = args['-r']
+        verbose = args['-v']
         gp = args['--gp']
         doplot = not args['--noplot']
         dofeedback = args['--feed']
@@ -935,8 +938,9 @@ class EmbeddedMagics(Magics):
             return
 
         core.do_multinest(system, user, gp,
-                          resume=resume, ncpu=ncpu, training=train_quantity,
-                          lin=lin_quantity, doplot=doplot, feed=dofeedback)
+                          resume=resume, ncpu=ncpu, verbose=verbose,
+                          training=train_quantity, lin=lin_quantity, 
+                          doplot=doplot, feed=dofeedback)
 
 
     @needs_local_scope
