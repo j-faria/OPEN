@@ -739,7 +739,21 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=None, doplot=True, feed=False):
+def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, feed=False):
+	"""
+	Run the MultiNest algorithm on the current system. 
+	Arguments
+	---------
+		user: the user sets up the namelist file and we just run MultiNest using that
+		gp:
+		resume: whether to resume from a previous run. This option takes precedence over `user`
+		verbose: plot and print more information at the end of the run
+		ncpu: number of cpu cores to run MultiNest on
+		training:
+		lin:
+		doplot: whether to show plots at the end of the run. Takes precedence over `verbose`
+		feed: when running automatic model selection, whether to provide sampling feedback
+	"""
 	from time import sleep, time
 
 	def get_multinest_output(root, nplanets, context='111'):
@@ -803,6 +817,7 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 			# in this case, the vsys is before the hyperparameters
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
 
+	# determine available number of cpu cores
 	available_cpu = get_number_cores()
 	if (ncpu is None) or (ncpu > available_cpu): 
 		ncpu = available_cpu
@@ -929,16 +944,23 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 			return
 
 		print  # newline
-		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
+		t = time()
+		took_min = int(t-start) / 60
+		took_sec = (t-start) - (took_min*60)
+
+		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 		clogger.info(msg)
 
-		# return
+		# read/parse the output
 		get_multinest_output(root_path, nplanets, context=full_context)
 		system.results = MCMC_nest(root_path, context=full_context)
 
 		if doplot:
 			system.results.do_plot_map(system)
-			#system.results.do_plot_map_phased(system)
+			if verbose:
+				system.results.do_plot_map_phased(system)
+				system.results.do_hist_plots()
+				
 
 		# save fit in the system
 		system.results.save_fit_to(system)
@@ -1000,7 +1022,11 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 			return
 
 		print  # newline
-		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
+		t = time()
+		took_min = int(t-start) / 60
+		took_sec = (t-start) - (took_min*60)
+
+		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 		clogger.info(msg)
 
 		get_multinest_output(root, nplanets, context=str(context))
@@ -1012,7 +1038,7 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 
 		##############################################################################
 		print
-		msg = blue('    : ') + 'Starting MultiNest for 1-planet model.\n'
+		msg = blue('INFO: ') + 'Starting MultiNest for 1-planet model.\n'
 		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
 		clogger.info(msg)
 
@@ -1068,7 +1094,11 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 			return
 
 		print  # newline
-		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
+		t = time()
+		took_min = int(t-start) / 60
+		took_sec = (t-start) - (took_min*60)
+
+		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 		clogger.info(msg)
 
 		get_multinest_output(root, nplanets, context=str(context))
@@ -1122,7 +1152,11 @@ def do_multinest(system, user, gp, resume=False, ncpu=None, training=None, lin=N
 			return
 
 		print  # newline
-		msg = blue('INFO: ') + 'MultiNest took %f s' % (time()-start)
+		t = time()
+		took_min = int(t-start) / 60
+		took_sec = (t-start) - (took_min*60)
+
+		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 		clogger.info(msg)
 
 
@@ -1550,7 +1584,12 @@ def get_rotation_period(system):
 	import re
 	filename = system.provenance.keys()[0]
 	regex = re.compile("HD[0-9]*")
-	temp_star_name = regex.findall(filename)[0]
+	try:
+		temp_star_name = regex.findall(filename)[0]
+	except IndexError:
+		from os.path import basename, splitext
+		temp_star_name = splitext(basename(filename))[0]
+
 	if ask_yes_no('Is "%s" the star (Y/n)? ' % temp_star_name, default=True):
 		pass
 	else:
@@ -1569,22 +1608,40 @@ def get_rotation_period(system):
 				found_it = True
 				star_info = line.strip().split()
 
-	if not found_it:
-		msg = red('ERROR: ') + 'Cannot find B-V information for %s' % temp_star_name
-		clogger.fatal(msg)
-		return
-
-	msg = blue('    : ') + '%s, V=%s  B=%s' % tuple(star_info[1:])
-	clogger.info(msg)
-
-	Vmag = float(star_info[2])
-	Bmag = float(star_info[3])
+	if found_it:
+		spect = star_info[1]
+		Vmag = float(star_info[2])
+		Bmag = float(star_info[3])
+		msg = blue('    : ') + '%s, V=%s  B=%s' % (spect, Bmag, Vmag)
+		clogger.info(msg)
+	else:
+		# msg = red('ERROR: ') + 'Cannot find B-V information for %s' % temp_star_name
+		# clogger.fatal(msg)
+		print  # newline
+		if ask_yes_no('Input B and V magnitudes (Y/n)?', default=True):
+			try:
+				Bmag = float(raw_input('B magnitude: '))
+			except ValueError:
+				Bmag = 0.
+			try:
+				Vmag = float(raw_input('V magnitude: '))
+			except ValueError:
+				Vmag = 0.
+			print  # newline
+		else:
+			msg = red('ERROR: ') + 'Cannot find B-V information for %s. Exiting' % temp_star_name
+			clogger.fatal(msg)
+			return
 
 	x = 1 - (Bmag - Vmag)
 	## Noyes (1984), Eq 4
 	log_tau = (1.362 - 0.166*x + 0.025*x**2 - 5.323*x**3) if x > 0 else (1.362 - 0.14*x)
 
-	lrhk = np.mean(system.extras.rhk)
+	lrhk = np.average(system.extras.rhk, weights=1/(system.extras.sig_rhk**2))
+	
+	msg = blue('INFO: ') + "Using weighted average of R'hk: %6.3f" % (lrhk,)
+	clogger.info(msg)
+	
 	y = 5. + lrhk
 	## Noyes (1984), Eq 3
 	log_P = (0.324 - 0.4*y - 0.283*y**2 - 1.325*y**3) + log_tau
@@ -1593,15 +1650,15 @@ def get_rotation_period(system):
 	clogger.info(msg)
 
 
-	# ## Mamajek & Hillenbrand (2008), Eq 3
-	# log_tau = -38.053 - 17.912*lrhk - 1.6675*lrhk**2
-	# tau = 10**log_tau
+	## Use same tau as from Noyes
+	tau = 10**log_tau
 
-	# ## Mamajek & Hillenbrand (2008), Eq 5
-	# P = (0.808 - 2.966*(lrhk+4.52)) * tau
+	## Mamajek & Hillenbrand (2008), Eq 5
+	Ro = (0.808 - 2.966*(lrhk+4.52))
+	P = Ro * tau
 
-	# msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f d' % (P)
-	# clogger.info(msg)
+	msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f d' % (P)
+	clogger.info(msg)
 
 
 
