@@ -1241,15 +1241,18 @@ class MCMC_nest:
 
     def read_iterations(self):
         """
-        Read the [root].txt file.
-        Columns have sample probability, -2*loglikehood, parameter values. 
-        Sample probability is the sample prior mass multiplied by its 
-        likelihood and normalized by the evidence.
+        Read the [root]ev.dat and [root]phys_live.points files which contain the
+        the set of rejected points and the current set of live points, respectively.
+        First npar columns are the parameter values for each iteration + live ones
+        npar+1 column are the log-likelihood values
         """
-        filename = self.root + '.txt'
+        filename1 = self.root + 'ev.dat'
+        filename2 = self.root + 'phys_live.points'
 
-        data = np.loadtxt(filename, unpack=True)
-        self.posterior_samples = data
+        rejected_points = np.loadtxt(filename1, unpack=True)
+        live_points = np.loadtxt(filename2, unpack=True)
+
+        self.posterior_samples = np.append(rejected_points[:self.npar, :], live_points[:self.npar, :], axis=1)
 
         parameter_names = ['period', 'K', 'ecc', 'omega', 't0']
         parameter_names = np.array([[par + '_'+str(i) for par in parameter_names] for i in range(self.nplanets)])
@@ -1257,7 +1260,7 @@ class MCMC_nest:
         p = namedtuple('parameter', parameter_names.flat)
 
         # this makes a namedtuple of all the parameter values
-        self.trace = p._make(data[2:-1,:])
+        self.trace = p._make(self.posterior_samples[:-1,:])
 
     def compress_chains(self):
         tstr = strftime("%Y%m%d-%H%M%S")
@@ -1286,9 +1289,15 @@ class MCMC_nest:
                                 (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 
     def confidence_intervals(self):
+        try:
+            self.trace
+        except AttributeError:
+            self.read_iterations()
+
         for i, name in enumerate(self.trace._fields):
             print '%10s' % name,
             print '  ', 'mean:', np.mean(self.trace[i]), 'std:', np.std(self.trace[i])
+            if (i+1)%5==0: print
 
     def save_fit_to(self, system):
         
@@ -1439,6 +1448,10 @@ class MCMC_nest:
         plt.show()
 
     def do_plot_trace(self, parameter):
+        try:
+            self.trace
+        except AttributeError:
+            self.read_iterations()
 
         if parameter not in self.trace._fields:
             print 'ERROR'
@@ -1652,15 +1665,81 @@ class MCMC_nest:
         plt.ticklabel_format(useOffset=False)
         plt.show()
 
+    def do_hist_plots(self, show_priors=True):
+        try:
+            self.trace
+        except AttributeError:
+            self.read_iterations()       
 
-    def do_triangle_plot(self):
+        if show_priors: 
+            from .prior_funcs import uniform, jeffreys, modjeffreys
 
-        triangle_plot(self.posterior_samples[2:,:].T, quantiles=[0.5])
+        # Sturges' formula for the optimal number of bins in the histograms
+        n = self.posterior_samples.shape[1]
+        k = int(np.log2(n) + 1)
+        k = 50
 
+        plt.figure(figsize=(8, 12))
+        gs = gridspec.GridSpec(5, 1)
+
+        # period histogram(s)
+        ax1 = plt.subplot(gs[0])
+        ax1.hist(self.posterior_samples[0:-1:5, :].T, bins=k, normed=True, label=['planet1', 'planet2'])
+        if show_priors:
+            xx = np.linspace(1.5*10, 1000, 200)
+            ax1.plot(xx, jeffreys(xx, 1.5*10, 1000), lw=3, color='k')
+        ax1.set_xlabel('Period [d]')
+        ax1.legend(frameon=False)
+
+        # semi amplitude histogram(s) - actually log of it because usually the prior spans a big range
+        ax2 = plt.subplot(gs[1])
+        ax2.hist(np.log(self.posterior_samples[1:-1:5, :].T), bins=k, normed=True)
+        # if show_priors:
+        #     m = np.min(self.posterior_samples[1:-1:5, :].T)
+        #     xx = np.logspace(np.log(m), np.log10(2129), 200)
+        #     ax2.plot(np.log(xx), modjeffreys(xx, 1., 2129), lw=3, color='k')
+        ax2.set_xlabel('log K [m/s]')
+
+        # eccentricity histogram(s)
+        ax3 = plt.subplot(gs[2])
+        ax3.hist(self.posterior_samples[2:-1:5, :].T, bins=k, normed=True)
+        if show_priors:
+            xx = np.linspace(0, 1, 200)
+            ax3.plot(xx, uniform(xx, 0, 1), lw=3, color='k')
+        ax3.set_xlabel('eccentricity')
+
+        # omega histogram(s)
+        ax4 = plt.subplot(gs[3])
+        ax4.hist(self.posterior_samples[3:-1:5, :].T, bins=k, normed=True)
+        if show_priors:
+            xx = np.linspace(0, 2*np.pi, 200)
+            ax4.plot(xx, uniform(xx, 0, 2*np.pi), lw=3, color='k')
+        ax4.set_xlim([0., 2*np.pi])
+        ax4.set_xlabel(r'$\omega$')
+
+        # t0 histogram(s)
+        ax5 = plt.subplot(gs[4])
+        ax5.hist(self.posterior_samples[4:-1:5, :].T, bins=k, normed=True)
+        ax5.set_xlabel(r'$t_0$')
+
+
+        plt.tight_layout()
+        plt.show()
+
+    def do_triangle_plot(self, planet='both'):
+        """
+        Triangle plot of posterior samples
+        """
+        try:
+            self.trace
+        except AttributeError:
+            self.read_iterations()
+
+        triangle_plot(self.posterior_samples[:5,:].T, quantiles=[0.5])
 
     def do_triangle_plot_kde(self):
 
-        triangle_plot_kde(self.posterior_samples[2:,:].T)
+        triangle_plot_kde(self.posterior_samples[:5,:].T)
 
 
 
