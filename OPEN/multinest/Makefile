@@ -15,7 +15,7 @@ FC := gfortran
 
 FFLAGS += -O3 -ffast-math -fPIC -ffree-line-length-none #-fcheck=all
 ifeq ($(PROFFILING),"true")
-	FFLAGS += -pg
+	FFLAGS += -pg -g -fprofile-arcs -ftest-coverage --coverage -lgcov
 endif
 
 LIBS = -L$(NESTLIBDIR) -lnest3 $(LAPACKLIB) # $(FLIB)
@@ -59,6 +59,9 @@ get_rvN.so: ../ext/get_rvN.f90 likelihood.f90
 %.o: %.f90
 	$(FC) $(FFLAGS) $(LIBS) -I$(NESTLIBDIR) -c -o $@ $^ 
  
+%.o: %.F90
+	$(FC) $(FFLAGS) $(LIBS) -I$(NESTLIBDIR) -c -o $@ $^ 
+
 nest: $(MN_OBJ)
 	$(FC) -o $@ $(MN_OBJ) $(FFLAGS) $(LIBS)
 

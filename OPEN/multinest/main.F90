@@ -47,11 +47,13 @@ program main
 
     if (mod(nest_context, 10) == 2) then
     	if (nest_context / 100 == 2) then
+#ifdef MPI
     		call MPI_INIT(ierr)
     		call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
     		if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
     		call MPI_BARRIER(MPI_COMM_WORLD, ierr)
     		call MPI_ABORT(MPI_COMM_WORLD,1)
+#endif
     	end if
     	using_jitter = .true.
     	nextra = 1
@@ -186,14 +188,15 @@ program main
 	! the mathematical form is only used when rescaling
 	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(i,1)= 1.2d0 !0.2d0
-		spriorran(i,2)= 3650d0 !365000.d0
+		spriorran(i,1)= 0.2d0 !0.2d0
+		spriorran(i,2)= 365d0 !365000.d0
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1d0
         !spriorran(i+1,1)= maxval(rvs) - minval(rvs)
 		! the true upper limit depends on e and P, and it will only be set when rescaling.
 		spriorran(i+1,2)=kmax
+        !spriorran(i+1,2)=60.d0
 
 		!! eccentricity, Uniform, 0-1
 		!spriorran(i+2,1)=0d0
