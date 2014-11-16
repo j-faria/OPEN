@@ -64,16 +64,16 @@ def metalpoor_widget(star, database, debug=True):
 		if debug: print 'array creation took: %.3f s' % (time()-t0)
 
 		return d, attrs, \
-		       x,y,err, \
+		       x, y, err, \
 		       freq, power_rv, power_fwhm, power_bis, power_rhk,\
 		       bfreq, bpower_rv
 
 	d, attrs, \
-		x,y,err, \
-		freq,power_rv,power_fwhm,power_bis,power_rhk, \
+		x, y, err, \
+		freq, power_rv, power_fwhm, power_bis, power_rhk, \
 		bfreq, bpower_rv = get_data(h5file, star)
 
-	app=QtGui.QApplication.instance() # checks if QApplication already exists
+	app=QtGui.QApplication.instance()  # checks if QApplication already exists
 	if not app: # create QApplication if it doesnt exist 
 		app = QtGui.QApplication([])
 	win = QtGui.QMainWindow()
@@ -111,10 +111,7 @@ def metalpoor_widget(star, database, debug=True):
 
 
 	## User-changeable parameters
-	params = [
-        	{'name': 'Star:', 'type': 'list', 'values': available_stars, 'value': star},
-        	# {'name': 'Load', 'type': 'action'},
-		]
+	params = [{'name': 'Star:', 'type': 'list', 'values': available_stars, 'value': star},]
 
 	## Add widgets into each dock
 
@@ -132,9 +129,13 @@ Data: %d measurements	%s
 """ 
 
 	try: 
-		teff, feh, feh_error, logg, logg_error = attrs.teff, attrs.feh, attrs.feh_error, attrs.logg, attrs.logg_error
+		teff = attrs.teff
+		feh, feh_error = attrs.feh, attrs.feh_error
+		logg, logg_error = attrs.logg, attrs.logg_error
+		prot = attrs.prot
 	except AttributeError:
 		teff = feh = feh_error = logg = logg_error = 0
+		prot = 0
 
 	label = QtGui.QLabel(label_text % (star, attrs.bmag, attrs.vmag,
 		                               attrs.spect_type, 
@@ -165,9 +166,13 @@ Data: %d measurements	%s
 
 		# w1.removeItem(label)
 		try: 
-			teff, feh, feh_error, logg, logg_error = attrs.teff, attrs.feh, attrs.feh_error, attrs.logg, attrs.logg_error
+			teff = attrs.teff
+			feh, feh_error = attrs.feh, attrs.feh_error
+			logg, logg_error = attrs.logg, attrs.logg_error
+			prot = attrs.prot
 		except AttributeError:
 			teff = feh = feh_error = logg = logg_error = 0
+			prot = 0
 		l = w1.children()[1]
 		l.setText(label_text % (star, attrs.bmag, attrs.vmag,
 			                     attrs.spect_type, 
@@ -191,6 +196,15 @@ Data: %d measurements	%s
 		if bfreq is not None:
 			w6.plot(1./bfreq, bpower_rv*max(power_rv), pen='r')
 		w6.autoRange()
+
+		## make sure we catch the FP error if prot=0 for some reason
+		old_settings = np.geterr()
+		np.seterr(divide='raise')
+		try:
+			vline_prot.setPos(np.log10(prot))
+		except FloatingPointError:
+			pass
+		w6.addItem(vline_prot, ignoreBounds=True)
 		w6.addItem(vLine, ignoreBounds=True)
 		w6.addItem(hLine, ignoreBounds=True)
 		
@@ -229,14 +243,16 @@ Data: %d measurements	%s
 	w1.addWidget(tree, row=0, col=2, rowspan=1)
 	d1.addWidget(w1)
 	state = None
+
 	def save():
-	    global state
-	    state = area.saveState()
-	    restoreBtn.setEnabled(True)
-	    print state
+		global state
+		state = area.saveState()
+		restoreBtn.setEnabled(True)
+		print state
+
 	def load():
-	    global state
-	    area.restoreState(state)
+		global state
+		area.restoreState(state)
 	saveBtn.clicked.connect(save)
 	restoreBtn.clicked.connect(load)
 
@@ -259,10 +275,17 @@ Data: %d measurements	%s
 
 	### periodogram RVs ============================
 	w6 = pg.PlotWidget(name="perRV")
+	
+	# estimated rotation period
+	vline_prot = pg.InfiniteLine(angle=90, movable=False, pen={'color':"g", 'width':2, 'alpha':0.1})
+	vline_prot.setPos(np.log10(prot))
+	w6.addItem(vline_prot)
+
 	w6.plot(1./freq, power_rv, title="Periodogram")
 	if bfreq is not None:
 		w6.plot(1./bfreq, bpower_rv*max(power_rv), pen='r')
 	w6.plotItem.setLogMode(True, False)
+
 	#cross hair
 	vLine = pg.InfiniteLine(angle=90, movable=False)
 	hLine = pg.InfiniteLine(angle=0, movable=False)
