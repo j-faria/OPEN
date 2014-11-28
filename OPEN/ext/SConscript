@@ -1,0 +1,10 @@
+import os
+
+env = Environment()
+bld = Builder(action = '/home/joao/anaconda/bin/f2py -m $MODULE -c $SOURCE --quiet')
+env.Append(BUILDERS = {'F2PY' : bld})
+
+
+
+## compile bayesian lomb scargle periodogram
+env.F2PY(MODULE='blombscargle', target='blombscargle.so', source='lombscargle_bayes.f90')
