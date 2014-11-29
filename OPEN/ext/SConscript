@@ -1,5 +1,6 @@
 import os  # for path-related things
 import shutil
+import commands
 from distutils import sysconfig  # to help in building Python extension modules
 import numpy
 
@@ -32,7 +33,11 @@ def CopySOAction(target = None, source = None, env = None):
 
 env = Environment()
 
-f2py_flags = ' --quiet --f90flags="-ffree-line-length-none -fopenmp" --opt="-O3" -lgomp'
+GCC_VERSION = commands.getoutput(env['F90'] + ' -dumpversion')
+
+f2py_flags = ' --quiet '
+f2py_flags += '--f90flags="-ffree-line-length-none -fopenmp" '
+f2py_flags += '--opt="-O3" -lgomp --fcompiler=gnu95'
 bld = Builder(action = 'f2py -m $MODULE -c $SOURCES' + f2py_flags)
 
 env.Append(BUILDERS={'F2PY': bld})
