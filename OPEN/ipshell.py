@@ -35,7 +35,7 @@ from IPython.utils.traitlets import Bool, CBool, Unicode
 from IPython.utils.io import ask_yes_no
 
 # intra-package imports
-from .commands import EmbeddedMagics
+from .commandsOPEN import EmbeddedMagics
 
 
 class EmbedShell(TerminalInteractiveShell):
