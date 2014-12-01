@@ -35,10 +35,19 @@ env = Environment()
 
 GCC_VERSION = commands.getoutput(env['F90'] + ' -dumpversion')
 
+## get path to f2py executable
+out = commands.getstatusoutput('which f2py')
+if out[0] == 0:
+	f2py_exec = out[1]
+	f2py_version = commands.getoutput(f2py_exec + ' -v')
+	print 'Found f2py version %s at %s' % (f2py_version, f2py_exec)
+else:
+	raise RuntimeError('f2py does not seem to be installed. Aborting!')
+
 f2py_flags = ' --quiet '
 f2py_flags += '--f90flags="-ffree-line-length-none -fopenmp" '
 f2py_flags += '--opt="-O3" -lgomp --fcompiler=gnu95'
-bld = Builder(action = 'f2py -m $MODULE -c $SOURCES' + f2py_flags)
+bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES' + f2py_flags)
 
 env.Append(BUILDERS={'F2PY': bld})
 
