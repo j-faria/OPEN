@@ -1,1 +1,2 @@
-SConscript(['ext/SConscript'])
+# SConscript(['ext/SConscript'])
+SConscript(['multinest/SConscript'])
