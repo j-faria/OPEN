@@ -28,8 +28,8 @@ contains
 	   	call nestRun(nest_IS,nest_mmodal,nest_ceff,nest_nlive,nest_tol, &
 	   		         nest_efr,sdim,nest_nPar, nest_nClsPar,nest_maxModes, &
 	   		         nest_updInt,nest_Ztol,nest_root,nest_rseed,nest_pWrap, &
-	   		         nest_fb,nest_resume,nest_outfile,nest_initMPI, &
-	   		         nest_logZero,nest_maxIter,getLogLike,dumper,context)
+	   		         nest_fb,nest_liveplot,nest_resume,nest_outfile,nest_initMPI, &
+	   		         nest_logZero,nest_maxIter,getLogLike,dumper,live_plot,context)
 
 	end subroutine nest_Sample
 
@@ -102,12 +102,16 @@ contains
 		! prior for period(s)
 		do i = 1, nPar-nextra, 5
 			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			!if (i==1) Cube(i) = JeffreysPrior(Cube(i), 650.d0, 750.d0)
+			!if (i==6) Cube(i) = JeffreysPrior(Cube(i), 80.d0, 120.d0)
+			!if (i==1) Cube(i) = GaussianPrior(Cube(i), 0.8374907d0, 0.0000002d0)
+			!if (i==6) Cube(i) = GaussianPrior(Cube(i), 45.294301d0, 0.000048d0)
 		end do
 
 		! priors for ecc, omega, t0
 		do i = 3, nPar-nextra, 5
-			!Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
-			Cube(i) = BetaPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			!Cube(i) = BetaPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
 			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
 			Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
 		end do
@@ -120,9 +124,10 @@ contains
 		do i = 2, nPar-nextra, 5
 			!Cube(i+1) is this planet's eccentricity
 			!Cube(i-1) is this planet's period
-			!kmax = spriorran(i,2)
-			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
-			!print *, kmax, Cube(i+1)
+			kmax = spriorran(i,2)
+			!kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
+			!print *, kmax
+			!Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
 			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), kmax)
 			!print *, Cube(i)
 		end do
@@ -265,5 +270,84 @@ contains
 
 	end subroutine dumper
 
+
+	subroutine live_plot(nPar, nLpt, phyP, l)
+		implicit none
+		integer nPar !total no. of parameters to save
+		integer nLpt !no. of live points
+		double precision phyP(nPar,nLpt), l(nLpt)
+#ifdef PLOT
+		integer, parameter :: nsamples = 3
+		double precision u(nsamples)
+		integer j(nsamples), jmaxlike(1), min_index, max_index, nt, i
+
+		call random_number(u)
+		!print *, u
+		min_index=1
+		max_index=nLpt
+		j = min_index + FLOOR((max_index+1-min_index)*u)
+		jmaxlike = maxloc(l)
+		!print *, j
+		!print *, phyP(:,j)
+		nt = size(times)
+
+		!**********************      PLOT      ******************
+		CALL PGERAS
+		! Define the Viewport
+	    CALL PGSVP(0.01, 0.99, 0.01, 0.99)
+		! Define the Window
+		CALL PGSWIN(REAL(minval(times)-10), REAL(maxval(times)+10), REAL(minval(rvs)-2), REAL(maxval(rvs)+2))
+		!CALL PGSWIN(2449464.5956, 2452856.4222, -150.0, 150.0)
+		!CALL PGSWIN(13000., 16000., -150.0, 150.0)
+		! Draw a box
+	    CALL PGSCI(4) ! blue
+	    CALL PGBOX ('BCTS', 0., 0, 'BCTSV', 0.0, 0)
+
+	    CALL PGSCI (6) ! magenta
+	    CALL PGPT (nt, REAL(times), REAL(rvs), 17)
+
+		do i=2,nsamples
+			call get_rvN(times_oversampled, &
+						 phyP(1:nPar-1:5, j(i)), & ! periods for all planets
+						 phyP(2:nPar-1:5, j(i)), & ! K for all planets
+						 phyP(3:nPar-1:5, j(i)), & ! ecc for all planets
+						 phyP(4:nPar-1:5, j(i)), & ! omega for all planets
+						 phyP(5:nPar-1:5, j(i)), & ! t0 for all planets
+						 phyP(nPar, j(i)), & ! systematic velocity
+						 vel_oversampled, 5*nt, nplanets)
+
+			!CALL PGSCI (0) ! white
+		    !CALL PGLINE(5*nt, REAL(times_oversampled), REAL(last_vel_oversampled(:,i)))
+		    !CALL PGPT (nt, REAL(times), REAL(last_vel), 18)
+		    CALL PGSCI (1) ! black
+		    !CALL PGPT (nt, REAL(times), REAL(vel), 18)
+		    CALL PGLINE(5*nt, REAL(times_oversampled), REAL(vel_oversampled))
+		    last_vel_oversampled(:, i) = vel_oversampled
+		end do
+
+		call get_rvN(times_oversampled, &
+					 phyP(1:nPar-1:5, jmaxlike), & ! periods for all planets
+					 phyP(2:nPar-1:5, jmaxlike), & ! K for all planets
+					 phyP(3:nPar-1:5, jmaxlike), & ! ecc for all planets
+					 phyP(4:nPar-1:5, jmaxlike), & ! omega for all planets
+					 phyP(5:nPar-1:5, jmaxlike), & ! t0 for all planets
+					 phyP(nPar, jmaxlike), & ! systematic velocity
+					 vel_oversampled, 5*nt, nplanets)
+
+		CALL PGSCI (3)
+		CALL PGSLW (3)  ! line width
+	    CALL PGLINE(5*nt, REAL(times_oversampled), REAL(last_vel_oversampled(:,1)))
+	    !CALL PGPT (nt, REAL(times), REAL(last_vel), 18)
+	    !CALL PGSCI (1) ! black
+	    !CALL PGPT (nt, REAL(times), REAL(vel), 18)
+	    !CALL PGLINE(5*nt, REAL(times_oversampled), REAL(vel_oversampled))
+	    last_vel_oversampled(:, 1) = vel_oversampled
+	
+
+	    CALL PGUPDT
+		CALL PGEBUF
+#endif
+
+	end subroutine live_plot
 
 end module nestwrapper
