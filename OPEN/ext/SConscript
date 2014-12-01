@@ -4,6 +4,7 @@ import commands
 from distutils import sysconfig  # to help in building Python extension modules
 import numpy
 
+
 # the build of Python extension modules is based on
 # http://www.eliteraspberries.com/blog/2013/03/build-python-extension-modules-with-scons.html
 
@@ -46,7 +47,15 @@ else:
 
 f2py_flags = ' --quiet '
 f2py_flags += '--f90flags="-ffree-line-length-none -fopenmp" '
-f2py_flags += '--opt="-O3" -lgomp --fcompiler=gnu95'
+f2py_flags += '--opt="-O3" -lgomp --fcompiler=gnu95 '
+
+## allow use to pass path to fortran compiler
+if GetOption('gfortran') is None:
+	pass
+else:
+	f2py_flags += '--f90exec=' + GetOption('gfortran')
+
+
 bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES' + f2py_flags)
 
 env.Append(BUILDERS={'F2PY': bld})
