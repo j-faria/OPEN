@@ -35,6 +35,8 @@ module params
     integer, allocatable, dimension(:) :: observ
     real(kind=8), allocatable, dimension(:) :: ss, alpha, tau
     real(kind=8), allocatable, dimension(:) :: vel, dist, sigma
+    real(kind=8), allocatable, dimension(:) :: times_oversampled, vel_oversampled
+    real(kind=8), allocatable, dimension(:, :) :: last_vel_oversampled
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
 
     integer nest_context
@@ -59,7 +61,7 @@ module params
 	
     !whether to do multimodal sampling
 	logical nest_mmodal 
- 	parameter(nest_mmodal=.false.)
+ 	parameter(nest_mmodal=.true.)
 	
     !sample with constant efficiency
     ! If ceff is set to True, then the enlargement factor of the 
@@ -71,7 +73,7 @@ module params
 	
     !max no. of live points
     integer nest_nlive
-	parameter(nest_nlive=300) !300
+	parameter(nest_nlive=1000) !300
       
     !total number of parameters, 
     !should be sdim in most cases but if you need to store some 
@@ -125,7 +127,7 @@ module params
     !initialize MPI routines?, relevant only if compiling with MPI
 	!set to False if you want your main program to handle MPI initialization
     logical nest_initMPI
-    parameter(nest_initMPI=.true.)
+    parameter(nest_initMPI=.false.)
       
     !points with loglike < nest_logZero will be ignored by MultiNest
     double precision nest_logZero
@@ -145,6 +147,9 @@ module params
     !feedback on the sampling progress?
     logical nest_fb 
     !parameter(nest_fb=.false.)
+
+    !live plot with pgplot?
+    logical nest_liveplot
 
 
 end module params
