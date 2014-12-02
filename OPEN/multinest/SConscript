@@ -69,7 +69,7 @@ else:
 def print_cmd_line(s, target, src, env):
     """s is the original command line, target and src are lists of target
     and source nodes respectively, and env is the environment."""
-    print s
+    # print s
     if 'CopySOAction' in s: return
     sys.stdout.write(" Making %s...\n"% (' and '.join([str(x) for x in target])))
 
@@ -96,7 +96,15 @@ Depends(nest, libnest)
 ## F2PY builder
 f2py_flags = ' --quiet '
 f2py_flags += '--f90flags="-ffree-line-length-none" '
-f2py_flags += '--opt="-O3" --fcompiler=gnu95 -llapack -lblas '
+f2py_flags += '--opt="-O3" --fcompiler=gnu95 '
+
+## on some machines, the gp.so extension needs to be linked
+## with lapack explicitely
+if GetOption('gp_lapack_link') is None:
+	f2py_flags += '-lblas '
+else:
+	f2py_flags += '-llapack -lblas '
+
 ## allow use to pass path to fortran compiler
 if GetOption('gfortran') is None:
 	pass

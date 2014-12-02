@@ -30,8 +30,18 @@ else:
 
 Export('MPI', 'mpif90_exec', 'f2py_exec')
 
+## specify the gfortran executable
+## --gfortran=/path/to/gfortran
 AddOption('--gfortran', dest='gfortran', type='string', nargs=1, action='store',
 	      help='Absolute path to Fortran compiler')
+
+
+## on some machines, the gp.so extension needs to be linked with lapack explicitely
+## use --gp-with-lapack if getting errors of the type
+## ImportError: /data/jfaria/OPEN/OPEN/ext/gp.so: undefined symbol: dpotrf
+AddOption('--gp-with-lapack', dest='gp_lapack_link', action='store_true',
+	      help='some help')
+
 
 
 
