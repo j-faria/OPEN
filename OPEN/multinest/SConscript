@@ -69,7 +69,7 @@ else:
 def print_cmd_line(s, target, src, env):
     """s is the original command line, target and src are lists of target
     and source nodes respectively, and env is the environment."""
-    print s
+    # print s
     sys.stdout.write(" Making %s...\n"% (' and '.join([str(x) for x in target])))
 
 env['PRINT_CMD_LINE_FUNC'] = print_cmd_line

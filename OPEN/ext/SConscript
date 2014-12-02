@@ -39,7 +39,7 @@ GCC_VERSION = commands.getoutput(env['F90'] + ' -dumpversion')
 
 
 f2py_flags = ' --quiet '
-f2py_flags += '--f90flags="-ffree-line-length-none -fopenmp" '
+f2py_flags += '--f90flags="-ffree-line-length-none" '
 f2py_flags += '--opt="-O3" -L/home/joao/Software/mesasdk/lib64 -lgomp --fcompiler=gnu95 '
 
 ## allow use to pass path to fortran compiler
@@ -57,6 +57,7 @@ env.Append(BUILDERS={'F2PY': bld})
 def print_cmd_line(s, target, src, env):
     """s is the original command line, target and src are lists of target
     and source nodes respectively, and env is the environment."""
+    # print s
     sys.stdout.write(" Compiling extension %s...\n"% (' and '.join([str(x) for x in target])))
 
 env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
