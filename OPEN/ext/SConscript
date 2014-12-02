@@ -38,7 +38,7 @@ GCC_VERSION = commands.getoutput(env['F90'] + ' -dumpversion')
 
 
 f2py_flags = ' --quiet '
-f2py_flags += '--f90flags="-ffree-line-length-none -L/home/joao/Software/mesasdk/lib64 -fopenmp" '
+f2py_flags += '--f90flags="-ffree-line-length-none -fopenmp" '
 f2py_flags += '--opt="-O3" -L/home/joao/Software/mesasdk/lib64 -lgomp --fcompiler=gnu95 '
 
 ## allow use to pass path to fortran compiler

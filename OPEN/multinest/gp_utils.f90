@@ -1,6 +1,7 @@
 module gputils
 
 	use array_utils
+	use random, only: setgmnd, genmnd
 	implicit none
 
 	real(kind=8), parameter, private :: pi = 3.1415926535897932384626433832795029d0
