@@ -1,6 +1,7 @@
 import os  # for path-related things
 import shutil
 import commands
+import sys
 from distutils import sysconfig  # to help in building Python extension modules
 import numpy
 
@@ -48,10 +49,18 @@ else:
 	f2py_flags += '--f90exec=' + GetOption('gfortran')
 
 
-bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES' + f2py_flags)
+bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES 1>> f2py-warn.log' + f2py_flags)
 
 env.Append(BUILDERS={'F2PY': bld})
 
+
+def print_cmd_line(s, target, src, env):
+    """s is the original command line, target and src are lists of target
+    and source nodes respectively, and env is the environment."""
+    sys.stdout.write(" Compiling extension %s...\n"% (' and '.join([str(x) for x in target])))
+
+env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
+# env['F2PYCOM'] += " 2> gcc-c-output.txt"
 
 ## compile bayesian lomb scargle periodogram
 blombscargle = env.F2PY(MODULE='blombscargle',
@@ -96,6 +105,7 @@ periodogram_DF = env.LoadableModule('periodogram_DF.so',
                                     ['periodogram_DF.c'],
                                     CPPFLAGS='-O3',
                                     CPPPATH = include_paths,
+                                    CCCOM=" 1>> f2py-warn.log",
                                     LIBPATH = [sysconfig.get_config_var('LIBDIR')],
                                     LIBS = ['python' + sysconfig.get_config_var('VERSION')],
                                     LIBPREFIX = '')
@@ -105,6 +115,7 @@ periodogram_CLEAN = env.LoadableModule('periodogram_CLEAN.so',
                                     ['periodogram_CLEAN.c'],
                                     CPPFLAGS='-O3',
                                     CPPPATH = include_paths,
+                                    CCCOM=" 1>> f2py-warn.log",
                                     LIBPATH = [sysconfig.get_config_var('LIBDIR')],
                                     LIBS = ['python' + sysconfig.get_config_var('VERSION')],
                                     LIBPREFIX = '')
