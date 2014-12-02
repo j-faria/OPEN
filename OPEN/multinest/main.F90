@@ -6,11 +6,13 @@ program main
 
 	use strings
 	use gputils
+    use array_utils, only: linspace
 
 	implicit none
 
 	integer i
 	integer :: iou, ierr
+    integer :: PGOPEN
 	integer :: n
 	character(len=40) line
 	character(len=1) delim
@@ -23,7 +25,7 @@ program main
 	real(kind=8), dimension(6) :: a
 
     namelist /NEST_parameters/ sdim, &
-                               nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, &
+                               nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_liveplot, &
                                nest_root, nest_context, &
                                training, train_variable, &
                                lin_dep, n_lin_dep
@@ -37,6 +39,34 @@ program main
       close(iou)
     end if
 
+
+#ifdef MPI
+    !MPI initializations
+    call MPI_INIT(ierr)
+    if (ierr/=MPI_SUCCESS) then
+            write(*,*)'Error starting MPI. Terminating.'
+            call MPI_ABORT(MPI_COMM_WORLD,ierr)
+    end if
+#endif
+
+#ifdef PLOT 
+    ! initialize graphics device
+    if (nest_liveplot) then
+#ifdef MPI
+        call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+        if (i==0) then
+            IF (PGOPEN('/XSERVE') .LE. 0) STOP 'Error creating plot window'
+            CALL PGPAGE
+            CALL PGBBUF
+        end if
+#else
+    IF (PGOPEN('/XSERVE') .LE. 0) STOP 'Error creating plot window'
+    CALL PGPAGE
+    CALL PGBBUF   
+#endif
+    end if
+#endif
+
 !    !! check compatibility between dimensionality and context
 !    if ((nest_context == 111 .and. sdim < 6) .or. &
 !        (nest_context == 112 .and. sdim < 7) .or. &
@@ -48,11 +78,12 @@ program main
     if (mod(nest_context, 10) == 2) then
     	if (nest_context / 100 == 2) then
 #ifdef MPI
-    		call MPI_INIT(ierr)
     		call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
     		if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
     		call MPI_BARRIER(MPI_COMM_WORLD, ierr)
     		call MPI_ABORT(MPI_COMM_WORLD,1)
+#else
+            stop '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
 #endif
     	end if
     	using_jitter = .true.
@@ -151,6 +182,10 @@ program main
     	end do
     end if
 
+    !! build oversampled time array
+    !print *, minval(times), maxval(times), 5*n
+    times_oversampled = linspace(minval(times), maxval(times), 5*n)
+
     !! initialize the GP "object"
     if (using_gp) then
         !write(*,*) 'Using Gaussian Process model'
@@ -188,22 +223,22 @@ program main
 	! the mathematical form is only used when rescaling
 	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(i,1)= 0.2d0 !0.2d0
-		spriorran(i,2)= 365d0 !365000.d0
+		spriorran(i,1)= 1.2d0 !0.2d0
+		spriorran(i,2)= 3390d0 !365000.d0
 
 		!! semi amplitude K, Mod. Jeffreys
-		spriorran(i+1,1)=1d0
-        !spriorran(i+1,1)= maxval(rvs) - minval(rvs)
+		spriorran(i+1,1)=1.d0
+        spriorran(i+1,2)= maxval(rvs) - minval(rvs)
 		! the true upper limit depends on e and P, and it will only be set when rescaling.
-		spriorran(i+1,2)=kmax
-        !spriorran(i+1,2)=60.d0
+		!spriorran(i+1,2)=kmax
+        !spriorran(i+1,2)=600.d0
 
 		!! eccentricity, Uniform, 0-1
-		!spriorran(i+2,1)=0d0
-		!spriorran(i+2,2)=1d0
+		spriorran(i+2,1)=0d0
+		spriorran(i+2,2)=1d0
         !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
-        spriorran(i+2,1)=0.867d0
-        spriorran(i+2,2)=3.03d0
+        !spriorran(i+2,1)=0.867d0
+        !spriorran(i+2,2)=3.03d0
 
 		!! long. periastron, Uniform, 0-2pi rad
 		spriorran(i+3,1)=0d0
@@ -278,6 +313,26 @@ program main
    	!call nullify(kernel_to_pass)
    	deallocate(n_each_observ)
    	call likelihood_finish
+
+#ifdef PLOT 
+    if (nest_liveplot) then
+    ! finish graphics devide
+#ifdef MPI
+    call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+    if (i==0) then
+        CALL PGEBUF
+        CALL PGCLOS
+    end if
+#else
+    CALL PGEBUF
+    CALL PGCLOS
+#endif
+    end if
+#endif
+
+#ifdef MPI
+    call MPI_FINALIZE(ierr) 
+#endif
 
 contains
 
