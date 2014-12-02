@@ -43,14 +43,13 @@ FFLAGS = '-O3 -fPIC -w -Wno-unused-parameter -ffree-line-length-none'
 if MPI: FFLAGS += ' -DMPI -lmpi'
 FFLAGS += ' -I' + MultiNest_dir
 
-env = env.Clone(tools=['gfortran'],
-	            F90=mpif90_exec if MPI else 'gfortran',
+env = env.Clone(F90=mpif90_exec if MPI else 'gfortran',
 	            LINK=mpif90_exec if MPI else 'gfortran',
-	            # LINKFLAGS=LINK,
-	            F90COMSTR='Compiling $SOURCE',
+	            LINKFLAGS='',
+	            # F90COMSTR='Compiling $SOURCE',
 	            F90FLAGS=FFLAGS,
 	            LIBS=['nest3', 'lapack', 'blas'], 
-	            LIBPATH=MultiNest_dir,
+	            LIBPATH=[MultiNest_dir],
 	            FORTRANMODDIRPREFIX = '-J',  # option used by gfortran to specify where to put .mod files for compiled modules
 	            FORTRANMODDIR='.'
 	            )
@@ -59,7 +58,9 @@ if GetOption('gfortran') is None:
 	pass
 else:
 	if MPI:
-		env['F90FLAGS'] += ' -f90=' + GetOption('gfortran')
+		env.Append(F90FLAGS = ' -f90=' + GetOption('gfortran'))
+		env.Append(LINKFLAGS = ' -f90=' + GetOption('gfortran'))
+		# env['F90FLAGS'] += ' -f90=' + GetOption('gfortran')
 		# print env['F90FLAGS']
 	else:
 		env['F90'] = GetOption('gfortran')
@@ -68,6 +69,7 @@ else:
 def print_cmd_line(s, target, src, env):
     """s is the original command line, target and src are lists of target
     and source nodes respectively, and env is the environment."""
+    print s
     sys.stdout.write(" Making %s...\n"% (' and '.join([str(x) for x in target])))
 
 env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
@@ -86,7 +88,8 @@ objs = [obj for obj in comps if obj.get_suffix() in (".o", ".os")]
 
 # this program has an additional dependence on libnest3.so
 libnest = File(os.path.join(MultiNest_dir, 'libnest3.so'))
-nest = env.Program('nest', [objs, libnest])
+nest = env.Program('nest', [objs])
+Depends(nest, libnest)
 
 
 ## F2PY builder
