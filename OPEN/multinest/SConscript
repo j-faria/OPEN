@@ -1,37 +1,53 @@
 import os
+import shutil
 import commands
+import sys
 
 Import('MPI')
+Import('mpif90_exec', 'f2py_exec')
+
 launch_dir = GetLaunchDir()
 MultiNest_dir = os.path.join(launch_dir, 'MultiNest/MultiNest_v3.7')
 
+
+def CopySOAction(target=None, source=None, env=None):
+    """
+    Copy the .so files create by f2py from launch_dir to the OPEN/ext directory.
+      target: a Node object representing the target file
+      source: a Node object representing the source file
+      env: the construction environment used for building the target file
+      The target and source arguments may be lists of Node objects if there 
+      is more than one target file or source file.
+    """
+    so_file = os.path.basename(str(target[0]))
+    fr = os.path.join(launch_dir, so_file)
+    to = os.path.join(launch_dir, str(target[0]))
+    # print fr
+    # print to
+    if os.path.isfile(fr):
+        shutil.move(fr, to)
+    # target_file_names = map(lambda x: str(x), target)
+    # print target_file_names
+    return 0
+
+
 env = Environment()
 
-bld = Builder(action = 'ln -s -f $SOURCE $TARGET')
-env.Append(BUILDERS={'SYMLINK': bld})
+## RV curve routine is always a copy from ../ext/get_rvN.f90 so that only
+## this file needs to be changed in all occasions
+rvN = env.Command("get_rvN.f90", "../ext/get_rvN.f90", Copy("$TARGET", "$SOURCE"))
 
-rvN = Command("get_rvN.f90", "../ext/get_rvN.f90", Copy("$TARGET", "$SOURCE"))
 
-## get path to mpif90 executable
-if MPI:
-	out = commands.getstatusoutput('which mpif90')
-	if out[0] == 0:
-		mpif90_exec = out[1]
-		mpif90_version = commands.getoutput(mpif90_exec + ' -v').split('\n')[0]
-		print 'Found %s at %s' % (mpif90_version, mpif90_exec)
-	else:
-		raise RuntimeError('Compiling with MPI but mpif90 does not seem to be installed. Aborting!')
-
-# # Configure the f90 compiler
-FFLAGS = '-O3 -w -Wno-unused-parameter -ffree-line-length-none'
+## Configure the f90 compiler
+FFLAGS = '-O3 -fPIC -w -Wno-unused-parameter -ffree-line-length-none'
 if MPI: FFLAGS += ' -DMPI -lmpi'
-
 FFLAGS += ' -I' + MultiNest_dir
 
 env = env.Clone(tools=['gfortran'],
 	            F90=mpif90_exec if MPI else 'gfortran',
 	            LINK=mpif90_exec if MPI else 'gfortran',
 	            # LINKFLAGS=LINK,
+	            F90COMSTR='Compiling $SOURCE',
 	            F90FLAGS=FFLAGS,
 	            LIBS=['nest3', 'lapack', 'blas'], 
 	            LIBPATH=MultiNest_dir,
@@ -49,16 +65,50 @@ else:
 		env['F90'] = GetOption('gfortran')
 		# print env['F90']
 
+def print_cmd_line(s, target, src, env):
+    """s is the original command line, target and src are lists of target
+    and source nodes respectively, and env is the environment."""
+    sys.stdout.write(" Making %s...\n"% (' and '.join([str(x) for x in target])))
+
+env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
+
+
 source_files = Glob('*.f90') + Glob('*.F90')
 # remove file which is to be compiled by F2PY
 source_files = [f for f in source_files if 'gp_python_wrapper.f90' not in str(f)] 
 
 # explicitly compile the source files to object+mod files
-comps = env.SharedObject(source_files)
+comps = env.Object(source_files)
 Depends(comps, rvN)
 
 # only object files without .mod
 objs = [obj for obj in comps if obj.get_suffix() in (".o", ".os")]
 
+# this program has an additional dependence on libnest3.so
+libnest = File(os.path.join(MultiNest_dir, 'libnest3.so'))
+nest = env.Program('nest', [objs, libnest])
 
-nest = env.Program('nest', objs)
+
+## F2PY builder
+f2py_flags = ' --quiet '
+f2py_flags += '--f90flags="-ffree-line-length-none" '
+f2py_flags += '--opt="-O3" --fcompiler=gnu95 '
+## allow use to pass path to fortran compiler
+if GetOption('gfortran') is None:
+	pass
+else:
+	f2py_flags += '--f90exec=' + GetOption('gfortran')
+
+bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES' + f2py_flags)
+env.Append(BUILDERS={'F2PY': bld})
+
+# only object files without .mod
+obj_for_gp = ['array_utils.o', 'get_rvN.o', 'gp_utils.o', 'random.o']
+objs = [obj for obj in comps if str(obj) in obj_for_gp]
+# print [str(f) for f in objs]
+
+## compile the gp wrapper extension
+gp = env.F2PY(MODULE='gp',
+	          target=os.path.join(launch_dir, 'OPEN/ext', 'gp.so'),
+	          source=['gp_python_wrapper.f90', objs])
+env.AddPostAction(gp, CopySOAction)
