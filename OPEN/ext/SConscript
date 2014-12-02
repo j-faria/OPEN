@@ -4,7 +4,7 @@ import commands
 from distutils import sysconfig  # to help in building Python extension modules
 import numpy
 
-
+Import('f2py_exec')
 # the build of Python extension modules is based on
 # http://www.eliteraspberries.com/blog/2013/03/build-python-extension-modules-with-scons.html
 
@@ -36,18 +36,10 @@ env = Environment()
 
 GCC_VERSION = commands.getoutput(env['F90'] + ' -dumpversion')
 
-## get path to f2py executable
-out = commands.getstatusoutput('which f2py')
-if out[0] == 0:
-	f2py_exec = out[1]
-	f2py_version = commands.getoutput(f2py_exec + ' -v')
-	print 'Found f2py version %s at %s' % (f2py_version, f2py_exec)
-else:
-	raise RuntimeError('f2py does not seem to be installed. Aborting!')
 
 f2py_flags = ' --quiet '
-f2py_flags += '--f90flags="-ffree-line-length-none -fopenmp" '
-f2py_flags += '--opt="-O3" -lgomp --fcompiler=gnu95 '
+f2py_flags += '--f90flags="-ffree-line-length-none -L/home/joao/Software/mesasdk/lib64 -fopenmp" '
+f2py_flags += '--opt="-O3" -L/home/joao/Software/mesasdk/lib64 -lgomp --fcompiler=gnu95 '
 
 ## allow use to pass path to fortran compiler
 if GetOption('gfortran') is None:
