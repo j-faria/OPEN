@@ -3,8 +3,8 @@ import shutil
 import commands
 import sys
 
-Import('MPI')
-Import('mpif90_exec', 'f2py_exec')
+Import('MPI', 'f2py_exec')
+if MPI: Import('mpif90_exec')
 
 launch_dir = GetLaunchDir()
 MultiNest_dir = os.path.join(launch_dir, 'MultiNest/MultiNest_v3.7')

@@ -28,7 +28,8 @@ else:
 	raise RuntimeError('f2py does not seem to be installed. Aborting!')
 
 
-Export('MPI', 'mpif90_exec', 'f2py_exec')
+Export('MPI', 'f2py_exec')
+if MPI: Export('mpif90_exec')
 
 ## specify the gfortran executable
 ## --gfortran=/path/to/gfortran
