@@ -1,4 +1,4 @@
 [submodule "MultiNest"]
 	path = MultiNest
 	url = https://github.com/j-faria/MultiNest.git
-	ignore = all
+	ignore = untracked
