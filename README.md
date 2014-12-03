@@ -34,6 +34,10 @@ or, if you are using `gfortran` from the MESA SDK,
 
     $ python scons/scons.py --gfortran=/path/to/mesasdk/bin/gfortran
 
+If everything goes smoothly you can now run OPEN:
+
+    $ python open.py
+
 Troubleshooting
 ---------------
 
