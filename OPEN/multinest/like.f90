@@ -3,7 +3,7 @@ module like
 	use params
 	use gputils, only: gp_n_planet_pars
 	use utils1, only: logSumExp
-	use Nested, only: MPI_COMM_WORLD
+	!use Nested, only: MPI_COMM_WORLD
 
 	!use lib_matrix, only: inverse, determinant
 	implicit none
@@ -24,6 +24,8 @@ contains
 		allocate(times(N), rvs(N), errors(N))
 		allocate(train_var(N))
 		allocate(vel(N), dist(N), sigma(N))
+		allocate(vel_oversampled(5*N), times_oversampled(5*N))
+		allocate(last_vel_oversampled(5*N, 3))
 		allocate(covmat(N,N), inv_covmat(N,N))
 	end subroutine likelihood_init
 
@@ -33,6 +35,7 @@ contains
 		deallocate(observ)
 		deallocate(times, rvs, errors)
 		deallocate(vel, dist, sigma)
+		deallocate(last_vel_oversampled, vel_oversampled, times_oversampled)
 		deallocate(covmat, inv_covmat)
 	end subroutine likelihood_finish		
 
