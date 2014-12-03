@@ -3,23 +3,36 @@ OPEN
 
 Tools for exoplanet detection.
 
-- A description of your project
-- Links to the project's ReadTheDocs page
-- A TravisCI button showing the state of the build
-- "Quickstart" documentation (how to quickly install and use your project)
-- A list of non-Python dependencies (if any) and how to install them
-                    
+
+Dependencies
+------------
+
+OPEN depends on the following Python packages:
+
+   * [Numpy](http://www.numpy.org/), [matplotlib](http://matplotlib.org/), [IPython](http://ipython.org/), [Scipy](http://scipy.org/)
+
+Different versions of these packages should not be causing problems. Nevertheless, OPEN is being developed with Numpy 1.9.1, Matplotlib 1.4.2, IPython 2.2.0 and Scipy 0.14.0 and so these versions are the ones officially supported. Please [file an issue](https://github.com/j-faria/OPEN/issues) if you notice any problems with older versions.
+
+OPEN also depends on a fairly recent version of the [GNU Compiler Collection](https://gcc.gnu.org/) to compile Fortran routines and Python extensions. An easy way to obtain all the compiler/library dependencies is to use the [MESA SDK](http://www.astro.wisc.edu/~townsend/static.php?ref=mesasdk) and specify the path to `gfortran` during installation (see below).
+ 
+ 
+   * Other non-Python packages
 
 Quickstart
 ----------
 
-OPEN depends on the following software:
+The easiest way to download OPEN is by using `git`. Open a terminal and run
 
-   * [Numpy](http://www.numpy.org/)
-   * [matplotlib](http://matplotlib.org/)
-   * [IPython](http://ipython.org/)
- 
-   * Other non-Python packages
+    git clone --recursive git@github.com:j-faria/OPEN.git
+
+which will create a directory `OPEN` containing the code (and the MultiNest submodule). Currently there is no other way to obtain the MultiNest submodule. This is a [known issue](https://github.com/j-faria/OPEN/issues/6).
+
+To install OPEN, go into the directory you just created and type
+
+    $ [cd OPEN]
+    $ python scons/scons.py
+
+
 
 Implementation details
 ----------------------
