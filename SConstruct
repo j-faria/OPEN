@@ -1,4 +1,5 @@
 import commands
+import os
 
 # compiling with MPI support?
 out = commands.getstatusoutput('mpirun --version')
@@ -44,7 +45,13 @@ AddOption('--gp-with-lapack', dest='gp_lapack_link', action='store_true',
 	      help='some help')
 
 
-
-
 SConscript(['OPEN/SConscript'])
-SConscript(['MultiNest/SConscript'])
+
+path = 'MultiNest/SConscript'
+if os.path.isfile(path):
+	SConscript([path])
+else:
+	print "Missing the SConscript file at %s." % path
+	print "Try cloning the MultiNest submodule:\n$ git submodule init\n$ git submodule update"
+	Exit(1)
+
