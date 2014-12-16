@@ -553,7 +553,7 @@ def do_diffevol(system, just_de=False, npop=100, ngen=250):
 	# save fit in the system
 	system.save_fit(lm_par, chi2)
 
-def do_genetic(system, just_gen=False):
+def do_genetic(system, just_gen=False, npop=500, ngen=50):
 	""" Carry out the fit using a genetic algorithm and if 
 	just_gen=False try to improve it with a run of the LM algorithm """
 	from deap import base, creator, tools, algorithms
@@ -600,7 +600,7 @@ def do_genetic(system, just_gen=False):
 
 	## create parameters by sampling from their priors
 	def P_prior():
-		return random.uniform(5, 1000)
+		return random.uniform(0.2, np.ptp(system.time))
 		# return random.gauss(maxP, size_maxP)
 	def K_prior():
 		return random.uniform(0, 150)
@@ -625,12 +625,10 @@ def do_genetic(system, just_gen=False):
 		return individual,
 
 	toolbox.register("evaluate", chi2_n)
-	toolbox.register("mate", tools.cxTwoPoints)
+	toolbox.register("mate", tools.cxTwoPoint)
 	toolbox.register("mutate", mutPrior, indpb=0.10)
 	toolbox.register("select", tools.selTournament, tournsize=3)
 
-	npop = 500
-	ngen = 150
 	npar = 5*keplerians+1
 	## build the population
 	pop = toolbox.population(n=npop)
@@ -642,7 +640,7 @@ def do_genetic(system, just_gen=False):
 	stats.register("min", np.nanmin)
 	# stats.register("max", np.nanmax)
 	# stats.register("total", sigma3)
-	stats.register("red", lambda v: min(v)/(len(system.time)-npar) )
+	# stats.register("red", lambda v: min(v)/(len(system.time)-npar) )
 
 	msg = blue('INFO: ') + 'Created population with N=%d. Going to evolve for %d generations...' % (npop,ngen)
 	clogger.info(msg)
@@ -660,8 +658,7 @@ def do_genetic(system, just_gen=False):
 		P, K, ecc, omega, T0, gam = [hof[0][j::6] for j in range(6)]
 		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 	
-	msg = yellow('RESULT: ') + 'Best fitness value: %s\n' % (hof[0].fitness)
-	clogger.info(msg)
+	print 
 
 	if just_gen: 
 		# save fit in the system and return, no need for LM
@@ -686,7 +683,10 @@ def do_genetic(system, just_gen=False):
 		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 
 	chi2 = chi2_n(lm_par)[0]
-	msg = yellow('RESULT: ') + 'Best fitness value: %f, %f' % (chi2, chi2/(len(system.time)-npar))
+	print 
+	msg = yellow('RESULT: ') + 'Best fitness value: '
+	msg += unichr(0x3c7).encode('utf-8') + '^2 = %f,  ' % (chi2,)
+	msg += 'reduced ' + unichr(0x3c7).encode('utf-8') + '^2 = %f' % (chi2/(len(system.time)-npar))
 	clogger.info(msg)
 
 	# save fit in the system
@@ -1031,6 +1031,8 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 
 		get_multinest_output(root, nplanets, context=str(context))
 		results_constant = MCMC_nest(root, context=str(context))
+		# put the results into a zip file
+		results_constant.compress_chains()
 		if doplot:
 			results_constant.do_plot_map(system)
 
@@ -1103,8 +1105,13 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 
 		get_multinest_output(root, nplanets, context=str(context))
 		results_one_planet = MCMC_nest(root, context=str(context))
+		# put the results into a zip file
+		results_one_planet.compress_chains()
 		if doplot:
 			results_one_planet.do_plot_map(system)
+			if verbose:
+				results_one_planet.do_plot_map_phased(system)
+				results_one_planet.do_hist_plots()
 
 		one_planet_lnE = results_one_planet.NS_lnE
 
@@ -1162,8 +1169,13 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 
 		get_multinest_output(root, nplanets, context=str(context))
 		results_two_planet = MCMC_nest(root, context=str(context))
+		# put the results into a zip file
+		results_two_planet.compress_chains()
 		if doplot:
 			results_two_planet.do_plot_map(system)
+			if verbose:
+				results_two_planet.do_plot_map_phased(system)
+				results_two_planet.do_hist_plots()
 
 		two_planet_lnE = results_two_planet.NS_lnE
 
@@ -1837,7 +1849,7 @@ def do_clean(system):
 		return
 
 	time, rv, err = system.time, system.vrad, system.error
-	plow = 1.0
+	plow = 0.5
 
 	msg = blue('INFO: ') + 'Running CLEAN...'
 	clogger.info(msg)
@@ -1866,7 +1878,8 @@ def do_clean(system):
 
 	plt.figure()
 	ax1 = plt.subplot(111)
-	ax1.semilogx((1./nu1), C,'k-')
+	ax1.semilogx((1./nu1), C, 'k-')
+	ax1.set_xlim([0.1, 1e3])
 	ax1.set_xlabel('Period [d]')
 	ax1.set_ylabel('Arbitrary power')
 	plt.show()
@@ -1947,12 +1960,52 @@ def do_create_planets(s):
 		else:
 			eccentricities = None
 
+		if ask_yes_no('Specify the semi-amplitudes (y/N)? ', default=False):
+			semi_amplitudes = []
+			for i in range(nplanets):
+				k = float(raw_input('\tsemi-amplitude %d:  ' % (i+1)))
+				semi_amplitudes.append(k)
+		else:
+			semi_amplitudes = None
+	
+
+		# use sampling directly from file or with other options
 		if ask_yes_no('Use sampling from file (y/N)? ', default=False):
 			filename = raw_input('Which file? ')
-			with open(filename) as f:
-				nobs = len(f.readlines())
+			# if yes then we use everything from the file
+			if ask_yes_no('Simply use sampling, error bars and number of points from file? Press n for other options (Y/n)', default=True):
+				with open(filename) as f:
+					nobs = len(f.readlines()) - 2  # skip header
+				use_number_points = True
+				use_error_bars = True
+				use_only_start_end = False
+			# else we can just use the first and last timestamp, only the error bars or only the sampling
+			else:
+				use_number_points = ask_yes_no('Use number of points from file (Y/n)?', default=True)
+				if use_number_points:
+					with open(filename) as f:
+						nobs = len(f.readlines()) - 2  # skip header
+				else:
+					obs = raw_input('How many observed RVs? ("r" for random) ')
+					nobs = np.random.randint(30, 220) if obs in ('r', '') else int(obs)
+
+				use_error_bars = ask_yes_no('Use error bars from file? Only effective if using number of points from file (Y/n)', default=True)
+
+				if use_error_bars and use_number_points:
+					errors_sampled_from_file = np.loadtxt(filename, usecols=(2,), skiprows=2)
+					assert len(errors_sampled_from_file) == nobs
+
+				use_only_start_end = ask_yes_no('Use first and last timestamp only? Sampling will be evenly spaced (y/N)', default=False)
+
+				if use_only_start_end:
+					times_sampled_from_file = np.loadtxt(filename, usecols=(0,), skiprows=2)
+					mint = min(times_sampled_from_file)
+					maxt = max(times_sampled_from_file)
+
 		else:
 			filename = None
+			use_number_points = False
+			use_only_start_end = False
 			obs = raw_input('How many observed RVs? ("r" for random) ')
 			nobs = np.random.randint(30, 220) if obs in ('r', '') else int(obs)
 
@@ -1970,18 +2023,26 @@ def do_create_planets(s):
 			else:
 				print "I don't understand that. Try 'no', w', 'r' or 'wr'."
 
+
 	print
 	msg = blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
 	if filename is not None:
 		msg += blue('    : ') + '-> sampling from %s\n' % (filename)
+		if use_only_start_end: msg += blue('    : ') + '-> using first and last timestamp\n'
+		if use_error_bars and use_number_points: msg += blue('    : ') + '-> using errorbars from this file\n'
 	else:
 		msg += blue('    : ') + '-> randomly spaced sampling\n'
 	msg += blue('    : ') + '-> %d observations\n' % (nobs)
 	msg += blue('    : ') + '-> %s noise\n' % (type_noise)
 	clogger.info(msg)
 
+	save_filename = None
+	options = (filename, save_filename, type_noise, use_only_start_end)
+
 	# get rv curve with random parameters
-	def gen_rv(nplanets, nobs, sampling_file, periods, eccentricities, type_noise, temp):
+	def gen_rv(nplanets, nobs, options, periods, eccentricities, amplitudes, temp):
+
+		sampling_file, saving_file, type_noise, use_only_start_end = options
 
 		if sampling_file is not None:  # the sampling is set in the file
 			times_sampled_from_file = np.loadtxt(sampling_file, usecols=(0,), skiprows=2)
@@ -2011,7 +2072,11 @@ def do_create_planets(s):
 			else:
 				ecc = eccentricities[planet]  # user-provided eccentricity
 
-			K = np.random.rand()*10. + 1.
+			if amplitudes is None:
+				K = np.random.rand()*10. + 1.
+			else:
+				K = amplitudes[planet]  # user-provided eccentricity
+			
 
 			omega = np.random.rand()*2.*pi 
 
@@ -2039,7 +2104,9 @@ def do_create_planets(s):
 		return times_full, vel_full, times, vel_total, vel_all, noise
 
 	# wrapper function that takes care of adding noise and logging to file
-	def generate_planets(nplanets, nobs, sampling_file, saving_file, type_noise, periods, eccentricities):
+	def generate_planets(nplanets, nobs, options, periods, eccentricities, amplitudes):
+		sampling_file, saving_file, type_noise, use_only_start_end = options
+
 		if saving_file is None:
 			# create temporary file to store simulation info
 			tf = tempfile.NamedTemporaryFile(dir='./')
@@ -2050,7 +2117,7 @@ def do_create_planets(s):
 		tf.write(time.strftime("%d/%m/%Y - %H:%M:%S\n#\n"))
 
 		times_full, vel_full, times, vel, vel_all, noise = \
-			gen_rv(nplanets, nobs, sampling_file, periods, eccentricities, type_noise, tf)
+			gen_rv(nplanets, nobs, options, periods, eccentricities, amplitudes, tf)
 
 		tf.write('#\n## %d observations, %s noise\n#\n' % (nobs, type_noise))
 		tf.write('# bjd \t vrad(km/s) \t svrad(km/s)\n')
@@ -2068,8 +2135,8 @@ def do_create_planets(s):
 
 		return times_full, vel_full, times, vel, vel_all
 
-	save_filename = None
-	r = generate_planets(nplanets, nobs, filename, save_filename, type_noise, periods, eccentricities)
+	
+	r = generate_planets(nplanets, nobs, options, periods, eccentricities, semi_amplitudes)
 	times_full, vel_full, times, vel1, vel2 = r
 
 
