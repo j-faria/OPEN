@@ -154,6 +154,18 @@ Options:
 """
 
 
+gen_usage = \
+"""
+Usage:
+    gen [--npop=<pop>] [--ngen=<gen>]
+    gen -h | --help
+Options:
+    --npop=<pop>  Number of individuals in population [default: 100]
+    --ngen=<gen>  Number of generations to evolve [default: 250]
+    -h --help     Show this help message
+"""
+
+
 rrot_usage = \
 """
 Usage:
@@ -330,12 +342,12 @@ class EmbeddedMagics(Magics):
 
         if (min(default.error) < 0.01 and not args['--nomps']):
             from shell_colors import blue
-            msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value'
+            msg = blue('INFO: ') + 'Converting to m/s'
             clogger.info(msg)
 
-            default.vrad = (default.vrad - mean(default.vrad)) * 1e3
+            default.vrad = (default.vrad) * 1e3
             default.error *= 1e3
-            default.vrad_full = (default.vrad_full - mean(default.vrad_full)) * 1e3
+            default.vrad_full = (default.vrad_full) * 1e3
             default.error_full *= 1e3
             default.units = 'm/s'
 
@@ -745,6 +757,20 @@ class EmbeddedMagics(Magics):
     def gen(self, parameter_s='', local_ns=None):
         """ Run the genetic algorithm minimization - stub """
         from shell_colors import red
+
+        ## take care of arguments
+        try:
+            args = parse_arg_string('gen', parameter_s)
+        except DocoptExit:
+            print de_usage.lstrip()
+            return
+        except SystemExit:
+            return
+        
+        ngen = int(args.pop('--ngen'))
+        npop = int(args.pop('--npop'))
+
+
         if local_ns.has_key('default'):
             system = local_ns['default']
         else:
@@ -753,7 +779,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_genetic(system)
+        core.do_genetic(system, npop=npop, ngen=ngen)
         system.do_plot_fit()
 
     @needs_local_scope
@@ -1177,6 +1203,9 @@ def parse_arg_string(command, arg_string):
 
     if command is 'de':
         args = docopt(de_usage, splitted)
+
+    if command is 'gen':
+        args = docopt(gen_usage, splitted)
 
     if command is 'demc':
         args = docopt(demc_usage, splitted)        
