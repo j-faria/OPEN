@@ -123,7 +123,7 @@ contains
 	    	!           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
 	    	!           Cube(6), vel, n, nplanets)
 		else
-			vel = Cube(1)
+			vel = Cube(nest_nPar)
 		end if
 
 	    dist = rvs - vel
@@ -141,9 +141,9 @@ contains
 			lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
 	    end if
 
-		
 		slhood = logSumExp(slhood,lhood)
-		!write(*, '(6f7.3)') Cube(1:nest_nPar)
+		!print *, Cube(1:nest_nPar)
+		!stop
 		if (doing_debug) write(*,'(f8.3)', advance='no') slhood
 
 	end subroutine slikelihood
