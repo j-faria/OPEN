@@ -75,6 +75,7 @@ contains
 			! prior for jitter
 			i = nPar-nextra+1 ! index of jitter parameter
 			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			!Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 
 			! prior for systematic velocity
 			i = npar-nextra+2 ! index of systematic velocity
@@ -110,8 +111,8 @@ contains
 
 		! priors for ecc, omega, t0
 		do i = 3, nPar-nextra, 5
-			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
-			!Cube(i) = BetaPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			!Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			Cube(i) = BetaPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
 			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
 			Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
 		end do
@@ -124,11 +125,12 @@ contains
 		do i = 2, nPar-nextra, 5
 			!Cube(i+1) is this planet's eccentricity
 			!Cube(i-1) is this planet's period
-			kmax = spriorran(i,2)
-			!kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
+			!kmax = spriorran(i,2)
+			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
 			!print *, kmax
-			!Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
-			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			!Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			!Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 			!print *, Cube(i)
 		end do
 
@@ -177,10 +179,16 @@ contains
 			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*4 - 3:)
 
+		else if (nplanets == 1 .and. using_jitter) then  ! 1 planet + jitter
+			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*4)
+
 		else if (nplanets == 1) then  ! 1 planet
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*4)
+
 		
 		else if (nplanets == 2 .and. using_gp) then  ! 2 planets + 4 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
@@ -192,6 +200,13 @@ contains
 			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
 			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*4 - 3:)
+
+		else if (nplanets == 2 .and. using_jitter) then  ! 2 planets + jitter
+			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*3+5)
+			write(fmt,'(a,i2,a)')  '(',7,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+6:nPar*4)
 
 		else if (nplanets == 2) then  ! 2 planets
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
@@ -225,6 +240,11 @@ contains
 			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
 			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+2:)
+
+		else if (nplanets == 0 .and. using_jitter) then  ! jitter + vsys
+			write(*,'(2a13)') (/"    s", " vsys" /)
+			write(fmt,'(a,i2,a)')  '(', 2, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:)
 
 		else if (nplanets == 0) then  ! one systematic velocity
 			write(*,'(a13)') (/" vsys" /)
