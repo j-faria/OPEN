@@ -757,7 +757,7 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 	from time import sleep, time
 	from commands import getoutput
 
-	def get_multinest_output(root, nplanets, context='111'):
+	def get_multinest_output(system, root, nplanets, context='111'):
 		msg = blue('INFO: ') + 'Analysing output...'
 		clogger.info(msg)
 
@@ -794,6 +794,7 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		par_map = [float(s.split()[1]) for s in stats[start:end]]
 		# P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
 
+		print 
 		msg = yellow('RESULT: ') + 'Parameters summary'
 		clogger.info(msg)
 
@@ -807,6 +808,19 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('ecc',   par_mean[5*i+2], par_sigma[5*i+2], par_mle[5*i+2], par_map[5*i+2])
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('omega', par_mean[5*i+3], par_sigma[5*i+3], par_mle[5*i+3], par_map[5*i+3])
 			print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
+		
+			print 
+
+			P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
+			m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
+
+			from .utils import mjup2mearth
+			m_me = m_mj * mjup2mearth
+
+			print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
+
+			print 
+
 		print yellow('system')
 		if context[2] == '2':
 			# jitter parameter
@@ -962,8 +976,12 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		clogger.info(msg)
 
 		# read/parse the output
-		get_multinest_output(root_path, nplanets, context=full_context)
 		system.results = MCMC_nest(root_path, context=full_context)
+
+		# save fit in the system
+		system.results.save_fit_to(system)
+
+		get_multinest_output(system, root_path, nplanets, context=full_context)
 
 		if doplot:
 			system.results.do_plot_map(system)
@@ -971,9 +989,6 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 				system.results.do_plot_map_phased(system)
 				system.results.do_hist_plots()
 				
-
-		# save fit in the system
-		system.results.save_fit_to(system)
 
 
 	else:
@@ -1039,7 +1054,7 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 		clogger.info(msg)
 
-		get_multinest_output(root, nplanets, context=str(context))
+		get_multinest_output(system, root, nplanets, context=str(context))
 		results_constant = MCMC_nest(root, context=str(context))
 		# put the results into a zip file
 		results_constant.compress_chains()
@@ -1113,7 +1128,7 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 		clogger.info(msg)
 
-		get_multinest_output(root, nplanets, context=str(context))
+		get_multinest_output(system, root, nplanets, context=str(context))
 		results_one_planet = MCMC_nest(root, context=str(context))
 		# put the results into a zip file
 		results_one_planet.compress_chains()
@@ -1177,7 +1192,7 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		clogger.info(msg)
 
 
-		get_multinest_output(root, nplanets, context=str(context))
+		get_multinest_output(system, root, nplanets, context=str(context))
 		results_two_planet = MCMC_nest(root, context=str(context))
 		# put the results into a zip file
 		results_two_planet.compress_chains()
