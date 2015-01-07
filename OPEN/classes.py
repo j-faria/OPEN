@@ -122,6 +122,10 @@ class rvSeries:
     #   chi2 : reduced(!) chi square value of the fit
     fit = None
 
+    # properties of the star
+    star_mass = 1.0  # in Msun, default 1.0
+
+
     def save(self, filename):
         rvIO.write_rv(self, filename)
 
