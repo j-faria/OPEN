@@ -69,7 +69,7 @@ module params
     ! is as close to the target efficiency (set by efr) as possible. 
     ! This does mean however, that the evidence value may not be accurate.
 	logical nest_ceff
- 	parameter(nest_ceff=.true.)
+ 	parameter(nest_ceff=.false.)
 	
     !max no. of live points
     integer nest_nlive
@@ -87,13 +87,13 @@ module params
       
     !evidence tolerance factor
     double precision nest_tol 
-    parameter(nest_tol=0.5)
+    parameter(nest_tol=0.1)
       
     !enlargement factor reduction parameter
     ! defines the sampling efficiency. 0.8 and 0.3 are recommended for 
     ! parameter estimation & evidence evaluation respectively.
     double precision nest_efr
-    parameter(nest_efr=0.8d0)
+    parameter(nest_efr=0.3d0)
       
     !root for saving posterior files
     character*100 nest_root
