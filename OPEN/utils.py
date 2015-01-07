@@ -20,6 +20,11 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Ellipse
 import matplotlib.cm as cm
 
+
+mjup2mearth  = 317.828
+
+
+
 ## this code from 
 ##   http://code.activestate.com/recipes/502263-yet-another-unique-function/
 ## atributed to Paul Rubin
