@@ -136,7 +136,7 @@ program main
 
     !! the number of parameters to cluster is usually set to 3
     !! but it cannot be greater than sdim
-    if (sdim==1) then
+    if (sdim==1 .or. sdim==2) then
         nest_nClsPar=1
     else
         nest_nClsPar=3
@@ -223,26 +223,30 @@ program main
 	! the mathematical form is only used when rescaling
 	do i = 1, sdim-nextra, 5
 		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(i,1)= 1.2d0 !0.2d0
-		spriorran(i,2)= 3390d0 !365000.d0
+		spriorran(i,1)= 0.2d0 !0.2d0
+		spriorran(i,2)= 365000d0 !365000.d0
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1.d0
-        spriorran(i+1,2)= maxval(rvs) - minval(rvs)
+        !spriorran(i+1,2)= maxval(rvs) - minval(rvs)
 		! the true upper limit depends on e and P, and it will only be set when rescaling.
-		!spriorran(i+1,2)=kmax
-        !spriorran(i+1,2)=600.d0
+		spriorran(i+1,2)=kmax 
+        !spriorran(i+1,2)=30.d0
+        ! when the data is in km/s
+        !spriorran(i+1,1) = 0.001d0  ! 1 m/s
+        !spriorran(i+1,2) = kmax * 1d-3
 
 		!! eccentricity, Uniform, 0-1
-		spriorran(i+2,1)=0d0
-		spriorran(i+2,2)=1d0
+		!spriorran(i+2,1)=0d0
+		!spriorran(i+2,2)=1d0
         !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
-        !spriorran(i+2,1)=0.867d0
-        !spriorran(i+2,2)=3.03d0
+        spriorran(i+2,1)=0.867d0
+        spriorran(i+2,2)=3.03d0
 
 		!! long. periastron, Uniform, 0-2pi rad
 		spriorran(i+3,1)=0d0
-		spriorran(i+3,2)=twopi		
+		spriorran(i+3,2)=twopi
+        !nest_pWrap(i+3) = 1  ! wrap around this parameter
 
 		!! chi, Uniform, 
 		spriorran(i+4,1)= minval(times)
@@ -253,8 +257,12 @@ program main
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], jitter, vsys_obs1, [vsys_obs2]
 		i = sdim-nextra+1 ! index of jitter parameter
-		spriorran(i,1)= 1d0
-		spriorran(i,2)= kmax
+		!spriorran(i,1)= 1d0
+		!spriorran(i,2)= kmax
+        ! when data is in km/s
+        spriorran(i,1)= 0.001d0
+        spriorran(i,2)= kmax * 1d-3
+        
 
 		!! systematic velocity(ies), Uniform, -kmax - kmax
 		i = sdim-nextra+2 
@@ -300,10 +308,10 @@ program main
 !        write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
 !        write(*, fmt) spriorran(:,1)
 !        write(*, fmt) spriorran(:,2)
-!        write(*,*) observ
+!        !write(*,*) observ
 !    end if
 !    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-!
+
 !    print *, training, train_variable
 ! 	stop "we have to stop here"
 
