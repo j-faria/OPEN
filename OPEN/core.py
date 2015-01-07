@@ -755,6 +755,7 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		feed: when running automatic model selection, whether to provide sampling feedback
 	"""
 	from time import sleep, time
+	from commands import getoutput
 
 	def get_multinest_output(root, nplanets, context='111'):
 		msg = blue('INFO: ') + 'Analysing output...'
@@ -907,6 +908,15 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
 				if 'nest_resume' in line: print replacer,
 				else: print line,
+
+			# sometimes resuming doesn't really work, this is a work around to correct the 
+			# numbers in the ev.dat and resume.dat files
+			nlive = int(getoutput("sed -n '2,+0p' " + root_path + "resume.dat").split()[3])
+			n_evfile = int(getoutput("wc " + root_path + "ev.dat").split()[0])
+			n_resumefile = int(getoutput("sed -n '2,+0p' " + root_path + "resume.dat").split()[0])
+			if (n_evfile + nlive != n_resumefile): 
+				os.system('cp ' + root_path + 'ev.dat ' + root_path + 'ev.dat.2')
+				os.system('head -n -50 ' + root_path + 'ev.dat.2 > ' + root_path + 'ev.dat')
 		else:
 			replacer = '    nest_resume=.false.\n'
 			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
@@ -1884,6 +1894,64 @@ def do_clean(system):
 	ax1.set_ylabel('Arbitrary power')
 	plt.show()
 
+
+def do_set_fit(system):
+	from ext.keplerian import keplerian
+
+	msg = blue('INFO: ') + 'Setting a known fit to the current system'
+	clogger.info(msg)
+
+	try:
+		nplanets = int(raw_input('How many planets? '))
+	except ValueError:
+		msg = red('ERROR: ') + "I don't know how many planets there are\n"
+		clogger.fatal(msg)
+		msg = blue('INFO: ') + 'Finished\n'
+		clogger.info(msg)
+		return	
+
+	periods = []
+	for i in range(nplanets):
+		p = float(raw_input('\tperiod %d:  ' % (i+1)))
+		periods.append(p)
+
+	eccentricities = []
+	for i in range(nplanets):
+		e = float(raw_input('\teccentricity %d:  ' % (i+1)))
+		eccentricities.append(e)
+
+	semi_amplitudes = []
+	for i in range(nplanets):
+		k = float(raw_input('\tsemi-amplitude %d:  ' % (i+1)))
+		semi_amplitudes.append(k)
+
+	omegas = []
+	for i in range(nplanets):
+		k = raw_input('\tomega %d:  ' % (i+1))
+		if 'pi' in k:
+			k = eval(k)
+			print k
+		else:
+			k = float(k)
+		omegas.append(k)
+
+	times_periastron = []
+	for i in range(nplanets):
+		k = float(raw_input('\ttime periastron %d:  ' % (i+1)))
+		times_periastron.append(k)
+
+	vsys = float(raw_input('\t vsys :  ' ))
+
+	vel = keplerian(system.time, 
+		            periods, semi_amplitudes, eccentricities, omegas, times_periastron, vsys)
+
+	if system.fit is not None: # there is already a fit
+		clogger.warning(yellow('Warning: ')+'Replacing older fit')
+
+	system.fit = {}
+	system.fit['params'] = np.hstack([periods, semi_amplitudes, eccentricities, omegas, times_periastron, vsys])
+	system.fit['residuals'] = system.vrad - vel
+	
 
 
 def do_create_planets(s):

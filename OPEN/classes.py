@@ -321,14 +321,15 @@ class rvSeries:
         colors = 'rgbmk' # possible colors
         t, rv, err = self.time, self.vrad, self.error # temporaries
 
-        tt = np.linspace(self.time.min()-200, self.time.max()+300, 400)
-        final = np.zeros_like(tt)
-        
         par = self.fit['params']
         keplerians = int(len(par)/6)
         P, K, ecc, omega, T0, gam = [par[j::6] for j in range(6)]
         gam = gam[0]
 
+        tt = np.linspace(self.time.min(), self.time.max(), 100*np.ptp(self.time)/P)
+        final = np.zeros_like(tt)
+
+        print len(tt)
         get_rvn = get_rvn_os
         get_rvn(tt, P, K, ecc, omega, T0, gam, final)
 
@@ -539,7 +540,7 @@ class rvSeries:
         # print min(r), max(r)
         return len(r), r
 
-    def get_time_to_plot(self):
+    def get_time_to_plot(self, P=None):
         """
         Returns sufficiently resolved time vector for plots
         """
@@ -547,7 +548,10 @@ class rvSeries:
         N = len(self.time)
         minim = self.time.min() - 2.*std
         maxim = self.time.max() + 2.*std
-        return np.linspace(minim, maxim, 10*N)
+        if P is None:
+            return np.linspace(minim, maxim, 10*N)
+        else:
+            return np.linspace(minim, maxim, 10*(maxim-minim)/P)
 
     def is_in_extras(self, extra):
         return extra in self.extras._fields
@@ -734,16 +738,23 @@ class PeriodogramBase:
         """
         xlabel = 'Period [d]'
         ylabel = 'Power'
+        do_title = kwargs.pop('title', True)
 
-        if newFig: 
+        if newFig and save:
+            self.fig = plt.figure(figsize=(8,4))
+        elif newFig:
             self.fig = plt.figure()
+        else:
+            self.fig = plt.gcf()
 
         if axes is None:
             self.ax = self.fig.add_subplot(1,1,1)
         else:
             self.ax = axes
 
-        self.ax.set_title("Normalized periodogram")
+        if do_title:
+            self.ax.set_title("Normalized periodogram")
+
         self.ax.set_xlabel(xlabel)
         self.ax.set_ylabel(ylabel)
         if self.power.max() < 1e-300:  # apparently, Metplotlib can't plot these small values
@@ -768,7 +779,7 @@ class PeriodogramBase:
         # plot vertical lines
         if verts is not None:
             for v in verts:
-                self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5) 
+                self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5, label="_nolegend_") 
                 # if v==18:
                 #   self.ax.axvline(x=v, color='r', ls='--', lw=2) 
 
@@ -794,11 +805,11 @@ class PeriodogramBase:
       """
       from shell_colors import blue
       # Index with maximum power
-      bbin = argmax(self.power)
+      bbin = np.argmax(self.power)
       # Maximum power
       pmax = self._upow[bbin]
 
-      rms = sqrt(self._YY * (1.-pmax))
+      # rms = np.sqrt(self._YY * (1.-pmax))
 
       # Get the curvature in the power peak by fitting a parabola y=aa*x^2
       if (bbin > 1) and (bbin < len(self.freq)-2):
@@ -806,43 +817,43 @@ class PeriodogramBase:
         xh = (self.freq[bbin-1:bbin+2] - self.freq[bbin])**2
         yh = self._upow[bbin-1:bbin+2] - self._upow[bbin]
         # Calculate the curvature (final equation from least square)
-        aa = sum(yh*xh)/sum(xh*xh)
+        aa = np.sum(yh*xh)/np.sum(xh*xh)
         nt = float(self.N)
-        f_err = sqrt(-2./nt * pmax/aa*(1.-pmax)/pmax)
-        Psin_err = sqrt(-2./nt* pmax/aa*(1.-pmax)/pmax) / self.freq[bbin]**2
+        f_err = np.sqrt(-2./nt * pmax/aa*(1.-pmax)/pmax)
+        Psin_err = np.sqrt(-2./nt* pmax/aa*(1.-pmax)/pmax) / self.freq[bbin]**2
       else:
         f_err = None
         Psin_err = None
 
       fbest = self.freq[bbin]
-      amp = sqrt(self._a[bbin]**2 + self._b[bbin]**2)
-      ph  = arctan2(self._a[bbin], self._b[bbin]) / (2.*pi)
-      T0  = min(self.th) - ph/fbest
+      # amp = np.sqrt(self._a[bbin]**2 + self._b[bbin]**2)
+      # ph  = np.arctan2(self._a[bbin], self._b[bbin]) / (2.*pi)
+      # T0  = np.min(self.th) - ph/fbest
       # Re-add the mean
-      offset = self._off[bbin] + self._Y
+      # offset = self._off[bbin] + self._Y
 
       # Statistics
       print "Generalized LS - statistical output"
       print 33*"-"
       if verbose:
         print "Number of input points:     %6d" % (nt)
-        print "Weighted mean of dataset:   % e" % (self._Y)
-        print "Weighted rms of dataset:    % e" % (sqrt(self._YY))
+        # print "Weighted mean of dataset:   % e" % (self._Y)
+        # print "Weighted rms of dataset:    % e" % (sqrt(self._YY))
         print "Time base:                  % e" % (max(self.th) - min(self.th))
         print "Number of frequency points: %6d" % (len(self.freq))
         print
         print "Maximum power, p :    % e " % (self.power[bbin])
         print "Maximum power (without normalization):   %e" % (pmax)
         print "Normalization    : ", self.norm
-        print "RMS of residuals :    % e " % (rms)
+        # print "RMS of residuals :    % e " % (rms)
         if self.error is not None:
-          print "  Mean weighted internal error:  % e" %(sqrt(nt/sum(1./self.error**2)))
+          print "  Mean weighted internal error:  % e" %(np.sqrt(nt/np.sum(1./self.error**2)))
         print "Best sine frequency : % e +/- % e" % (fbest, f_err)
         print "Best sine period    : % e +/- % e" % (1./fbest, Psin_err)
-        print "Amplitude:          : % e +/- % e" % (amp, sqrt(2./nt)*rms)
-        print "Phase (ph) : % e +/- % e" % (ph, sqrt(2./nt)*rms/amp/(2.*pi))
-        print "Phase (T0) : % e +/- % e" % (T0, sqrt(2./nt)*rms/amp/(2.*pi)/fbest)
-        print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
+        # print "Amplitude:          : % e +/- % e" % (amp, sqrt(2./nt)*rms)
+        # print "Phase (ph) : % e +/- % e" % (ph, sqrt(2./nt)*rms/amp/(2.*pi))
+        # print "Phase (T0) : % e +/- % e" % (T0, sqrt(2./nt)*rms/amp/(2.*pi)/fbest)
+        # print "Offset     : % e +/- % e" % (offset, sqrt(1./nt)*rms)
         print 60*"-"
       else:
         print "Input points: %6d, frequency points: %6d" % (nt, len(self.freq))
@@ -911,7 +922,7 @@ class PeriodogramBase:
 
 
 from time import strftime
-from zipfile import ZipFile     
+from zipfile import ZipFile   
 
 class MCMC_dream:
     """
@@ -1252,6 +1263,8 @@ class MCMC_nest:
         rejected_points = np.loadtxt(filename1, unpack=True)
         live_points = np.loadtxt(filename2, unpack=True)
 
+        if self.jitter: j=1
+
         self.posterior_samples = np.append(rejected_points[:self.npar, :], live_points[:self.npar, :], axis=1)
 
         parameter_names = ['period', 'K', 'ecc', 'omega', 't0']
@@ -1260,18 +1273,20 @@ class MCMC_nest:
         p = namedtuple('parameter', parameter_names.flat)
 
         # this makes a namedtuple of all the parameter values
-        self.trace = p._make(self.posterior_samples[:-1,:])
+        self.trace = p._make(self.posterior_samples[:-1-j,:])
 
     def compress_chains(self):
         tstr = strftime("%Y%m%d-%H%M%S")
-        zfilename = 'demc-out-'+tstr+'.zip'
+        zfilename = 'chains/nest-out-'+tstr+'.zip'
+        nest_output_files = set(glob.glob(self.root+'*')) - set(glob.glob(self.root+'*.zip'))
 
         with ZipFile(zfilename, 'a', compression=8) as zf:
-            for f in self.chain_filenames:
+            for f in nest_output_files:
                 zf.write(f)
-            zf.write('OPEN/demc/namelist1')
+            zf.write('OPEN/multinest/namelist1')
 
-        print 'done!'
+        msg = blue('INFO: ') + 'Saved output files to %s' % zfilename
+        clogger.info(msg)
 
     def print_best_solution(self):
         ## output best solution
@@ -1320,6 +1335,10 @@ class MCMC_nest:
         if self.npar == 1:  # systematic velocity only
             vel = self.par_map[0]
 
+        if self.context[2] == '2':  # model with jitter
+            jitter = True
+            s = self.par_map.pop(-2)
+
         ## MAP estimate of the parameters
         elif self.gp:
             par_map = self.par_map[:-4] 
@@ -1337,6 +1356,7 @@ class MCMC_nest:
             omega = par_map[3:-1:5]
             t0 = par_map[4:-1:5]
             par = [P, K, ecc, omega, t0, vsys]
+            print par
 
             args = [t] + par + [vel]
             get_rvn(*args)
@@ -1470,7 +1490,7 @@ class MCMC_nest:
     def do_plot_map(self, system):
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
-        tt = system.get_time_to_plot()
+        tt = system.get_time_to_plot(P=self.par_map[0])
         vel = np.zeros_like(tt)
 
         nobserv = len(system.provenance)  # number of observatories
@@ -1480,6 +1500,10 @@ class MCMC_nest:
         else:
             vsys = self.par_map[-1]
             get_rvn = get_rvn_os
+
+        if self.context[2] == '2':  # model with jitter
+            self.jitter = True
+            s = self.par_map.pop(-2)
 
         ## MAP estimate of the parameters
         if self.npar == 1:  # systematic velocity only
@@ -1500,7 +1524,7 @@ class MCMC_nest:
 
         gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
         ax1 = plt.subplot(gs[0])
-        ax2 = plt.subplot(gs[1], sharex=ax1, sharey=ax1)
+        ax2 = plt.subplot(gs[1], sharex=ax1)
 
         if self.npar == 1:  # systematic velocity only
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
@@ -1581,8 +1605,6 @@ class MCMC_nest:
             par_map = self.par_map[:-4]  # don't care about the hyperparameters for now
         else:
             par_map = self.par_map
-            if self.npar in (7, 12):
-                par_map.pop(-2)
 
         newFig=True
         if newFig:
@@ -1642,13 +1664,13 @@ class MCMC_nest:
                 m = n-nout # how many values are there after restriction
 
                 phase = ((t[:m] - t0[planeti]) / P[planeti]) % 1.0
-                ax.errorbar(np.sort(phase), rv[np.argsort(phase)] - vel_other[np.argsort(phase)] + vsys,
+                ax.errorbar(np.sort(phase), rv[np.argsort(phase)] - vel_other[np.argsort(phase)],
                              yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i], label=os.path.basename(fname))
-                ax.errorbar(np.sort(phase)+1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)] + vsys,
+                ax.errorbar(np.sort(phase)+1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)],
                              yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i])
-                ax.errorbar(np.sort(phase)-1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)] + vsys,
+                ax.errorbar(np.sort(phase)-1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)],
                              yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i])
                 t, rv, err = t[m:], rv[m:], err[m:]
@@ -1671,8 +1693,13 @@ class MCMC_nest:
         except AttributeError:
             self.read_iterations()       
 
+        if self.jitter: j=1
+
         if show_priors: 
-            from .prior_funcs import uniform, jeffreys, modjeffreys
+            from .prior_funcs import uniform, jeffreys, modjeffreys, beta
+            print 
+            # msg = blue('INFO: ') + 'Plotting logP. prior(P)=Jeffreys, prior(logP)=Uniform'
+            # clogger.info(msg)
 
         # Sturges' formula for the optimal number of bins in the histograms
         n = self.posterior_samples.shape[1]
@@ -1684,33 +1711,37 @@ class MCMC_nest:
 
         # period histogram(s)
         ax1 = plt.subplot(gs[0])
-        ax1.hist(self.posterior_samples[0:-1:5, :].T, bins=k, normed=True, label=['planet1', 'planet2'])
-        if show_priors:
-            xx = np.linspace(1.5*10, 1000, 200)
-            ax1.plot(xx, jeffreys(xx, 1.5*10, 1000), lw=3, color='k')
-        ax1.set_xlabel('Period [d]')
+        ax1.hist(self.posterior_samples[0:-1-j:5, :].T, bins=k, normed=True, label=['planet1', 'planet2'])
+        # if show_priors:
+            # xx = np.linspace(1.5*10, 1000, 200)
+            # ax1.plot(np.log10(xx), jeffreys(xx, 1.5*10, 1000), lw=3, color='k')
+        ax1.set_xlabel('P [d]')
         ax1.legend(frameon=False)
 
         # semi amplitude histogram(s) - actually log of it because usually the prior spans a big range
         ax2 = plt.subplot(gs[1])
-        ax2.hist(np.log(self.posterior_samples[1:-1:5, :].T), bins=k, normed=True)
-        # if show_priors:
-        #     m = np.min(self.posterior_samples[1:-1:5, :].T)
+        ax2.hist(self.posterior_samples[1:-1-j:5, :].T, bins=k, normed=True)
+        if show_priors:
+        #     m = np.min(self.posterior_samples[1:-1-j:5, :].T)
         #     xx = np.logspace(np.log(m), np.log10(2129), 200)
         #     ax2.plot(np.log(xx), modjeffreys(xx, 1., 2129), lw=3, color='k')
-        ax2.set_xlabel('log K [m/s]')
+            xx = np.linspace(0, 60, 200)
+            ax2.plot(xx, modjeffreys(xx, 1., 60), lw=3, color='k')
+        ax2.set_xlabel('K [m/s]')
 
         # eccentricity histogram(s)
         ax3 = plt.subplot(gs[2])
-        ax3.hist(self.posterior_samples[2:-1:5, :].T, bins=k, normed=True)
+        ax3.hist(self.posterior_samples[2:-1-j:5, :].T, bins=k, normed=True)
         if show_priors:
-            xx = np.linspace(0, 1, 200)
-            ax3.plot(xx, uniform(xx, 0, 1), lw=3, color='k')
+            # xx = np.linspace(0, 1, 200)
+            # ax3.plot(xx, uniform(xx, 0, 1), lw=3, color='k')
+            xx = np.linspace(0.0001, 1, 500)
+            ax3.plot(xx, beta(xx, 0.867, 3.03), lw=3, color='k')
         ax3.set_xlabel('eccentricity')
 
         # omega histogram(s)
         ax4 = plt.subplot(gs[3])
-        ax4.hist(self.posterior_samples[3:-1:5, :].T, bins=k, normed=True)
+        ax4.hist(self.posterior_samples[3:-1-j:5, :].T, bins=k, normed=True)
         if show_priors:
             xx = np.linspace(0, 2*np.pi, 200)
             ax4.plot(xx, uniform(xx, 0, 2*np.pi), lw=3, color='k')
@@ -1719,7 +1750,7 @@ class MCMC_nest:
 
         # t0 histogram(s)
         ax5 = plt.subplot(gs[4])
-        ax5.hist(self.posterior_samples[4:-1:5, :].T, bins=k, normed=True)
+        ax5.hist(self.posterior_samples[4:-1-j:5, :].T, bins=k, normed=True)
         ax5.set_xlabel(r'$t_0$')
 
 

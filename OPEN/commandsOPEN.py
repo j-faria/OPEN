@@ -342,12 +342,13 @@ class EmbeddedMagics(Magics):
 
         if (min(default.error) < 0.01 and not args['--nomps']):
             from shell_colors import blue
-            msg = blue('INFO: ') + 'Converting to m/s'
+            mean_vrad = mean(default.vrad)
+            msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
             clogger.info(msg)
 
-            default.vrad = (default.vrad) * 1e3
+            default.vrad = (default.vrad - mean(default.vrad)) * 1e3
             default.error *= 1e3
-            default.vrad_full = (default.vrad_full) * 1e3
+            default.vrad_full = (default.vrad_full - mean(default.vrad_full)) * 1e3
             default.error_full *= 1e3
             default.units = 'm/s'
 
@@ -669,6 +670,28 @@ class EmbeddedMagics(Magics):
             return
 
         system.do_plot_fit()
+
+
+    @needs_local_scope
+    @line_magic
+    def set_fit(self, parameter_s='', local_ns=None):
+        from shell_colors import red
+        # args = parse_arg_string('fit', parameter_s)
+        # if args == 1: return
+        #print args
+
+        # verb = True if args['--verbose'] else False
+
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.do_set_fit(system)
+
 
     @needs_local_scope
     @line_magic

@@ -392,7 +392,7 @@ class gls(PeriodogramBase):
   """
 
   def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
-               norm="HorneBaliunas", stats=False, ext=True):
+               norm="HorneBaliunas", stats=False, ext=True, force_notrend=False):
     self.name = 'Generalized Lomb-Scargle'
 
     self.power = None
@@ -407,7 +407,7 @@ class gls(PeriodogramBase):
       self.y = rv.extras.bis_span
       self.error = 2. * rv.error #ones_like(self.y)
     elif quantity == 'fwhm':
-      if ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+      if not force_notrend and ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
         m, b = polyfit(self.t, rv.extras.fwhm, 1)
         yp = polyval([m, b], self.t)
         self.y = rv.extras.fwhm - yp
@@ -657,7 +657,8 @@ class bls(PeriodogramBase):
         The frequency array.
   """
 
-  def __init__(self, rv, ofac=6, hifac=40, freq=None, quantity='vrad', stats=False):
+  def __init__(self, rv, ofac=6, hifac=40, freq=None, quantity='vrad', 
+               stats=False, force_notrend=False):
     self.name = 'Bayesian Lomb-Scargle'
 
     self.power = None
@@ -672,7 +673,7 @@ class bls(PeriodogramBase):
       self.y = rv.extras.bis_span
       self.error = 2. * rv.error #ones_like(self.y)
     elif quantity == 'fwhm':
-      if ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+      if not force_notrend and ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
         m, b = polyfit(self.t, rv.extras.fwhm, 1)
         yp = polyval([m, b], self.t)
         self.y = rv.extras.fwhm - yp
