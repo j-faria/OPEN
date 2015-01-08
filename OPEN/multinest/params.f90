@@ -22,7 +22,7 @@ module params
     logical using_jitter, using_gp
     !train the gaussian process beforehand
     logical training
-    character(len=10) train_variable
+    real(kind=8), dimension(4) :: trained_parameters
     !extra linear dependence in the model
     !how many variables
     logical lin_dep

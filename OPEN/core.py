@@ -47,6 +47,7 @@ except ImportError:
 
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date, ask_yes_no, get_number_cores
+import train_gp
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 pi = np.pi
@@ -940,19 +941,26 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		# if training the GP before, set the appropriate namelist flags
 		if training:
 			replacer1 = '    training = .true.\n'
-			replacer2 = '    train_variable = \'%s\'\n' % training
 			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
 				if 'training' in line: print replacer1,
-				elif 'train_variable' in line: print replacer2,
-				else: print line,
-		else:
-			replacer1 = '    training = .false.\n'
-			replacer2 = '    train_variable = \'NONE\'\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'training' in line: print replacer1,
-				elif 'train_variable' in line: print replacer2,
 				else: print line,
 
+			# do the actual training
+			GP_parameters = train_gp.do_it(system, training)
+
+			# write the trained parameters to the namelist
+			replacer1 = '    trained_parameters = %fd0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters)
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'trained_parameters' in line: print replacer1,
+				else: print line,
+
+		else:
+			replacer1 = '    training = .false.\n'
+			replacer2 = '    trained_parameters = 0.d0, 0.d0, 0.d0, 0.d0\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'training' in line: print replacer1,
+				elif 'trained_parameters' in line: print replacer2,
+				else: print line,
 
 
 		msg = blue('    : ') + 'Starting MultiNest (%d threads) ...' % (ncpu,)

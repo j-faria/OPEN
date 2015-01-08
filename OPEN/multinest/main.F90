@@ -27,7 +27,7 @@ program main
     namelist /NEST_parameters/ sdim, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_liveplot, &
                                nest_root, nest_context, &
-                               training, train_variable, &
+                               training, trained_parameters, &
                                lin_dep, n_lin_dep
     ! read configuration values from namelist
     iou = 8
@@ -278,19 +278,38 @@ program main
         spriorran(i,2)= kmax
 
         !! hyperparameters
-        ! amplitude of GP
-        i = sdim-nextra+nobserv+1
-        spriorran(i,1)= 0.d0
-        spriorran(i,2)= 10d0
-        ! timescale for growth / decay of active regions (d)
-        spriorran(i+1,1)= 20d0
-        spriorran(i+1,2)= 50.d0
-        ! periodicity (recurrence) timescale -> rotation period of the star
-        spriorran(i+2,1)= 10.d0
-        spriorran(i+2,2)= 20.d0
-        ! smoothing parameter (?)
-        spriorran(i+3,1)= 0.1d0
-        spriorran(i+3,2)= 10d0
+        if (training) then 
+            ! the prior limits in this case are just the values of the 
+            ! trained parameters, only the GP amplitude is left to vary
+            
+            ! amplitude of GP
+            i = sdim-nextra+nobserv+1
+            spriorran(i,1)= 0.d0
+            spriorran(i,2)= 10d0
+            ! timescale for growth / decay of active regions (d)
+            spriorran(i+1,1)= trained_parameters(2)
+            spriorran(i+1,2)= trained_parameters(2)
+            ! periodicity (recurrence) timescale -> rotation period of the star
+            spriorran(i+2,1)= trained_parameters(3)
+            spriorran(i+2,2)= trained_parameters(3)
+            ! smoothing parameter (?)
+            spriorran(i+3,1)= trained_parameters(4)
+            spriorran(i+3,2)= trained_parameters(4)
+        else
+            ! amplitude of GP
+            i = sdim-nextra+nobserv+1
+            spriorran(i,1)= 0.d0
+            spriorran(i,2)= 10d0
+            ! timescale for growth / decay of active regions (d)
+            spriorran(i+1,1)= 20d0
+            spriorran(i+1,2)= 50.d0
+            ! periodicity (recurrence) timescale -> rotation period of the star
+            spriorran(i+2,1)= 10.d0
+            spriorran(i+2,2)= 20.d0
+            ! smoothing parameter (?)
+            spriorran(i+3,1)= 0.1d0
+            spriorran(i+3,2)= 10d0
+        end if
         
 	else
     ! parameter array organization in this case:
@@ -312,7 +331,7 @@ program main
 !    end if
 !    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
-!    print *, training, train_variable
+!    print *, training, trained_parameters
 ! 	stop "we have to stop here"
 
    	call nest_Sample
