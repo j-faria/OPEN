@@ -1066,11 +1066,18 @@ class EmbeddedMagics(Magics):
                 return
 
             if ask_yes_no('Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
+                system.provenance.values()[0][1] = n
                 # remove observations with indices ind_to_remove from
                 # system.(time,vrad,error); leave *_full arrays intact
                 system.time = delete(system.time, ind_to_remove)
                 system.vrad = delete(system.vrad, ind_to_remove)
                 system.error = delete(system.error, ind_to_remove)
+                # remove observations with indices ind_to_remove from
+                # system.extras.*; leave system.extras_full.* arrays intact
+                for i, arr in enumerate(system.extras):
+                    field_name = system.extras._fields[i]
+                    replacer = {field_name:delete(arr, ind_to_remove)}
+                    system.extras = system.extras._replace(**replacer)
                 msg = blue('    : ') + 'Done'
                 clogger.info(msg)                
             else:
