@@ -262,7 +262,7 @@ contains
 		! pars(1) --> period
 		! pars(2) --> correlation scale
 		omega = pi / self%pars(1)
-		gamma = self%pars(2)
+		gamma = 2.d0 / self%pars(2)**2
 
 		matrix = 0.d0
 		!call add_value_to_diagonal(matrix, 1.d0)
