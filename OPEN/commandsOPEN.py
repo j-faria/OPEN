@@ -18,7 +18,7 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
 from IPython.core.magic_arguments import argument
 
 # other imports
-from numpy import sqrt, mean, min, delete
+from numpy import sqrt, mean, min, delete, take
 
 # intra-package imports
 from .docopt import docopt, DocoptExit
@@ -195,12 +195,13 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
+    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
 Options
     -u            User sets the namelist file
     -r            Resume from a previous MultiNest run
     -v            Be verbose on output and plots
     --gp          Perform model selection within Gaussian Process framework
+    --jitter      Include a jitter parameter (incompatible with --gp)
     --train=None  Train the GP on quantity before using it in the RVs
     --lin=None    Include linear dependence on quantity in the model
     --ncpu=<cpu>  Number of threads to use [default: all available]
@@ -216,8 +217,10 @@ Usage:
     restrict [(year <yr>)]
     restrict [(years <yr1> <yr2>)]
     restrict --gui
+    restrict --index=None
 Options:
     --gui         Restrict data using a graphical interface (experimental)
+    --index=None  Remove specific data points, providing their indices [default:None]
 """
 
 
@@ -970,6 +973,11 @@ class EmbeddedMagics(Magics):
         resume = args['-r']
         verbose = args['-v']
         gp = args['--gp']
+        jitter = args['--jitter']
+        if gp and jitter:
+            msg = red('ERROR: ') + '--gp and --jitter are incompatible'
+            clogger.fatal(msg)
+            return
         doplot = not args['--noplot']
         dofeedback = args['--feed']
 
@@ -986,7 +994,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user, gp,
+        core.do_multinest(system, user, gp, jitter,
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, lin=lin_quantity, 
                           doplot=doplot, feed=dofeedback)
@@ -1006,12 +1014,9 @@ class EmbeddedMagics(Magics):
         args = parse_arg_string('restrict', parameter_s)
 
         if args == DocoptExit:
-            msg = yellow('Warning: ') + "I'm not doing anything. See restrict -h"
+            msg = yellow('Warning: ') + "I'm not doing anything. Type restrict -h for help"
             clogger.fatal(msg)
             return
-
-        if args == 1: return
-        print args
 
         # use default system or user defined
         if local_ns.has_key('default'):
@@ -1061,15 +1066,23 @@ class EmbeddedMagics(Magics):
                 return
             core.do_restrict(system, 'years', yr1, yr2)
 
-        if args['--gui']:
-            ind_to_remove = selectable_plot(system, style='ro')
+        if args['--gui'] or args['--index']:
+            if args['--index']:
+                ind_to_remove = map(int, args['--index'].split(','))
+                for i in ind_to_remove:
+                    x, y = take(system.time, i), take(system.vrad, i)
+                    msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i, x, y)
+                    clogger.info(msg)
+            else:
+                ind_to_remove = selectable_plot(system, style='ro')
+
             n = len(ind_to_remove)
             if n == 0:
                 msg = blue('    : ') + 'Not removing any observations'
                 clogger.info(msg)
                 return
 
-            if ask_yes_no('Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
+            if ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
                 system.provenance.values()[0][1] = n
                 # remove observations with indices ind_to_remove from
                 # system.(time,vrad,error); leave *_full arrays intact
@@ -1218,7 +1231,7 @@ def parse_arg_string(command, arg_string):
         try:
             args = docopt(restrict_usage, splitted)
         except (SystemExit, DocoptExit) as e:
-            return 1
+            return DocoptExit
 
     if command is 'wf':
         try:

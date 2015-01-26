@@ -1215,10 +1215,14 @@ class MCMC_nest:
             stats = f.readlines()
 
         npar = self.npar
-        self.nplanets = npar/5
-        if self.gp and (npar == 5): 
+        if self.gp:
+            self.nplanets = (npar-4)/5
+        elif self.gp and (npar == 5): 
             self.nplanets = 0
             self.gp_only = True
+        else:
+            self.nplanets = npar/5
+        
 
         try:
             self.NS_lnE = float(stats[0].split()[-3])
@@ -1267,7 +1271,8 @@ class MCMC_nest:
         rejected_points = np.loadtxt(filename1, unpack=True)
         live_points = np.loadtxt(filename2, unpack=True)
 
-        if self.jitter: j=1
+        j = 1 if self.jitter else 0
+        j = j+4 if self.gp else j+0
 
         self.posterior_samples = np.append(rejected_points[:self.npar, :], live_points[:self.npar, :], axis=1)
 
@@ -1339,8 +1344,9 @@ class MCMC_nest:
         if self.npar == 1:  # systematic velocity only
             vel = self.par_map[0]
 
+        self.jitter = False
         if self.context[2] == '2':  # model with jitter
-            jitter = True
+            self.jitter = True
             s = self.par_map.pop(-2)
 
         ## MAP estimate of the parameters
@@ -1360,7 +1366,6 @@ class MCMC_nest:
             omega = par_map[3:-1:5]
             t0 = par_map[4:-1:5]
             par = [P, K, ecc, omega, t0, vsys]
-            print par
 
             args = [t] + par + [vel]
             get_rvn(*args)
@@ -1494,20 +1499,23 @@ class MCMC_nest:
     def do_plot_map(self, system):
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
-        tt = system.get_time_to_plot(P=self.par_map[0])
+        # tt = system.get_time_to_plot(P=self.par_map[0])
+        tt = system.get_time_to_plot()
         vel = np.zeros_like(tt)
 
         nobserv = len(system.provenance)  # number of observatories
+        j = 4 if self.gp else 0
         if nobserv > 1:
             vsys = self.par_map[-nobserv+1:]
             get_rvn = get_rvn_ms
         else:
-            vsys = self.par_map[-1]
+            vsys = self.par_map[-1-j]
             get_rvn = get_rvn_os
 
-        if self.context[2] == '2':  # model with jitter
-            self.jitter = True
-            s = self.par_map.pop(-2)
+        # if self.context[2] == '2':  # model with jitter
+        #     self.jitter = True
+        #     print self.par_map
+        #     s = self.par_map.pop(-2)
 
         ## MAP estimate of the parameters
         if self.npar == 1:  # systematic velocity only
@@ -1540,7 +1548,6 @@ class MCMC_nest:
             omega = par_map[3:-1:5]
             t0 = par_map[4:-1:5]
             par = [P, K, ecc, omega, t0, vsys]
-            # print par
 
             if nobserv > 1:
                 observ = np.ones_like(vel)
@@ -1584,7 +1591,8 @@ class MCMC_nest:
             t, rv, err = t[m:], rv[m:], err[m:]
 
 
-        ax2.axhline(y=0, ls='--', color='k')
+        # plot systematic velocity
+        ax1.axhline(y=vsys, ls='--', color='k', alpha=0.3)
 
         ax2.set_xlabel('Time [days]')
         ax1.set_ylabel('RV [%s]'%system.units)
@@ -1697,7 +1705,8 @@ class MCMC_nest:
         except AttributeError:
             self.read_iterations()       
 
-        if self.jitter: j=1
+        j = 1 if self.jitter else 0
+        j = j+4 if self.gp else j+0
 
         if show_priors: 
             from .prior_funcs import uniform, jeffreys, modjeffreys, beta
