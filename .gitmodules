@@ -2,3 +2,7 @@
 	path = MultiNest
 	url = https://github.com/j-faria/MultiNest.git
 	ignore = untracked
+
+[submodule "RJDNest3"]
+	path = RJDNest3
+	url = git@github.com:j-faria/OPEN-RJDNest3.git
