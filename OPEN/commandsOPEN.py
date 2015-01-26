@@ -195,12 +195,13 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
+    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
 Options
     -u            User sets the namelist file
     -r            Resume from a previous MultiNest run
     -v            Be verbose on output and plots
     --gp          Perform model selection within Gaussian Process framework
+    --jitter      Include a jitter parameter (incompatible with --gp)
     --train=None  Train the GP on quantity before using it in the RVs
     --lin=None    Include linear dependence on quantity in the model
     --ncpu=<cpu>  Number of threads to use [default: all available]
@@ -972,6 +973,11 @@ class EmbeddedMagics(Magics):
         resume = args['-r']
         verbose = args['-v']
         gp = args['--gp']
+        jitter = args['--jitter']
+        if gp and jitter:
+            msg = red('ERROR: ') + '--gp and --jitter are incompatible'
+            clogger.fatal(msg)
+            return
         doplot = not args['--noplot']
         dofeedback = args['--feed']
 
@@ -988,7 +994,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user, gp,
+        core.do_multinest(system, user, gp, jitter,
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, lin=lin_quantity, 
                           doplot=doplot, feed=dofeedback)

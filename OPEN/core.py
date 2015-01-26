@@ -740,13 +740,14 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, feed=False):
+def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, feed=False):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
 	---------
 		user: the user sets up the namelist file and we just run MultiNest using that
 		gp:
+		jitter: include a jitter parameter
 		resume: whether to resume from a previous run. This option takes precedence over `user`
 		verbose: plot and print more information at the end of the run
 		ncpu: number of cpu cores to run MultiNest on
@@ -945,14 +946,17 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 				if 'training' in line: print replacer1,
 				else: print line,
 
-			# do the actual training
-			GP_parameters = train_gp.do_it(system, training)
+			# we assume the user did not change the trained_parameters in 
+			# the namelist if resuming from a previous job
+			if not resume:
+				# do the actual training
+				GP_parameters = train_gp.do_it(system, training)
 
-			# write the trained parameters to the namelist
-			replacer1 = '    trained_parameters = %fd0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters)
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'trained_parameters' in line: print replacer1,
-				else: print line,
+				# write the trained parameters to the namelist
+				replacer1 = '    trained_parameters = %fd0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters)
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'trained_parameters' in line: print replacer1,
+					else: print line,
 
 		else:
 			replacer1 = '    training = .false.\n'
@@ -1006,8 +1010,11 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		nplanets = 0
 		if gp: 
 			context = 201
-		else: 
-			context = 101
+		else:
+			if jitter: 
+				context = 102
+			else:
+				context = 101 
 		root = 'chains/nest-noplanet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
@@ -1081,7 +1088,10 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		if gp: 
 			context = 211
 		else: 
-			context = 111
+			if jitter: 
+				context = 112
+			else:
+				context = 111 
 		root = 'chains/nest-1planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
@@ -1158,7 +1168,10 @@ def do_multinest(system, user, gp, resume=False, verbose=False, ncpu=None, train
 		if gp: 
 			context = 221
 		else: 
-			context = 121
+			if jitter: 
+				context = 122
+			else:
+				context = 121 
 		root = 'chains/nest-2planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
