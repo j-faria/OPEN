@@ -991,6 +991,10 @@ class EmbeddedMagics(Magics):
                           training=train_quantity, lin=lin_quantity, 
                           doplot=doplot, feed=dofeedback)
 
+    @needs_local_scope
+    @line_magic
+    def dnest(self, parameter_s='', local_ns=None):
+        pass
 
     @needs_local_scope
     @line_magic
