@@ -108,6 +108,12 @@ class rvSeries:
         # same for extras
         self.extras_full = copy(self.extras)
 
+        # each time a fit is saved to the system, the residuals should be copied
+        # to the following array. We assume less than 10 planets will be removed
+        self.resid = np.zeros((len(self.time), 10))
+        # the "first" residuals are the original radial velocities
+        self.resid[:,0] = self.vrad_full
+
     # associated model to be adjusted to the data
     # this will be a dictionary with the following key:value pairs:
     #   k : number of keplerians in the model
@@ -121,6 +127,11 @@ class rvSeries:
     #   residuals : residuals of the fit
     #   chi2 : reduced(!) chi square value of the fit
     fit = None
+
+    # the number of planets (signals) whose residuals have been calculated
+    # after removing a planet, update this and copy residuals to the array
+    # self.resid[:, self.n_removed_planets]
+    n_removed_planets = 0
 
     # properties of the star
     star_mass = 1.0  # in Msun, default 1.0
@@ -1251,6 +1262,15 @@ class MCMC_nest:
         self.par_map = [float(s.split()[1]) for s in stats[start:end]]
         # P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
 
+        self.jitter = False
+        if self.context[2] == '2':  # model with jitter
+            self.jitter = True
+            s = self.par_map.pop(-2)
+
+        self.only_vsys = False
+        if self.npar == 1 or len(self.par_map) == 1:  # systematic velocity only
+            self.only_vsys = True
+
     def read_gp_file(self):
         filename = self.root+'gp.dat'
         try:
@@ -1341,23 +1361,18 @@ class MCMC_nest:
             vsys = self.par_map[-1]
             get_rvn = get_rvn_os
 
-        if self.npar == 1:  # systematic velocity only
+        if self.only_vsys:  # systematic velocity only
             vel = self.par_map[0]
 
-        self.jitter = False
-        if self.context[2] == '2':  # model with jitter
-            self.jitter = True
-            s = self.par_map.pop(-2)
-
         ## MAP estimate of the parameters
-        elif self.gp:
+        if self.gp and not self.only_vsys:
             par_map = self.par_map[:-4] 
             hyper_map = self.par_map[-4:]
             if self.gp_only:
                 vel = gp_predictor(t, rv, err, par_map, hyper_map, 'constant')
             else:
                 vel = gp_predictor(t, rv, err, par_map, hyper_map, 'keplerian')
-        else:
+        elif not self.only_vsys:
             par_map = self.par_map
 
             P = par_map[:-1:5]
@@ -1518,7 +1533,7 @@ class MCMC_nest:
         #     s = self.par_map.pop(-2)
 
         ## MAP estimate of the parameters
-        if self.npar == 1:  # systematic velocity only
+        if self.only_vsys:  # systematic velocity only
             vel = self.par_map[0] * np.ones_like(tt)
         elif self.gp:
             par_map = self.par_map[:-4] 
@@ -1538,7 +1553,7 @@ class MCMC_nest:
         ax1 = plt.subplot(gs[0])
         ax2 = plt.subplot(gs[1], sharex=ax1)
 
-        if self.npar == 1:  # systematic velocity only
+        if self.only_vsys:  # systematic velocity only
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
         elif not self.gp_only:
             # plot best solution
@@ -1564,7 +1579,7 @@ class MCMC_nest:
                                           color='k', alpha=0.3, label='2*std')
 
         vel = np.zeros_like(t)
-        if self.gp_only or self.npar == 1:
+        if self.gp_only or self.only_vsys:
             vel = self.par_map[0] * np.ones_like(tt)
         else:
             args = [t] + par + [vel]
@@ -1603,14 +1618,17 @@ class MCMC_nest:
         plt.show()
 
     def do_plot_map_phased(self, system, noname=False, plot_gp=True):
+        # if systematic velocity only, there is nothing to do here
+        if self.only_vsys: return
+
         get_rvn = get_rvn_os
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         tt = system.get_time_to_plot()
         vel = np.zeros_like(tt)
 
-        if self.gp:
-            self.npar
+        # if self.gp:
+        #     self.npar
 
         ## MAP estimate of the parameters
         if self.gp:
@@ -1719,12 +1737,29 @@ class MCMC_nest:
         k = int(np.log2(n) + 1)
         k = 50
 
-        plt.figure(figsize=(8, 12))
-        gs = gridspec.GridSpec(5, 1)
+        fig_ysize = 6 if self.npar==2 else 12
+        fig_ysize = 4 if self.only_vsys else fig_ysize
+
+        plt.figure(figsize=(8, fig_ysize))
+        gs = gridspec.GridSpec(min(5,self.npar), 1)
+
+        if self.nplanets < 1:
+            ax1 = plt.subplot(gs[0])
+            ax1.hist(self.posterior_samples[-1, :].T, bins=k, normed=True, label='vsys')
+            ax1.set_xlabel('Vsys [m/s]')
+            ax1.legend(frameon=False)
+
+            if self.jitter:
+                ax2 = plt.subplot(gs[1])
+                ax2.hist(self.posterior_samples[-2, :].T, bins=k, normed=True)
+                ax2.set_xlabel('jitter [m/s]')
+
+            plt.tight_layout()
+            return
 
         # period histogram(s)
         ax1 = plt.subplot(gs[0])
-        ax1.hist(self.posterior_samples[0:-1-j:5, :].T, bins=k, normed=True, label=['planet1', 'planet2'])
+        ax1.hist(self.posterior_samples[0:-1-j:5, :].T, bins=k, normed=True, label=['planet1', 'planet2', 'planet3'])
         # if show_priors:
             # xx = np.linspace(1.5*10, 1000, 200)
             # ax1.plot(np.log10(xx), jeffreys(xx, 1.5*10, 1000), lw=3, color='k')
