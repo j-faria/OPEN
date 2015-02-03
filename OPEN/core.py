@@ -950,7 +950,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 			# the namelist if resuming from a previous job
 			if not resume:
 				# do the actual training
-				GP_parameters = train_gp.do_it(system, training)
+				GP_parameters = train_gp.do_it(system, training, ncpu)
 
 				# write the trained parameters to the namelist
 				replacer1 = '    trained_parameters = %fd0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters)
@@ -1007,6 +1007,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		# OPEN is in control and will try to run a full model selection
 		# analysis, editing the namelist accordingly.
 
+		### set the namelist for 0 planet model
 		nplanets = 0
 		if gp: 
 			context = 201
@@ -1050,7 +1051,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				if 'nest_fb' in line: print replacer,
 				else: print line,
 
-
+		### run MultiNest
 		sleep(1)
 		start = time()
 		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
@@ -1084,6 +1085,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
 		clogger.info(msg)
 
+		### set the namelist for 1 planet model
 		nplanets = 1
 		if gp: 
 			context = 211
@@ -1225,6 +1227,89 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 		two_planet_lnE = results_two_planet.NS_lnE
 
+
+		##############################################################################
+		print
+		msg = blue('INFO: ') + 'Starting MultiNest for 3-planet model.\n'
+		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
+		clogger.info(msg)
+
+		### set the namelist for 3 planet model
+		nplanets = 3
+		if gp: 
+			context = 201 + nplanets*10
+		else: 
+			if jitter: 
+				context = 102 + nplanets*10
+			else:
+				context = 101 + nplanets*10
+		root = 'chains/nest-1planet-'
+		## automatically fill the necessary parameters in the inlist
+		replacer1 = '    nest_context = %d\n' % context
+		replacer2 = '    nest_root=\'%s\'\n' % root
+		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
+			elif 'nest_root' in line: print replacer2,
+			elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
+			else: print line,
+
+		# if resuming from a previous run, set the appropriate namelist flag
+		if resume:
+			replacer = '    nest_resume=.true.\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_resume' in line: print replacer,
+				else: print line,
+		else:
+			replacer = '    nest_resume=.false.\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_resume' in line: print replacer,
+				else: print line,
+
+		# by default, feedback on the sampling progress is omitted, but
+		# the user can still request it
+		if feed:
+			replacer = '    nest_fb=.true.\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_fb' in line: print replacer,
+				else: print line,
+		else:
+			replacer = '    nest_fb=.false.\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_fb' in line: print replacer,
+				else: print line,
+
+
+		sleep(1)
+		start = time()
+		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
+		rc = subprocess.call(cmd, shell=True)
+
+		if (rc == 1): 
+			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
+			clogger.fatal(msg)
+			return
+
+		print  # newline
+		t = time()
+		took_min = int(t-start) / 60
+		took_sec = (t-start) - (took_min*60)
+
+		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
+		clogger.info(msg)
+
+		get_multinest_output(system, root, nplanets, context=str(context))
+		results_three_planet = MCMC_nest(root, context=str(context))
+		# put the results into a zip file
+		results_three_planet.compress_chains()
+		if doplot:
+			results_three_planet.do_plot_map(system)
+			if verbose:
+				results_three_planet.do_plot_map_phased(system)
+				results_three_planet.do_hist_plots()
+
+		three_planet_lnE = results_three_planet.NS_lnE
+
+
 		##############################################################################
 		print  # newline
 		msg = yellow('RESULT: ') + 'Evidence results'
@@ -1233,6 +1318,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		msg1 = yellow('      : ') + 'cte lnE'.rjust(12) + ' = %12.6f' % (constant_lnE)
 		msg2 = yellow('      : ') + '1 planet lnE = %12.6f' % (one_planet_lnE)
 		msg3 = yellow('      : ') + '2 planet lnE = %12.6f' % (two_planet_lnE)
+		msg4 = yellow('      : ') + '3 planet lnE = %12.6f' % (three_planet_lnE)
 
 		## odds ratio
 		import warnings
@@ -1242,6 +1328,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				O11 = 1
 				O21 = np.exp(one_planet_lnE) / np.exp(constant_lnE)
 				O31 = np.exp(two_planet_lnE) / np.exp(constant_lnE)
+				O41 = np.exp(three_planet_lnE) / np.exp(constant_lnE)
 				K = np.exp(one_planet_lnE) / np.exp(two_planet_lnE)
 			except RuntimeWarning:
 				try:
@@ -1252,17 +1339,19 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 					except ImportError:
 						warn = red('Warning: ') + 'Cannot exponentiate lnE; mpmath is not available'
 						clogger.warning(warn)
-						O11 = O21 = O31 = np.nan
+						O11 = O21 = O31 = O41 = np.nan
 				else:
 					O11 = 1
 					O21 = mpmath.exp(one_planet_lnE) / mpmath.exp(constant_lnE)
 					O31 = mpmath.exp(two_planet_lnE) / mpmath.exp(constant_lnE)
+					O41 = mpmath.exp(three_planet_lnE) / mpmath.exp(constant_lnE)
 					K = mpmath.exp(one_planet_lnE) / mpmath.exp(two_planet_lnE)
 			finally:
-				msg1 += ' '*5 + 'p = %-13.8f\n' % (O11/(O11+O21+O31), )
-				msg2 += ' '*5 + 'p = %-13.8f\n' % (O21/(O11+O21+O31), )
-				msg3 += ' '*5 + 'p = %-13.8f\n' % (O31/(O11+O21+O31), )
-				msg = msg1 + msg2 + msg3
+				msg1 += ' '*5 + 'p = %-13.8f\n' % (O11/(O11+O21+O31+O41), )
+				msg2 += ' '*5 + 'p = %-13.8f\n' % (O21/(O11+O21+O31+O41), )
+				msg3 += ' '*5 + 'p = %-13.8f\n' % (O31/(O11+O21+O31+O41), )
+				msg4 += ' '*5 + 'p = %-13.8f\n' % (O41/(O11+O21+O31+O41), )
+				msg = msg1 + msg2 + msg3 + msg4
 				clogger.info(msg)
 
 		
@@ -1300,10 +1389,13 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		# 		msg += '%-15s\t%s' % ('Kass & Raftery', kass_raftery_scale[key])
 		# clogger.info(msg)
 
-		## save the fit with highest evidence to the system
+		
 		fits = {constant_lnE: results_constant,
 		        one_planet_lnE: results_one_planet,
 		        two_planet_lnE: results_two_planet}
+		## save all fits to the system
+		system.allfits = fits
+		## save the fit with highest evidence to the system
 		system.results = fits[sorted(fits, reverse=True)[0]]
 
 
@@ -1728,7 +1820,7 @@ def do_Dawson_Fabrycky(system):
 		return
 
 	time, rv, err = system.time, system.vrad, system.error
-	ofac = 2.0
+	ofac = 4.0
 
 	def specwindow(freq,time):
 		""" Calculate the spectral window function and its phase angles """
@@ -1747,7 +1839,7 @@ def do_Dawson_Fabrycky(system):
 	### GET THE WINDOW FUNCTION AT THOSE FREQUENCIES + plot dials
 	amp,phase = specwindow(freq,time)
 
-	figure(num=1,figsize=(12,8))
+	plt.figure(num=1,figsize=(12,8))
 
 	#### GET 3 Maximum peaks + create fake data
 	nf = len(freq)
@@ -1784,35 +1876,35 @@ def do_Dawson_Fabrycky(system):
 
 	timemin=int(min(time))
 	timemax=int(max(time))
-	timefake=frange(timemin-10,timemax+10,0.05)
+	timefake=np.arange(timemin-10,timemax+10,0.05)
 	timefake = time
 
 	xdiff = max(time) - min(time)
 
-	rv_fake1 = array([a1*cos(fmax1*2.*pi*i) + b1*sin(fmax1*2.*pi*i) + c1 for i in timefake])
-	rv_fake2 = array([a2*cos(fmax2*2.*pi*i) + b2*sin(fmax2*2.*pi*i) + c2 for i in timefake])
-	rv_fake3 = array([a3*cos(fmax3*2.*pi*i) + b3*sin(fmax3*2.*pi*i) + c3 for i in timefake])
+	rv_fake1 = np.array([a1*np.cos(fmax1*2.*pi*i) + b1*np.sin(fmax1*2.*pi*i) + c1 for i in timefake])
+	rv_fake2 = np.array([a2*np.cos(fmax2*2.*pi*i) + b2*np.sin(fmax2*2.*pi*i) + c2 for i in timefake])
+	rv_fake3 = np.array([a3*np.cos(fmax3*2.*pi*i) + b3*np.sin(fmax3*2.*pi*i) + c3 for i in timefake])
 	#errfake = [0.001 for i in timefake]
 	errfake = err
 
 	### PLOT REAL PERIODOGRAM + DIALS
-	figure(num = 1)
+	plt.figure(num = 1)
 
-	subplot(4,1,1)
-	title('window function + periodogram')
-	semilogx(1/freq,amp,'r-', alpha=0.3)
-	semilogx(1/freq,power,'k-')
+	plt.subplot(4,1,1)
+	plt.title('window function + periodogram')
+	plt.semilogx(1/freq,amp,'r-', alpha=0.3)
+	plt.semilogx(1/freq,power,'k-')
 
-	semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
-	semilogx([1./fmax1,1./fmax1+0.025*cos(ph1)],[max(power)+0.1,max(power)+0.1+0.025*sin(ph1)],'k-',lw=1)
-	semilogx([1./fmax2,1./fmax2+0.025*cos(ph2)],[max(power)+0.1,max(power)+0.1+0.025*sin(ph2)],'k-',lw=1)
-	semilogx([1./fmax3,1./fmax3+0.025*cos(ph3)],[max(power)+0.1,max(power)+0.1+0.025*sin(ph3)],'k-',lw=1)
+	plt.semilogx([1./fmax1,1./fmax1+0.025*np.cos(ph1)],[max(power)+0.1,max(power)+0.1+0.025*np.sin(ph1)],'k-',lw=1)
+	plt.semilogx([1./fmax2,1./fmax2+0.025*np.cos(ph2)],[max(power)+0.1,max(power)+0.1+0.025*np.sin(ph2)],'k-',lw=1)
+	plt.semilogx([1./fmax3,1./fmax3+0.025*np.cos(ph3)],[max(power)+0.1,max(power)+0.1+0.025*np.sin(ph3)],'k-',lw=1)
 
-	xlim(plow,xdiff*ofac)
-	ylim(0.0,max(power)+0.2)
+	plt.xlim(plow,xdiff*ofac)
+	plt.ylim(0.0,max(power)+0.2)
 
 	### PLOT FAKE PERIODOGRAMS + DIALS
 	#### 1st FAKE
@@ -1822,21 +1914,21 @@ def do_Dawson_Fabrycky(system):
 	ind2 = list(freq).index(fmax2)
 	ind3 = list(freq).index(fmax3)
 
-	subplot(4,1,2)
+	plt.subplot(4,1,2)
 
-	semilogx([1./i for i in freq],power,'k-')
-	fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
+	plt.semilogx([1./i for i in freq], power, 'k-')
+	plt.fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
 
-	semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
-	semilogx([1./fmax1,1./fmax1+0.045*cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind1])],'k-',lw=1)
-	semilogx([1./fmax2,1./fmax2+0.045*cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind2])],'k-',lw=1)
-	semilogx([1./fmax3,1./fmax3+0.045*cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind3])],'k-',lw=1)
+	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
+	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
+	plt.semilogx([1./fmax3,1./fmax3+0.045*np.cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind3])],'k-',lw=1)
 
-	xlim(plow,xdiff*ofac)
-	ylim(0.0,max(power)+0.2)
+	plt.xlim(plow,xdiff*ofac)
+	plt.ylim(0.0,max(power)+0.2)
 
 	#### 2nd FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake2, errfake, ofac, plow)
@@ -1845,20 +1937,21 @@ def do_Dawson_Fabrycky(system):
 	ind2 = list(freq).index(fmax2)
 	ind3 = list(freq).index(fmax3)
 
-	subplot(4,1,3)
+	plt.subplot(4,1,3)
 
-	semilogx([1./i for i in freq],power,'k-')
+	plt.semilogx([1./i for i in freq], power, 'k-')
+	plt.fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
 
-	semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
-	semilogx([1./fmax1,1./fmax1+0.045*cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind1])],'k-',lw=1)
-	semilogx([1./fmax2,1./fmax2+0.045*cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind2])],'k-',lw=1)
-	semilogx([1./fmax3,1./fmax3+0.045*cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind3])],'k-',lw=1)
+	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
+	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
+	plt.semilogx([1./fmax3,1./fmax3+0.045*np.cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind3])],'k-',lw=1)
 
-	xlim(plow,xdiff*ofac)
-	ylim(0.0,max(power)+0.2)
+	plt.xlim(plow,xdiff*ofac)
+	plt.ylim(0.0,max(power)+0.2)
 
 	#### 3rd FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake3, errfake, ofac, plow)
@@ -1867,23 +1960,24 @@ def do_Dawson_Fabrycky(system):
 	ind2 = list(freq).index(fmax2)
 	ind3 = list(freq).index(fmax3)
 
-	subplot(4,1,4)
+	plt.subplot(4,1,4)
 
-	semilogx([1./i for i in freq],power,'k-')
+	plt.semilogx([1./i for i in freq], power,'k-')
+	plt.fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
 
-	semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
-	semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
-	semilogx([1./fmax1,1./fmax1+0.045*cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind1])],'k-',lw=1)
-	semilogx([1./fmax2,1./fmax2+0.045*cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind2])],'k-',lw=1)
-	semilogx([1./fmax3,1./fmax3+0.045*cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*sin(phi[ind3])],'k-',lw=1)
+	plt.semilogx([1./fmax3,1./fmax3+0.045*np.cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind3])],'k-',lw=1)
+	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
+	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
 
-	xlim(plow,xdiff*ofac)
-	ylim(0.0,max(power)+0.2)
+	plt.xlim(plow,xdiff*ofac)
+	plt.ylim(0.0,max(power)+0.2)
 
 	# savefig(name+'_DF.ps',orientation = 'Landscape')
-	show()
+	plt.show()
 
 
 def do_clean(system):

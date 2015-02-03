@@ -30,8 +30,8 @@ def lnlike(p, t, y, yerr):
 
 def lnprior(p):
     z1, z2, z3, z4 = p
-    # if (0. < z1 < 0.01 and 5. < z2 < 50. and 20. < z3 < 30. and 5. < z4 < 50.): 
-    if (0.001 < z1 < 0.009 and 20. < z2 < 30. and 20. < z3 < 30. and 25. < z4 < 40.): 
+    if (0. < z1 < 1. and 5. < z2 < 50. and 5. < z3 < 30. and 5. < z4 < 50.): 
+    # if (0.001 < z1 < 0.009 and 20. < z2 < 30. and 20. < z3 < 30. and 25. < z4 < 40.): 
         return 0.0
     return -np.inf
 
@@ -40,19 +40,19 @@ def lnprob(p, x, y, yerr):
     return lp + lnlike(p, x, y, yerr) if np.isfinite(lp) else -np.inf
 
 
-def fit_gp(initial, data, nwalkers=10):
+def fit_gp(initial, data, ncpu, nwalkers=10):
     ndim = len(initial)
-    p0 = [np.array(initial) #+ 1e-8 * np.random.randn(ndim)
+    p0 = [np.array(initial) + 1e-4 * np.random.randn(ndim)
           for i in xrange(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=data)
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=data, threads=1)
 
     msg = blue('    :: ') + 'Running burn-in...'
     clogger.info(msg)
 
-    p0, lnp, _ = sampler.run_mcmc(p0, 1000)
+    p0, lnp, _ = sampler.run_mcmc(p0, 5000)
     sampler.reset()
 
-    niter = 10
+    niter = 50000
     
     msg = blue('    :: ') + 'Running %d MCMC chains for %d iterations...' % (nwalkers, niter)
     clogger.info(msg)
@@ -70,7 +70,7 @@ def fit_gp(initial, data, nwalkers=10):
 
 
 
-def do_it(system, training_variable):
+def do_it(system, training_variable, ncpu=1):
 
 	t = system.time
 
@@ -82,16 +82,20 @@ def do_it(system, training_variable):
 		training_variable_error = 'sig_rhk'
 		i = system.extras._fields.index(training_variable_error) # index corresponding to the uncertainties
 		yerr = system.extras[i]
-	if training_variable == 'fwhm': 
-		yerr = 2.35 * system.error
+	if training_variable == 'fwhm':
+		if system.units == 'm/s':
+			f = 2.35e-3
+		else:
+			f = 2.35
+		yerr = f * system.error
 	
 	
 	# subtract mean
 	y = y - np.mean(y)
 
 	data = (t, y, 1.0 / yerr ** 2)
-	initial = np.array([0.005, 27., 25.3, 30.])
-	sampler, best_p = fit_gp(initial, data)
+	initial = np.array([0.05, 10., 13, 30.])
+	sampler, best_p = fit_gp(initial, data, ncpu)
 
 	msg = yellow('    :: ') + 'Best GP hyperparameters: z1=%f, z2=%f, z3=%f, z4=%f' % tuple(best_p)
 	clogger.info(msg)
@@ -131,7 +135,7 @@ def do_it(system, training_variable):
 	plt.figure()
 	plt.subplot(211)
 	plt.plot(x, m, color='r', alpha=0.8)
-	plt.plot(t, m1, color='r', alpha=0.8)
+	# plt.plot(t, m1, color='r', alpha=0.8)
 
 	# Plot the data
 	plt.errorbar(t, y, yerr=yerr, fmt=".k", capsize=0)

@@ -44,10 +44,8 @@ def read_rv(*filenames, **kwargs):
         Dictionary with name of file and number of values from each file
     """
 
-    # set logging level
-    clogger.setLevel(logging.VERBOSE) \
-                if (kwargs.has_key('verbose') and kwargs['verbose']) \
-                else clogger.setLevel(logging.INFO)
+    # verbosity
+    verbose = kwargs.get('verbose', True)
 
     # how many header lines to skip?
     if (kwargs.has_key('skip')): header_skip = int(kwargs['skip'])
@@ -59,7 +57,9 @@ def read_rv(*filenames, **kwargs):
             with rvfile(filename) as f:
                 nlines = len(f.readuncommented())
             dic[filename] = [nlines, 0]
-            clogger.info('Reading %d values from file %s' % (nlines, filename))
+            if verbose:
+                msg = blue('INFO:') + ' Reading %d values from file %s' % (nlines, filename)
+                clogger.info(msg)
         else:
             # should raise an error or read from the other files?
             raise IOError("The file '%s' doesn't seem to exist" % filename)
