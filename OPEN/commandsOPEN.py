@@ -36,11 +36,12 @@ read_usage = \
 """
 Usage:
     read <file>...
-    read <file>... [-d] [--skip=<sn>] [-v] [--nomps]
+    read <file>... [-d] [--skip=<sn>] [-v] [--quiet] [--nomps]
     read -h | --help
 Options:
     -d                  Set this as default system.
     -v --verbose        Verbose output about data just read.
+    --quiet             Do not print any output.
     --skip=<sn>         How many header lines to skip [default: 0].
     --nomps             Do not convert data to m/s
     -h --help           Show this help message.
@@ -329,25 +330,27 @@ class EmbeddedMagics(Magics):
         # that we can do, e.g., HDXXXX = %read file1 file2
         if local_ns.has_key('default') and not args['-d']:
             try:
-                return rvSeries(*filenames, skip=args['--skip'])
+                return rvSeries(*filenames, skip=args['--skip'], verbose=not args['--quiet'])
             except AttributeError:
                 pass
         else:
             try:
-                local_ns['default'] = rvSeries(*filenames, skip=args['--skip'])
+                local_ns['default'] = rvSeries(*filenames, skip=args['--skip'], verbose=not args['--quiet'])
             except IOError:
                 return
 
         default = local_ns['default']
         
-        if args['--verbose']:
+        if args['--verbose'] and not args['--quiet']:
             default.stats()
 
         if (min(default.error) < 0.01 and not args['--nomps']):
             from shell_colors import blue
             mean_vrad = mean(default.vrad)
-            msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
-            clogger.info(msg)
+
+            if not args['--quiet']:
+                msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
+                clogger.info(msg)
 
             default.vrad = (default.vrad - mean(default.vrad)) * 1e3
             default.error *= 1e3
@@ -999,6 +1002,21 @@ class EmbeddedMagics(Magics):
                           training=train_quantity, lin=lin_quantity, 
                           doplot=doplot, feed=dofeedback)
 
+
+    @needs_local_scope
+    @line_magic
+    def dnest(self, parameter_s='', local_ns=None):
+        from shell_colors import red
+
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+        else:
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.do_RJ_DNest3(system)
 
     @needs_local_scope
     @line_magic
