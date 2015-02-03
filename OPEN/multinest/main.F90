@@ -203,6 +203,7 @@ program main
     	gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
         if (nest_context / 100 == 2) then
             gp1%mean_fun => mean_fun_keplerian
+            print *, 'Setting Keplerian mean function'
         else
             gp1%mean_fun => mean_fun_constant
         endif
@@ -237,8 +238,8 @@ program main
         !spriorran(i+1,2) = kmax * 1d-3
 
 		!! eccentricity, Uniform, 0-1
-		!spriorran(i+2,1)=0d0
-		!spriorran(i+2,2)=1d0
+! 		spriorran(i+2,1)=0d0
+! 		spriorran(i+2,2)=1d0
         !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
         spriorran(i+2,1)=0.867d0
         spriorran(i+2,2)=3.03d0
