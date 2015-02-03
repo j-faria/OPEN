@@ -25,7 +25,7 @@ program main
 	real(kind=8), dimension(6) :: a
 
     namelist /NEST_parameters/ sdim, &
-                               nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_liveplot, &
+                               nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &
                                nest_root, nest_context, &
                                training, trained_parameters, &
                                lin_dep, n_lin_dep

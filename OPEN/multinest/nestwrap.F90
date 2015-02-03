@@ -28,7 +28,7 @@ contains
 	   	call nestRun(nest_IS,nest_mmodal,nest_ceff,nest_nlive,nest_tol, &
 	   		         nest_efr,sdim,nest_nPar, nest_nClsPar,nest_maxModes, &
 	   		         nest_updInt,nest_Ztol,nest_root,nest_rseed,nest_pWrap, &
-	   		         nest_fb,nest_liveplot,nest_resume,nest_outfile,nest_initMPI, &
+	   		         nest_fb,nest_MAPfb,nest_liveplot,nest_resume,nest_outfile,nest_initMPI, &
 	   		         nest_logZero,nest_maxIter,getLogLike,dumper,live_plot,context)
 
 	end subroutine nest_Sample

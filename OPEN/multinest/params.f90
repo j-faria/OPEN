@@ -73,7 +73,7 @@ module params
 	
     !max no. of live points
     integer nest_nlive
-	parameter(nest_nlive=1000) !300
+	parameter(nest_nlive=300) !300
       
     !total number of parameters, 
     !should be sdim in most cases but if you need to store some 
@@ -87,7 +87,7 @@ module params
       
     !evidence tolerance factor
     double precision nest_tol 
-    parameter(nest_tol=0.1)
+    parameter(nest_tol=0.5)
       
     !enlargement factor reduction parameter
     ! defines the sampling efficiency. 0.8 and 0.3 are recommended for 
@@ -146,8 +146,10 @@ module params
 	
     !feedback on the sampling progress?
     logical nest_fb 
-    !parameter(nest_fb=.false.)
 
+    !feedback on current MAP parameters?
+    logical nest_MAPfb
+    
     !live plot with pgplot?
     logical nest_liveplot
 
