@@ -1341,20 +1341,46 @@ class MCMC_nest:
         msg = blue('INFO: ') + 'Saved output files to %s' % zfilename
         clogger.info(msg)
 
-    def print_best_solution(self):
-        ## output best solution
-        best_ind = np.argmax(self.chains[1, :])
-        par_best = self.chains[2:, best_ind]
-        print # newline
-        msg = yellow('RESULT: ') + 'Best solution is'
+    def print_best_solution(self, system):
+
+        par_mean, par_sigma, par_mle, par_map = self.par_mean, self.par_sigma, self.par_mle, self.par_map
+
+        msg = yellow('RESULT: ') + 'Parameters summary'
         clogger.info(msg)
+
+        print '%8s %14s %9s %14s %14s' % ('', 'mean', '+- sigma', 'ML', 'MAP')
         ## loop over planets
-        print("%3s %12s %10s %10s %10s %15s %9s" % \
-            ('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+        i = -1
         for i, planet in enumerate(list(ascii_lowercase)[:self.nplanets]):
-            P, K, ecc, omega, T0, gam = [par_best[j::6] for j in range(6)]
-            print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % 
-                                (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+            print yellow(planet)
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('P',     par_mean[5*i], par_sigma[5*i], par_mle[5*i], par_map[5*i])
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('K',     par_mean[5*i+1], par_sigma[5*i+1], par_mle[5*i+1], par_map[5*i+1])
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('ecc',   par_mean[5*i+2], par_sigma[5*i+2], par_mle[5*i+2], par_map[5*i+2])
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('omega', par_mean[5*i+3], par_sigma[5*i+3], par_mle[5*i+3], par_map[5*i+3])
+            print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
+        
+            print 
+
+            P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
+            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
+
+            from .utils import mjup2mearth
+            m_me = m_mj * mjup2mearth
+
+            print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
+
+            print 
+
+        print yellow('system')
+        if self.context[2] == '2':
+            # jitter parameter
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])
+        if self.context[0] == '1':
+            # in this case, the vsys parameters is the last one
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
+        elif self.context[0] == '2':
+            # in this case, the vsys is before the hyperparameters
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
 
     def confidence_intervals(self):
         try:
@@ -1535,7 +1561,7 @@ class MCMC_nest:
         plt.plot(t)
         plt.ylabel(self.trace._fields[i])
 
-    def do_plot_map(self, system):
+    def do_plot_map(self, system, legend=True):
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         # tt = system.get_time_to_plot(P=self.par_map[0])
@@ -1636,12 +1662,12 @@ class MCMC_nest:
         ax2.set_xlabel('Time [days]')
         ax1.set_ylabel('RV [%s]'%system.units)
         ax2.set_ylabel('Residuals [%s]'%system.units)
-        ax1.legend()
+        if legend: ax1.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
         plt.show()
 
-    def do_plot_map_phased(self, system, noname=False, plot_gp=True):
+    def do_plot_map_phased(self, system, legend=True, plot_gp=True):
         # if systematic velocity only, there is nothing to do here
         if self.only_vsys: return
 
@@ -1733,10 +1759,10 @@ class MCMC_nest:
             ax.axhline(y=vsys, ls='--', color='k', alpha=0.3)
 
             ax.set_xlim([-0.2, 1.2])
-            ax.set_xlabel('Phase (P=%5.2f)' % P[planeti])
+            ax.set_xlabel('Phase (P =%5.2f)' % P[planeti])
             ax.set_ylabel('RV [%s]'%system.units)
 
-        if not noname: plt.legend()
+        if legend: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
         plt.show()
