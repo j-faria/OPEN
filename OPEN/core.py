@@ -1016,7 +1016,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				context = 102
 			else:
 				context = 101 
-		root = 'chains/nest-noplanet-'
+		root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1076,6 +1076,8 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		results_constant.compress_chains()
 		if doplot:
 			results_constant.do_plot_map(system)
+			if verbose:
+				results_constant.do_hist_plots()
 
 		constant_lnE = results_constant.NS_lnE
 
@@ -1094,7 +1096,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				context = 112
 			else:
 				context = 111 
-		root = 'chains/nest-1planet-'
+		root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1174,7 +1176,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				context = 122
 			else:
 				context = 121 
-		root = 'chains/nest-2planet-'
+		root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1243,7 +1245,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				context = 102 + nplanets*10
 			else:
 				context = 101 + nplanets*10
-		root = 'chains/nest-1planet-'
+		root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1400,6 +1402,10 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 
 	return
+
+
+def do_RJ_DNest3(system):
+	print 'hello'
 
 def do_correlate(system, vars=(), verbose=False, remove=False):
 	"""
