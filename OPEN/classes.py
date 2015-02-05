@@ -88,6 +88,32 @@ class rvSeries:
           clogger.fatal(msg)
           return
 
+        # # the following is the most readable and less nested way I found of doing this
+        # def get_time(d):
+        #     try:
+        #         return d.pop('jdb')
+        #     except KeyError:
+        #         pass
+        #     try:
+        #         return d.pop('time')
+        #     except KeyError:
+        #         pass
+        #     raise IOError('The .rdb file header should have standard names: jdb/time, rv/vrad, err/svrad.')
+
+        # def get_RV(d):
+        #     try:
+        #         return d.pop('vrad'), d.pop('svrad')
+        #     except KeyError:
+        #         pass
+        #     try:
+        #         return d.pop('rv'), d.pop('err')
+        #     except KeyError:
+        #         pass
+        #     raise IOError('The .rdb file header should have standard names: jdb/time, rv/vrad, err/svrad.')
+
+        # self.time = get_time(data)
+        # self.vrad, self.error = get_RV(data)
+
         self.time, self.vrad, self.error = data.pop('jdb'), data.pop('vrad'), data.pop('svrad')
 
         # by default
