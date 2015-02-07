@@ -72,7 +72,7 @@ per_usage = \
 """
 Usage:
     per -n SYSTEM
-    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--save=filename]
+    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--save=filename] [--noplot]
     per -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
@@ -85,6 +85,7 @@ Options:
     --ofac=<of>      Oversampling factor [default: 6]
     --fap            Plot false alarm probabilities
     --save=filename  Save figure as filename
+    --noplot         Don't plot the periodogram (just creates system.per* instance)
     -v --verbose     Verbose statistical output 
     -h --help        Show this help message
 """
@@ -196,7 +197,7 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
+    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed] [--restart]
 Options
     -u            User sets the namelist file
     -r            Resume from a previous MultiNest run
@@ -208,6 +209,7 @@ Options
     --ncpu=<cpu>  Number of threads to use [default: all available]
     --noplot      Do not produce result plots
     --feed        Force progress feedback
+    --restart     Fully restart a previous automatic model selection run
 """
 
 restrict_usage = \
@@ -471,6 +473,7 @@ class EmbeddedMagics(Magics):
         hf = float(args.pop('--hifac'))
         of = float(args.pop('--ofac'))
         fap = args['--fap']
+        showplot = not args['--noplot']
 
         # which periodogram should be calculated?
         per_fcn = None
@@ -501,32 +504,38 @@ class EmbeddedMagics(Magics):
                 if system.per.name != name:
                     raise AttributeError
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=fap, save=args['--save'])
+                if showplot:
+                    system.per._plot(doFAP=fap, save=args['--save'])
             except AttributeError:
                 system.per = per_fcn(system, hifac=hf, ofac=of)
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=fap, save=args['--save'])
+                if showplot:
+                    system.per._plot(doFAP=fap, save=args['--save'])
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
             system.bis_per = per_fcn(system, hifac=hf, ofac=of, quantity='bis')
-            system.bis_per._plot(doFAP=fap, save=args['--save'])
+            if showplot:
+                system.bis_per._plot(doFAP=fap, save=args['--save'])
 
         if args['fwhm']: # periodogram of the CCF's fwhm
             system.fwhm_per = per_fcn(system, hifac=hf, ofac=of, quantity='fwhm')
-            system.fwhm_per._plot(doFAP=fap, save=args['--save'])
+            if showplot:
+                system.fwhm_per._plot(doFAP=fap, save=args['--save'])
 
         if args['rhk']: # periodogram of rhk
             system.rhk_per = per_fcn(system, hifac=hf, ofac=of, quantity='rhk')
-            system.rhk_per._plot(doFAP=fap, save=args['--save'])
+            if showplot:
+                system.rhk_per._plot(doFAP=fap, save=args['--save'])
 
         if args['contrast']: # periodogram of contrast
             system.contrast_per = per_fcn(system, hifac=hf, ofac=of, quantity='contrast')
-            system.contrast_per._plot(doFAP=fap, save=args['--save'])
-
+            if showplot:
+                system.contrast_per._plot(doFAP=fap, save=args['--save'])
 
         if args['resid']: # periodogram of the residuals of the current fit
             system.resid_per = per_fcn(system, hifac=hf, ofac=of, quantity='resid')
-            system.resid_per._plot()
+            if showplot:
+                system.resid_per._plot()
 
     @needs_local_scope
     @line_magic
@@ -983,6 +992,7 @@ class EmbeddedMagics(Magics):
             return
         doplot = not args['--noplot']
         dofeedback = args['--feed']
+        restart = args['--restart']
 
         try: 
             ncpu = int(args['--ncpu'])
@@ -1000,7 +1010,8 @@ class EmbeddedMagics(Magics):
         core.do_multinest(system, user, gp, jitter,
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, lin=lin_quantity, 
-                          doplot=doplot, feed=dofeedback)
+                          doplot=doplot, feed=dofeedback,
+                          restart=restart)
 
 
     @needs_local_scope

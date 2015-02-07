@@ -9,7 +9,7 @@
 import warnings
 import datetime, time
 import subprocess
-import sys, os
+import sys, os, shutil, glob
 import random
 from collections import namedtuple
 from string import ascii_lowercase
@@ -740,7 +740,8 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, feed=False):
+def do_multinest(system, user, gp, jitter, resume=False, verbose=False, 
+	             ncpu=None, training=None, lin=None, doplot=True, feed=False, restart=False):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -755,6 +756,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		lin:
 		doplot: whether to show plots at the end of the run. Takes precedence over `verbose`
 		feed: when running automatic model selection, whether to provide sampling feedback
+		restart: whether to restart a previous automatic run
 	"""
 	from time import sleep, time
 	from commands import getoutput
@@ -1006,6 +1008,60 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 	else:
 		# OPEN is in control and will try to run a full model selection
 		# analysis, editing the namelist accordingly.
+		
+		# try to find name of star automatically
+		# this will be used for reading and writing in restarts
+		import re
+		filename = system.provenance.keys()[0]
+		regex = re.compile("HD[0-9]*")
+		try:
+			temp_star_name = regex.findall(filename)[0]
+		except IndexError:
+			from os.path import basename, splitext
+			temp_star_name = splitext(basename(filename))[0]
+
+		if restart:
+			import zipfile
+			msg = blue('    : ') + 'Restarting automatic run for star %s' % temp_star_name
+			clogger.info(msg)
+
+			restart_folder = os.path.join('chains', temp_star_name)
+			zipfilenames = glob.glob(os.path.join(restart_folder, '*.zip'))
+
+			# for now, we only use the most up-to-date zip files
+			zipfilenames.sort()  # the filenames have timestamps
+			zipfilenames = zipfilenames[-4:]
+
+			msg = blue('    : ') + 'Found %d/4 necessary (newest) zip files in directory %s' % (len(zipfilenames), restart_folder)
+			clogger.info(msg)
+
+			i = 0
+			for zf in zipfilenames:  # cycle all zip files in restart folder
+				ZF = zipfile.ZipFile(zf, "r")  # create the ZipFile object
+				for name in ZF.namelist():  # cycle every path in the zip file
+					# we don't actually need th namelist files here, as they would cause 
+					# rewritting issues. They are just there for reproducibility
+					if 'namelist1' in name:
+						continue
+					fname = os.path.join(restart_folder, os.path.basename(name))
+					# print 'creating', fname
+					fout = open(fname, "wb")
+					fout.write(ZF.read(name))
+					fout.close()
+					i += 1
+
+			msg = blue('    : ') + 'Created %d files for restart' % i
+			clogger.info(msg)
+
+			restart_root = os.path.join(restart_folder, 'nest-')
+			# print restart_root
+			# return
+
+		##############################################################################
+		print
+		msg = blue('INFO: ') + 'Starting MultiNest for constant model.\n'
+		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
+		clogger.info(msg)
 
 		### set the namelist for 0 planet model
 		nplanets = 0
@@ -1015,8 +1071,11 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 			if jitter: 
 				context = 102
 			else:
-				context = 101 
-		root = 'chains/nest-' + str(nplanets) + 'planet-'
+				context = 101
+		if restart:
+			root = restart_root + str(nplanets) + 'planet-'
+		else:
+			root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1072,8 +1131,9 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 		get_multinest_output(system, root, nplanets, context=str(context))
 		results_constant = MCMC_nest(root, context=str(context))
+		results_constant.model_name = 'd0'
 		# put the results into a zip file
-		results_constant.compress_chains()
+		zip_filename_constant = results_constant.compress_chains()
 		if doplot:
 			results_constant.do_plot_map(system)
 			if verbose:
@@ -1096,7 +1156,10 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				context = 112
 			else:
 				context = 111 
-		root = 'chains/nest-' + str(nplanets) + 'planet-'
+		if restart:
+			root = restart_root + str(nplanets) + 'planet-'
+		else:
+			root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1152,8 +1215,9 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 		get_multinest_output(system, root, nplanets, context=str(context))
 		results_one_planet = MCMC_nest(root, context=str(context))
+		results_one_planet.model_name = 'd0k1'
 		# put the results into a zip file
-		results_one_planet.compress_chains()
+		zip_filename_one_planet = results_one_planet.compress_chains()
 		if doplot:
 			results_one_planet.do_plot_map(system)
 			if verbose:
@@ -1176,7 +1240,10 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				context = 122
 			else:
 				context = 121 
-		root = 'chains/nest-' + str(nplanets) + 'planet-'
+		if restart:
+			root = restart_root + str(nplanets) + 'planet-'
+		else:
+			root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1219,8 +1286,9 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 		get_multinest_output(system, root, nplanets, context=str(context))
 		results_two_planet = MCMC_nest(root, context=str(context))
+		results_two_planet.model_name = 'd0k2'
 		# put the results into a zip file
-		results_two_planet.compress_chains()
+		zip_filename_two_planet = results_two_planet.compress_chains()
 		if doplot:
 			results_two_planet.do_plot_map(system)
 			if verbose:
@@ -1245,7 +1313,10 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 				context = 102 + nplanets*10
 			else:
 				context = 101 + nplanets*10
-		root = 'chains/nest-' + str(nplanets) + 'planet-'
+		if restart:
+			root = restart_root + str(nplanets) + 'planet-'
+		else:
+			root = 'chains/nest-' + str(nplanets) + 'planet-'
 		## automatically fill the necessary parameters in the inlist
 		replacer1 = '    nest_context = %d\n' % context
 		replacer2 = '    nest_root=\'%s\'\n' % root
@@ -1301,8 +1372,9 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 		get_multinest_output(system, root, nplanets, context=str(context))
 		results_three_planet = MCMC_nest(root, context=str(context))
+		results_three_planet.model_name = 'd0k3'
 		# put the results into a zip file
-		results_three_planet.compress_chains()
+		zip_filename_three_planet = results_three_planet.compress_chains()
 		if doplot:
 			results_three_planet.do_plot_map(system)
 			if verbose:
@@ -1394,12 +1466,31 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		
 		fits = {constant_lnE: results_constant,
 		        one_planet_lnE: results_one_planet,
-		        two_planet_lnE: results_two_planet}
+		        two_planet_lnE: results_two_planet,
+		        three_planet_lnE: results_three_planet}
 		## save all fits to the system
 		system.allfits = fits
 		## save the fit with highest evidence to the system
 		system.results = fits[sorted(fits, reverse=True)[0]]
 
+		## save the zip files into a folder with the name of the star
+		## allowing for complete restarts in the future
+		if restart:
+			save_folder = os.path.dirname(root)
+		else:
+			root_dir_name = os.path.dirname(root)
+			save_folder = os.path.join(root_dir_name, temp_star_name)
+			if os.path.isdir(save_folder):  # folder already exists (shouldn't really happen)
+				clogger.info(blue('INFO: ') + 'Directory %s already exists' % save_folder)
+			else:
+				clogger.info(blue('INFO: ') + 'Creating directory %s' % save_folder)
+				os.makedirs(save_folder)
+
+		clogger.info(blue('INFO: ') + 'Copying zip files to %s to allow restarts' % save_folder)
+		shutil.copy(zip_filename_constant, save_folder)
+		shutil.copy(zip_filename_one_planet, save_folder)
+		shutil.copy(zip_filename_two_planet, save_folder)
+		shutil.copy(zip_filename_three_planet, save_folder)
 
 	return
 

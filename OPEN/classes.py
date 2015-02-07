@@ -1329,6 +1329,10 @@ class MCMC_nest:
         self.trace = p._make(self.posterior_samples[:-1-j,:])
 
     def compress_chains(self):
+        """
+        Save all MultiNest output files in a zip file, allowing for future restarts.
+        Returns the zip file name.
+        """
         tstr = strftime("%Y%m%d-%H%M%S")
         zfilename = 'chains/nest-out-'+tstr+'.zip'
         nest_output_files = set(glob.glob(self.root+'*')) - set(glob.glob(self.root+'*.zip'))
@@ -1336,10 +1340,13 @@ class MCMC_nest:
         with ZipFile(zfilename, 'a', compression=8) as zf:
             for f in nest_output_files:
                 zf.write(f)
+            # include the namelist used to run MultiNest
             zf.write('OPEN/multinest/namelist1')
 
         msg = blue('INFO: ') + 'Saved output files to %s' % zfilename
         clogger.info(msg)
+
+        return zfilename
 
     def print_best_solution(self, system):
 
