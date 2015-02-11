@@ -87,7 +87,7 @@ module params
       
     !evidence tolerance factor
     double precision nest_tol 
-    parameter(nest_tol=0.5)
+    parameter(nest_tol=0.1)
       
     !enlargement factor reduction parameter
     ! defines the sampling efficiency. 0.8 and 0.3 are recommended for 
