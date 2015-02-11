@@ -72,7 +72,7 @@ per_usage = \
 """
 Usage:
     per -n SYSTEM
-    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--save=filename] [--noplot]
+    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
     per -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
@@ -84,6 +84,7 @@ Options:
     --hifac=<hf>     hifac * Nyquist is lowest frequency used [default: 40]
     --ofac=<of>      Oversampling factor [default: 6]
     --fap            Plot false alarm probabilities
+    --bfap           Plot false alarm probabilities calculated using bootstrap
     --save=filename  Save figure as filename
     --noplot         Don't plot the periodogram (just creates system.per* instance)
     -v --verbose     Verbose statistical output 
@@ -473,6 +474,7 @@ class EmbeddedMagics(Magics):
         hf = float(args.pop('--hifac'))
         of = float(args.pop('--ofac'))
         fap = args['--fap']
+        bfap = args['--bfap']
         showplot = not args['--noplot']
 
         # which periodogram should be calculated?
@@ -505,37 +507,37 @@ class EmbeddedMagics(Magics):
                     raise AttributeError
                 # system.per._output(verbose=verb)  # not ready
                 if showplot:
-                    system.per._plot(doFAP=fap, save=args['--save'])
+                    system.per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
             except AttributeError:
                 system.per = per_fcn(system, hifac=hf, ofac=of)
                 # system.per._output(verbose=verb)  # not ready
                 if showplot:
-                    system.per._plot(doFAP=fap, save=args['--save'])
+                    system.per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
             system.bis_per = per_fcn(system, hifac=hf, ofac=of, quantity='bis')
             if showplot:
-                system.bis_per._plot(doFAP=fap, save=args['--save'])
+                system.bis_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['fwhm']: # periodogram of the CCF's fwhm
             system.fwhm_per = per_fcn(system, hifac=hf, ofac=of, quantity='fwhm')
             if showplot:
-                system.fwhm_per._plot(doFAP=fap, save=args['--save'])
+                system.fwhm_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['rhk']: # periodogram of rhk
             system.rhk_per = per_fcn(system, hifac=hf, ofac=of, quantity='rhk')
             if showplot:
-                system.rhk_per._plot(doFAP=fap, save=args['--save'])
+                system.rhk_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['contrast']: # periodogram of contrast
             system.contrast_per = per_fcn(system, hifac=hf, ofac=of, quantity='contrast')
             if showplot:
-                system.contrast_per._plot(doFAP=fap, save=args['--save'])
+                system.contrast_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['resid']: # periodogram of the residuals of the current fit
             system.resid_per = per_fcn(system, hifac=hf, ofac=of, quantity='resid')
             if showplot:
-                system.resid_per._plot()
+                system.resid_per._plot(doFAP=fap, dobFAP=bfap)
 
     @needs_local_scope
     @line_magic

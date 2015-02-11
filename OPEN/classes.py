@@ -728,41 +728,50 @@ class PeriodogramBase:
       return self.probInv(Prob)  
 
     def FAP_by_bootstrap(self):
-
+        from tqdm import tqdm
         name = '_' + self.__class__.__name__
-        # access the instance's __calcPeriodogramFast function
-        exec 'calc = self.' + name + '__calcPeriodogramFast'
 
         # temporaries
-        f = self.freq
-        p = self.power
+        temp_per = copy(self)
+        # access the instance's __calcPeriodogramFast function
+        exec 'calc = temp_per.' + name + '__calcPeriodogramFast'
+
+        f = temp_per.freq
+        p = temp_per.power
 
         perc01 = 0.001 # 0.1% FAP
         perc1 = 1.  # 1% FAP
-        perm = int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
+        perc10 = 10.  # 10% FAP
+        perm = 1000 # int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
 
-        maxPowers = []
-        for k in tqdm(range(perm)):
-            permutted = np.random.permutation(zip(self.y, self.error))
-            self.y = permutted[:,0]
-            self.error = permutted[:,1]
+        try:
+            self.peaks
+            if len(self.peaks) != perm: raise AttributeError
+        except AttributeError:
+            maxPowers = []
+            for k in tqdm(xrange(perm)):
+                permutted = np.random.permutation(zip(temp_per.y, temp_per.error))
+                temp_per.y = permutted[:,0]
+                temp_per.error = permutted[:,1]
 
-            calc()
-            # self._plot_pg()
-            powermaxP = self.power.max()
-            maxPowers.append(powermaxP)
-        #print maxPowers
+                calc()
+                # temp_per._plot_pg()
+                powermaxP = temp_per.power.max()
+                maxPowers.append(powermaxP)
+            self.peaks = np.sort(maxPowers)
 
-        peaks = np.sort(maxPowers)
-        # index01 = int( ((1-perc01/100.0) * len(peaks)) )
-        index1 = int( ((1-perc1/100.0) * len(peaks)) )
-        # powerFAP_01 = peaks[index01]
-        powerFAP_1 = peaks[index1]
+        index01 = int( ((1-perc01/100.0) * len(self.peaks)) )
+        index1 = int( ((1-perc1/100.0) * len(self.peaks)) )
+        index10 = int( ((1-perc10/100.0) * len(self.peaks)) )
+        powerFAP_01 = self.peaks[index01]
+        powerFAP_1 = self.peaks[index1]
+        powerFAP_10 = self.peaks[index10]
 
 
         plt.semilogx(1./f, p, 'k-')
-        # plt.axhline(powerFAP_01,c='r',ls=':')
+        plt.axhline(powerFAP_01,c='r',ls=':')
         plt.axhline(powerFAP_1,c='r',ls='--')
+        plt.axhline(powerFAP_10,c='r',ls='-')
         plt.show()
         #         if orbit == 'circ':
         #             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
@@ -771,7 +780,8 @@ class PeriodogramBase:
         # #       print k
         #         maxPowers.append(powermaxP)
 
-    def _plot(self, doFAP=False, faps=None, verts=None, newFig=True, axes=None, save=None, **kwargs):
+    def _plot(self, doFAP=False, dobFAP=False, faps=None, verts=None, 
+              newFig=True, axes=None, save=None, **kwargs):
         """
         Plot this periodogram.
         """
@@ -802,9 +812,10 @@ class PeriodogramBase:
         else:
             self.ax.semilogx(1./self.freq, self.power, 'b-', **kwargs)
         # plot FAPs
-        if doFAP and (faps is None):
-            clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
-        if doFAP: # do default FAPs of 10%, 1% and 0.1%
+        if doFAP:
+            # do default FAPs of 10%, 1% and 0.1%
+            if faps is None: clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
+
             pmin = 1./self.freq.min()
             pmax = 1./self.freq.max()
             plvl1 = self.powerLevel(0.1) # 10% FAP
@@ -814,6 +825,9 @@ class PeriodogramBase:
             self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
             self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
             self.ax.legend(frameon=True)
+        if dobFAP:
+            # calculate FAP by bootstrap
+            self.FAP_by_bootstrap()
 
         # plot vertical lines
         if verts is not None:
