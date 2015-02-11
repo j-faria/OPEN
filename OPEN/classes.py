@@ -1326,8 +1326,8 @@ class MCMC_nest:
         filename1 = self.root + 'ev.dat'
         filename2 = self.root + 'phys_live.points'
 
-        rejected_points = np.loadtxt(filename1, unpack=True)
-        live_points = np.loadtxt(filename2, unpack=True)
+        rejected_points = np.genfromtxt(filename1, unpack=True)
+        live_points = np.genfromtxt(filename2, unpack=True)
 
         j = 1 if self.jitter else 0
         j = j+4 if self.gp else j+0
@@ -1337,7 +1337,10 @@ class MCMC_nest:
         parameter_names = ['period', 'K', 'ecc', 'omega', 't0']
         parameter_names = np.array([[par + '_'+str(i) for par in parameter_names] for i in range(self.nplanets)])
 
-        p = namedtuple('parameter', parameter_names.flat)
+        # we have to name every namedtuple class differently
+        p = namedtuple('parameter'+str(self.nplanets), parameter_names.flat)
+        # and assign it to the module globals, so that pickle doesn't complain
+        globals()[p.__name__] = p
 
         # this makes a namedtuple of all the parameter values
         self.trace = p._make(self.posterior_samples[:-1-j,:])
