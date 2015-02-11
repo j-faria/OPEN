@@ -1582,7 +1582,7 @@ class MCMC_nest:
         plt.plot(t)
         plt.ylabel(self.trace._fields[i])
 
-    def do_plot_map(self, system, legend=True):
+    def do_plot_map(self, system, legend=True, save=None):
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         # tt = system.get_time_to_plot(P=self.par_map[0])
@@ -1618,11 +1618,11 @@ class MCMC_nest:
 
         newFig=True
         if newFig:
-            plt.figure()
+            fig = plt.figure()
 
         gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
-        ax1 = plt.subplot(gs[0])
-        ax2 = plt.subplot(gs[1], sharex=ax1)
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1], sharex=ax1)
 
         if self.only_vsys:  # systematic velocity only
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
@@ -1684,11 +1684,16 @@ class MCMC_nest:
         ax1.set_ylabel('RV [%s]'%system.units)
         ax2.set_ylabel('Residuals [%s]'%system.units)
         if legend: ax1.legend()
-        plt.tight_layout()
-        plt.ticklabel_format(useOffset=False)
-        plt.show()
+        fig.tight_layout()
+        # fig.ticklabel_format(useOffset=False)
 
-    def do_plot_map_phased(self, system, legend=True, plot_gp=True):
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            fig.savefig(save)
+
+
+    def do_plot_map_phased(self, system, legend=True, plot_gp=True, save=None):
         # if systematic velocity only, there is nothing to do here
         if self.only_vsys: return
 
@@ -1799,7 +1804,7 @@ class MCMC_nest:
 
         if show_priors: 
             from .prior_funcs import uniform, jeffreys, modjeffreys, beta
-            print 
+            # print 
             # msg = blue('INFO: ') + 'Plotting logP. prior(P)=Jeffreys, prior(logP)=Uniform'
             # clogger.info(msg)
 
@@ -1874,7 +1879,11 @@ class MCMC_nest:
 
 
         plt.tight_layout()
-        plt.show()
+
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
 
     def do_triangle_plot(self, planet='both'):
         """

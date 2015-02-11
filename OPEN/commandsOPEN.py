@@ -198,7 +198,7 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed] [--restart]
+    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--saveplot] [--feed] [--MAPfeed] [--restart]
 Options
     -u            User sets the namelist file
     -r            Resume from a previous MultiNest run
@@ -209,7 +209,9 @@ Options
     --lin=None    Include linear dependence on quantity in the model
     --ncpu=<cpu>  Number of threads to use [default: all available]
     --noplot      Do not produce result plots
-    --feed        Force progress feedback
+    --saveplot    Save all plots (does nothing if --noplot is given)
+    --feed        Force feedback on the progress of the evidence calculation
+    --MAPfeed     Force feedback on the current MAP parameters
     --restart     Fully restart a previous automatic model selection run
 """
 
@@ -993,7 +995,9 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
         doplot = not args['--noplot']
+        saveplot = args['--saveplot']
         dofeedback = args['--feed']
+        doMAPfeedback = args['--MAPfeed']
         restart = args['--restart']
 
         try: 
@@ -1012,7 +1016,7 @@ class EmbeddedMagics(Magics):
         core.do_multinest(system, user, gp, jitter,
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, lin=lin_quantity, 
-                          doplot=doplot, feed=dofeedback,
+                          doplot=doplot, saveplot=saveplot, feed=dofeedback, MAPfeed=doMAPfeedback,
                           restart=restart)
 
 

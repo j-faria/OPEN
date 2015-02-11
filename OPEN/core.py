@@ -741,8 +741,8 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, resume=False, verbose=False, 
-	             ncpu=None, training=None, lin=None, doplot=True, feed=False, restart=False):
+def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=None, 
+	             training=None, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -756,6 +756,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False,
 		training:
 		lin:
 		doplot: whether to show plots at the end of the run. Takes precedence over `verbose`
+		saveplot: save all plots from automatic run
 		feed: when running automatic model selection, whether to provide sampling feedback
 		restart: whether to restart a previous automatic run
 	"""
@@ -1021,6 +1022,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False,
 			from os.path import basename, splitext
 			temp_star_name = splitext(basename(filename))[0]
 
+
 		if restart:
 			import zipfile
 			msg = blue('    : ') + 'Restarting automatic run for star %s' % temp_star_name
@@ -1135,10 +1137,14 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False,
 		results_constant.model_name = 'd0'
 		# put the results into a zip file
 		zip_filename_constant = results_constant.compress_chains()
+
+		map_plot_file_constant = 'constant_map.png' if saveplot else None
+		hist_plot_file_constant = 'constant_hist.png' if saveplot else None
+
 		if doplot:
-			results_constant.do_plot_map(system)
+			results_constant.do_plot_map(system, save=map_plot_file_constant)
 			if verbose:
-				results_constant.do_hist_plots()
+				results_constant.do_hist_plots(save=hist_plot_file_constant)
 
 		constant_lnE = results_constant.NS_lnE
 
@@ -1219,11 +1225,16 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False,
 		results_one_planet.model_name = 'd0k1'
 		# put the results into a zip file
 		zip_filename_one_planet = results_one_planet.compress_chains()
+		
+		map_plot_file_one_planet = 'one_planet_map.png' if saveplot else None
+		map_phased_plot_file_one_planet = 'one_planet_map_phased.png' if saveplot else None
+		hist_plot_file_one_planet = 'one_planet_hist.png' if saveplot else None
+		
 		if doplot:
-			results_one_planet.do_plot_map(system)
+			results_one_planet.do_plot_map(system, save=map_plot_file_one_planet)
 			if verbose:
-				results_one_planet.do_plot_map_phased(system)
-				results_one_planet.do_hist_plots()
+				results_one_planet.do_plot_map_phased(system, save=map_phased_plot_file_one_planet)
+				results_one_planet.do_hist_plots(save=hist_plot_file_one_planet)
 
 		one_planet_lnE = results_one_planet.NS_lnE
 
@@ -1290,11 +1301,16 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False,
 		results_two_planet.model_name = 'd0k2'
 		# put the results into a zip file
 		zip_filename_two_planet = results_two_planet.compress_chains()
+
+		map_plot_file_two_planet = 'two_planet_map.png' if saveplot else None
+		map_phased_plot_file_two_planet = 'two_planet_map_phased.png' if saveplot else None
+		hist_plot_file_two_planet = 'two_planet_hist.png' if saveplot else None
+
 		if doplot:
-			results_two_planet.do_plot_map(system)
+			results_two_planet.do_plot_map(system, save=map_plot_file_two_planet)
 			if verbose:
-				results_two_planet.do_plot_map_phased(system)
-				results_two_planet.do_hist_plots()
+				results_two_planet.do_plot_map_phased(system, save=map_phased_plot_file_two_planet)
+				results_two_planet.do_hist_plots(save=hist_plot_file_two_planet)
 
 		two_planet_lnE = results_two_planet.NS_lnE
 
@@ -1376,11 +1392,16 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False,
 		results_three_planet.model_name = 'd0k3'
 		# put the results into a zip file
 		zip_filename_three_planet = results_three_planet.compress_chains()
+
+		map_plot_file_three_planet = 'three_planet_map.png' if saveplot else None
+		map_phased_plot_file_three_planet = 'three_planet_map_phased.png' if saveplot else None
+		hist_plot_file_three_planet = 'three_planet_hist.png' if saveplot else None
+
 		if doplot:
-			results_three_planet.do_plot_map(system)
+			results_three_planet.do_plot_map(system, save=map_plot_file_three_planet)
 			if verbose:
-				results_three_planet.do_plot_map_phased(system)
-				results_three_planet.do_hist_plots()
+				results_three_planet.do_plot_map_phased(system, save=map_phased_plot_file_three_planet)
+				results_three_planet.do_hist_plots(save=hist_plot_file_three_planet)
 
 		three_planet_lnE = results_three_planet.NS_lnE
 
@@ -1492,6 +1513,37 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False,
 		shutil.copy(zip_filename_one_planet, save_folder)
 		shutil.copy(zip_filename_two_planet, save_folder)
 		shutil.copy(zip_filename_three_planet, save_folder)
+
+		if saveplot:
+			try:
+				os.remove(os.path.join(save_folder, map_plot_file_constant))
+				os.remove(os.path.join(save_folder, map_plot_file_one_planet))
+				os.remove(os.path.join(save_folder, map_plot_file_two_planet))
+				os.remove(os.path.join(save_folder, map_plot_file_three_planet))
+			except OSError:
+				pass
+			shutil.move(map_plot_file_constant, save_folder)
+			shutil.move(map_plot_file_one_planet, save_folder)
+			shutil.move(map_plot_file_two_planet, save_folder)
+			shutil.move(map_plot_file_three_planet, save_folder)
+			if verbose:
+				try:
+					os.remove(os.path.join(save_folder, map_phased_plot_file_one_planet))
+					os.remove(os.path.join(save_folder, map_phased_plot_file_two_planet))
+					os.remove(os.path.join(save_folder, map_phased_plot_file_three_planet))
+					os.remove(os.path.join(save_folder, hist_plot_file_one_planet))
+					os.remove(os.path.join(save_folder, hist_plot_file_two_planet))
+					os.remove(os.path.join(save_folder, hist_plot_file_three_planet))
+				except OSError:
+					pass
+				shutil.move(map_phased_plot_file_one_planet, save_folder)
+				shutil.move(map_phased_plot_file_two_planet, save_folder)
+				shutil.move(map_phased_plot_file_three_planet, save_folder)
+				shutil.move(hist_plot_file_one_planet, save_folder)
+				shutil.move(hist_plot_file_two_planet, save_folder)
+				shutil.move(hist_plot_file_three_planet, save_folder)				
+
+
 
 	return
 
