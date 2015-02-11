@@ -1110,7 +1110,7 @@ class EmbeddedMagics(Magics):
                 return
 
             if ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
-                system.provenance.values()[0][1] = n
+                system.provenance.values()[0][1] += n
                 # remove observations with indices ind_to_remove from
                 # system.(time,vrad,error); leave *_full arrays intact
                 system.time = delete(system.time, ind_to_remove)
