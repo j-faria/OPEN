@@ -1302,6 +1302,8 @@ class MCMC_nest:
         if self.context[2] == '2':  # model with jitter
             self.jitter = True
             s = self.par_map.pop(-2)
+            s = self.par_mle.pop(-2)
+
 
         self.only_vsys = False
         if self.npar == 1 or len(self.par_map) == 1:  # systematic velocity only
@@ -1789,9 +1791,155 @@ class MCMC_nest:
         if legend: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
 
-    def do_hist_plots(self, show_priors=True):
+
+    def do_plot_map_and_ml(self, system, legend=True, save=None):
+        colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        # tt = system.get_time_to_plot(P=self.par_map[0])
+        tt = system.get_time_to_plot()
+        vel_map = np.zeros_like(tt)
+        vel_mle = np.zeros_like(tt)
+
+        nobserv = len(system.provenance)  # number of observatories
+        j = 4 if self.gp else 0
+        if nobserv > 1:
+            map_vsys = self.par_map[-nobserv+1:]
+            mle_vsys = self.par_mle[-nobserv+1:]
+            get_rvn = get_rvn_ms
+        else:
+            map_vsys = self.par_map[-1-j]
+            mle_vsys = self.par_mle[-1-j]
+            get_rvn = get_rvn_os
+
+        ## MAP estimate of the parameters
+        if self.only_vsys:  # systematic velocity only
+            vel_map = self.par_map[0] * np.ones_like(tt)
+        elif self.gp:
+            par_map = self.par_map[:-4] 
+            hyper_map = self.par_map[-4:]
+            if self.gp_only:
+                pred = gp_predictor(t, rv, err, par_map, hyper_map, 'constant')
+            else:
+                pred = gp_predictor(t, rv, err, par_map, hyper_map, 'keplerian')
+        else:
+            par_map = self.par_map
+
+        ## ML estimate of the parameters
+        if self.only_vsys:  # systematic velocity only
+            vel_mle = self.par_mle[0] * np.ones_like(tt)
+        elif self.gp:
+            par_mle = self.par_mle[:-4] 
+            hyper_mle = self.par_mle[-4:]
+            if self.gp_only:
+                pred = gp_predictor(t, rv, err, par_mle, hyper_mle, 'constant')
+            else:
+                pred = gp_predictor(t, rv, err, par_mle, hyper_mle, 'keplerian')
+        else:
+            par_mle = self.par_mle
+
+
+        newFig=True
+        if newFig:
+            fig = plt.figure()
+
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1], sharex=ax1)
+
+        if self.only_vsys:  # systematic velocity only
+            ax1.plot(tt, vel_map, '-g', lw=2.5, label='MAP')
+            ax1.plot(tt, vel_mle, '--r', lw=2.5, label='ML')
+        elif not self.gp_only:
+            # plot best solution
+            map_P = par_map[:-1:5]
+            map_K = par_map[1:-1:5]
+            map_ecc = par_map[2:-1:5]
+            map_omega = par_map[3:-1:5]
+            map_t0 = par_map[4:-1:5]
+            par = [map_P, map_K, map_ecc, map_omega, map_t0, map_vsys]
+
+            if nobserv > 1:
+                observ = np.ones_like(vel_map)
+                args = [tt] + par + [observ] + [vel_map]
+            else:
+                args = [tt] + par + [vel_map]
+            get_rvn(*args)
+            ax1.plot(tt, vel_map, '-g', lw=2.5, label='MAP')
+
+            mle_P = par_mle[:-1:5]
+            mle_K = par_mle[1:-1:5]
+            mle_ecc = par_mle[2:-1:5]
+            mle_omega = par_mle[3:-1:5]
+            mle_t0 = par_mle[4:-1:5]
+            par = [mle_P, mle_K, mle_ecc, mle_omega, mle_t0, mle_vsys]
+
+            if nobserv > 1:
+                observ = np.ones_like(vel_mle)
+                args = [tt] + par + [observ] + [vel_mle]
+            else:
+                args = [tt] + par + [vel_mle]
+            get_rvn(*args)
+            ax1.plot(tt, vel_mle, '--r', lw=2.5, label='ML')
+
+
+
+        # plot GP predictions
+        if self.gp:
+            ax1.plot(self.pred_t, self.pred_y, '-k', lw=1.5, label='GP mean')
+            ax1.fill_between(self.pred_t, y1=self.pred_y-2*self.pred_std, y2=self.pred_y+2*self.pred_std,
+                                          color='k', alpha=0.3, label='2*std')
+
+        vel = np.zeros_like(t)
+        if self.gp_only or self.only_vsys:
+            vel = self.par_map[0] * np.ones_like(tt)
+        else:
+            args = [t] + par + [vel]
+            get_rvn(*args)
+
+        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+
+            # plot each files' values
+            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
+            # plot residuals
+            if self.gp:
+                ax2.errorbar(t[:m], rv[:m]-pred[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+            else:
+                ax2.errorbar(t[:m], rv[:m]-vel[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+
+            t, rv, err = t[m:], rv[m:], err[m:]
+
+
+        # plot systematic velocity
+        ax1.axhline(y=map_vsys, ls='--', color='k', alpha=0.3)
+
+        ax2.set_xlabel('Time [days]')
+        ax1.set_ylabel('RV [%s]'%system.units)
+        ax2.set_ylabel('Residuals [%s]'%system.units)
+        if legend: ax1.legend()
+        fig.tight_layout()
+        # fig.ticklabel_format(useOffset=False)
+
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            fig.savefig(save)
+
+
+    def do_hist_plots(self, show_priors=True, save=None):
         try:
             self.trace
         except AttributeError:
