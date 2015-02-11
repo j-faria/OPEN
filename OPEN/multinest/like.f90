@@ -141,8 +141,10 @@ contains
 			lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
 	    end if
 
+! 	    print *, slhood, lhood, product(sqrt(sigma))
 		slhood = logSumExp(slhood,lhood)
 		!print *, Cube(1:nest_nPar)
+! 		print*, slhood
 		!stop
 		if (doing_debug) write(*,'(f8.3)', advance='no') slhood
 
