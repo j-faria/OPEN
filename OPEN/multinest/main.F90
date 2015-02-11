@@ -170,7 +170,19 @@ program main
             read(15, *) times(i), rvs(i), errors(i)
         end if
     end do
-    
+
+    if (size(times) <= sdim) then
+#ifdef MPI
+        call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+        if (i==0) print *, 'Number of observations is less than dimensionality. Aborting!'
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        if (i==0) call MPI_ABORT(MPI_COMM_WORLD,1)
+#else
+        stop 'Number of observations is less than dimensionality. Aborting!'
+#endif
+    end if
+
+
     if (nobserv == 1) then ! if only one observatory, observ is always 1
     	observ = 1
     else ! else it takes a different value for each observatory
@@ -182,9 +194,11 @@ program main
     	end do
     end if
 
+#ifdef PLOT 
     !! build oversampled time array
     !print *, minval(times), maxval(times), 5*n
     times_oversampled = linspace(minval(times), maxval(times), 5*n)
+#endif
 
     !! initialize the GP "object"
     if (using_gp) then
@@ -226,7 +240,7 @@ program main
 		!! Period, Jeffreys, 0.2d - 365000d
 		spriorran(i,1)= 0.2d0 !0.2d0
 		!spriorran(i,2)= 365000d0 !365000.d0
-        spriorran(i,2)= maxval(times) - minval(times) ! don't look for periods longer than timespan
+        spriorran(i,2)= 4.*(maxval(times) - minval(times)) ! don't look for periods longer than 4*timespan
 
 		!! semi amplitude K, Mod. Jeffreys
 		spriorran(i+1,1)=1.d0
@@ -259,11 +273,11 @@ program main
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], jitter, vsys_obs1, [vsys_obs2]
 		i = sdim-nextra+1 ! index of jitter parameter
-		!spriorran(i,1)= 1d0
-		!spriorran(i,2)= kmax
+		spriorran(i,1)= 1d0
+		spriorran(i,2)= kmax
         ! when data is in km/s
-        spriorran(i,1)= 0.001d0
-        spriorran(i,2)= kmax * 1d-3
+!         spriorran(i,1)= 0.001d0
+!         spriorran(i,2)= kmax * 1d-3
         
 
 		!! systematic velocity(ies), Uniform, -kmax - kmax
