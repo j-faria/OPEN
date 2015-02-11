@@ -47,6 +47,7 @@ except ImportError:
 
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date, ask_yes_no, get_number_cores
+from .prior_funcs import random_from_jeffreys, random_from_modjeffreys
 import train_gp
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
@@ -2332,17 +2333,19 @@ def do_create_planets(s):
 	clogger.info(msg)
 
 	save_filename = None
-	options = (filename, save_filename, type_noise, use_only_start_end)
+	options = (filename, save_filename, type_noise, use_only_start_end, use_error_bars)
 
 	# get rv curve with random parameters
 	def gen_rv(nplanets, nobs, options, periods, eccentricities, amplitudes, temp):
 
-		sampling_file, saving_file, type_noise, use_only_start_end = options
+		sampling_file, saving_file, type_noise, use_only_start_end, use_error_bars = options
 
 		if sampling_file is not None:  # the sampling is set in the file
 			times_sampled_from_file = np.loadtxt(sampling_file, usecols=(0,), skiprows=2)
 			times = times_sampled_from_file
 			times_full = np.linspace(min(times_sampled_from_file), max(times_sampled_from_file), 1000)
+			if use_error_bars:
+				noise = np.loadtxt(sampling_file, usecols=(2,), skiprows=2)
 		else:  # the sampling is random
 			times_full = np.linspace(2449460, 2452860, 1000)
 			# sample (N points) randomly from the data to produce unevenly sampled time series
@@ -2358,25 +2361,37 @@ def do_create_planets(s):
 		output = '# planet %d with P=%f, K=%f, e=%f, w=%f, t0=%f\n'
 		for planet in range(nplanets):
 			if periods is None: 
-				P = np.random.rand()*998. + 2.  # random period, U(2, 998)
+				# this is the prior used in MN, but truncated
+				P = 1.
+				while P<2 or P>200:
+					P = random_from_jeffreys(np.random.rand(), 0.2, np.ptp(times))
 			else: 
 				P = periods[planet]  # user-provided period
 
 			if eccentricities is None:
+				# this is the prior used in MN
 				ecc = np.random.beta(0.867, 3.03)  # from Kipping 2013
 			else:
 				ecc = eccentricities[planet]  # user-provided eccentricity
 
 			if amplitudes is None:
-				K = np.random.rand()*10. + 1.
+				# this is the prior used in MN, but truncated
+				K = 31.
+				while K > 30:
+					K = random_from_modjeffreys(np.random.rand(), 1., 2129)
 			else:
-				K = amplitudes[planet]  # user-provided eccentricity
+				K = amplitudes[planet]  # user-provided semi-amplitude
 			
 
 			omega = np.random.rand()*2.*pi 
 
 			if type_noise is 'white':
-				noise = np.random.randn(len(vel_each))  # sigma??????
+				if use_error_bars:
+					# add extra white noise with the same std as the uncertainties
+					added_noise = noise.std() * np.random.randn(len(vel_each))
+				else:
+					added_noise = np.random.randn(len(vel_each))  # sigma=1 ??????
+					noise = added_noise
 			else:
 				noise = np.ones_like(vel_each)
 
@@ -2400,7 +2415,7 @@ def do_create_planets(s):
 
 	# wrapper function that takes care of adding noise and logging to file
 	def generate_planets(nplanets, nobs, options, periods, eccentricities, amplitudes):
-		sampling_file, saving_file, type_noise, use_only_start_end = options
+		sampling_file, saving_file, type_noise, use_only_start_end, use_error_bars = options
 
 		if saving_file is None:
 			# create temporary file to store simulation info
@@ -2417,8 +2432,13 @@ def do_create_planets(s):
 		tf.write('#\n## %d observations, %s noise\n#\n' % (nobs, type_noise))
 		tf.write('# bjd \t vrad(km/s) \t svrad(km/s)\n')
 
+		if use_error_bars: 
+			e_multiplier = 1.
+		else:
+			e_multiplier = 1e-3
+
 		for t, v, e in zip(times, vel, noise):
-			tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*1e-3)))
+			tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*e_multiplier)))
 
 		try:
 			tf.delete = False
