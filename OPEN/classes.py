@@ -299,7 +299,6 @@ class rvSeries:
         # plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
 
     def do_plot_extras(self, extra, save=None):
         """ Plot other observed quantities as a function of time.
@@ -341,7 +340,6 @@ class rvSeries:
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05))
         plt.minorticks_on()
         plt.tight_layout()
-        plt.show()
 
         if save:
             msg = yellow('INFO: ') + 'Saving figure to %s' % save
@@ -418,7 +416,7 @@ class rvSeries:
         #       t, rv, err = t[m:], rv[m:], err[m:]
         #   ax.plot( np.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
 
-        plt.show()
+        # plt.show()
 
     def do_plot_resid(self, newFig=True, leg=True, save=None):
         """ Plot the residuals from a fit as a function of time.
@@ -1161,7 +1159,7 @@ class MCMC_dream:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        # plt.show()
 
     def do_plot_trace(self, parameter):
 
@@ -1219,7 +1217,7 @@ class MCMC_dream:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        # plt.show()
 
     def do_triangle_plot(self):
 
@@ -1560,7 +1558,7 @@ class MCMC_nest:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        # plt.show()
 
     def do_plot_trace(self, parameter):
         try:
