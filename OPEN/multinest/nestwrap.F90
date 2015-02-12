@@ -134,6 +134,11 @@ contains
 			!print *, Cube(i)
 		end do
 
+		! For e=0, where pericentre is undefined, ω=0 can be chosen
+		! such that t0 gives the time of nodal passage
+		do i=3,nPar-1,5
+			if (Cube(i) == 0) Cube(i+1) = 0.d0
+		end do
 
 		!call loglike function here 
 		call slikelihood(Cube,lnew,context)
