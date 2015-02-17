@@ -1563,8 +1563,65 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 	return
 
 
-def do_RJ_DNest3(system):
-	print 'hello'
+def do_RJ_DNest3(system, resume=False, verbose=False, ncpu=None):
+	"""
+	Run the Reversible Jump Diffusive Nested Sampling algorithm on the current system. 
+	Arguments
+	---------
+		resume: whether to resume from a previous run.
+		verbose: plot and print more information at the end of the run
+		ncpu: number of cpu cores to run on
+	"""
+	from time import sleep, time
+	from commands import getoutput
+
+	# determine available number of cpu cores
+	available_cpu = get_number_cores()
+	if (ncpu is None) or (ncpu > available_cpu): 
+		ncpu = available_cpu
+
+	msg = blue('INFO: ') + 'Transfering data to RJ-DNest3...'
+	clogger.info(msg)
+
+	# write data to file to be read by RJ-DNest3
+	nest_filename = 'input.rv'
+	nest_header = 'file automatically generated for RJ-DNest3 analysis, ' + updated_timestamp()
+
+	d = system.provenance
+	nest_header += '\n' + str(len(d))  # number of files (observatories)
+	# this is a hack otherwise the dict values are not ordered the right way
+	sizes_each_file = [d[k][0] if (d[k][1]==0) else (d[k][0]-d[k][1]) for k in sorted(d.keys())]
+	sizes = len(sizes_each_file) * '%d ' % tuple(sizes_each_file)
+	nest_header += '\n' + sizes  # number measurements in each file
+	nest_header += '\n' + str(len(system.time))  # total number measurements
+
+	savetxt(nest_filename, zip(system.time, system.vrad, system.error),
+			header=nest_header,
+			fmt=['%12.6f', '%7.5f', '%7.5f'])
+
+
+	msg = blue('    : ') + 'Starting RJ-DNest3 (%d threads) ...' % (ncpu,)
+	clogger.info(msg)
+
+	start = time()
+	cmd = './RJDNest3/run --ncpu %d' % (ncpu,)
+	# cmd = './RJDNest3/main -t %d -d ../input.rv' % (ncpu,)
+	rc = subprocess.call(cmd, shell=True)
+
+	if (rc == 1): 
+		msg = red('ERROR: ') + 'RJ-DNest3 terminated prematurely'
+		clogger.fatal(msg)
+		return
+
+	print  # newline
+	t = time()
+	took_min = int(t-start) / 60
+	took_sec = (t-start) - (took_min*60)
+
+	msg = blue('INFO: ') + 'RJ-DNest3 took %2dm%2.0fs' % (took_min, took_sec)
+	clogger.info(msg)
+
+
 
 def do_correlate(system, vars=(), verbose=False, remove=False):
 	"""
