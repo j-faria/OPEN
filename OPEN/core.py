@@ -2536,7 +2536,6 @@ def do_create_planets(s):
 			msg += blue('    : ') + '-> saving output to %s\n' % save_filename
 		clogger.info(msg)
 
-	return
 
 	save_filename = None
 	options = (filename, save_filename, type_noise, use_only_start_end, use_error_bars)
