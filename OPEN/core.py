@@ -53,6 +53,9 @@ import train_gp
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 pi = np.pi
 
+def updated_timestamp():
+	return datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+
 def do_fit(system, verbose):
 	try:
 		degree = system.model['d']
@@ -857,7 +860,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 	# write data to file to be read by MultiNest
 	nest_filename = 'input.rv'
-	nest_header = 'file automatically generated for MultiNest analysis, ' + timestamp
+	nest_header = 'file automatically generated for MultiNest analysis, ' + updated_timestamp()
 
 	d = system.provenance
 	nest_header += '\n' + str(len(d))  # number of files (observatories)
