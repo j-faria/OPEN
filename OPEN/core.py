@@ -2235,51 +2235,129 @@ def do_set_fit(system):
 
 
 def do_create_planets(s):
-	msg = blue('INFO: ') + 'Starting the planet creator'
-	clogger.info(msg)
+	if not '--quiet' in s:
+		msg = blue('INFO: ') + 'Starting the planet creator'
+		clogger.info(msg)
 
 	if s != '':  # parse options from the command line
 		import re
+		keep_s = s
 		s = s.lower()
+
+		# match number of planets
+		regex0 = re.compile("np\((.*?)\)")
+		if regex0.match(s) is None:
+			nplanets = None
+		else:
+			nplanets_set_later = False
+			try:
+				m = regex0.findall(s)[0]
+				s = s.replace('np('+m+')', '').strip()
+				nplanets = int(m)
+			except ValueError:
+				msg = red('ERROR: ') + "Couldn't parse arguments; Try np(int)"
+				clogger.fatal(msg)
+				return
+
+		# get filename to sample from
+		try:
+			regex = re.compile("sample\((.*?)\)")
+			filename = regex.findall(keep_s)[0]
+			s = s.replace('sample('+filename.lower()+')', '').strip()
+			with open(filename) as f:
+				nobs = len(f.readlines()) - 2  # skip header
+			use_number_points = True
+			use_error_bars = True
+			use_only_start_end = False
+		except IndexError:
+			filename = None
+
+
 		try:
 			# match periods
 			regex1 = re.compile("p\((.*?)\)")
 			p = regex1.findall(s)[0]
 			periods = [float(i) for i in p.split(',')]
+		except IndexError:
+			periods = None
+		try:
 			# match eccentricities
 			regex2 = re.compile("e\((.*?)\)")
 			e = regex2.findall(s)[0]
+			s = s.replace('e('+e+')', '').strip()
 			eccentricities = [float(i) for i in e.split(',')]
+		except IndexError:
+			eccentricities = None
+		try:
 			# match semi-amplitudes
 			regex3 = re.compile("k\((.*?)\)")
 			k = regex3.findall(s)[0]
 			semi_amplitudes = [float(i) for i in k.split(',')]
 		except IndexError:
-			msg = red('ERROR: ') + "Couldn't parse arguments"
-			clogger.fatal(msg)
-			return
+			semi_amplitudes = None
 
-		if not len(periods) == len(eccentricities) == len(semi_amplitudes):
-			msg = red('ERROR: ') + 'Non-matching number of options'
-			clogger.fatal(msg)
-			return
+		# assert that everything matches
+		if nplanets:
+			if periods and len(periods) != nplanets:
+				msg = red('ERROR: ') + "Number of planets and length of periods don't match."
+				clogger.fatal(msg)
+				return
+			if eccentricities and len(eccentricities) != nplanets:
+				msg = red('ERROR: ') + "Number of planets and length of eccentricities don't match."
+				clogger.fatal(msg)
+				return
+			if semi_amplitudes and len(semi_amplitudes) != nplanets:
+				msg = red('ERROR: ') + "Number of planets and length of semi-amplitudes don't match."
+				clogger.fatal(msg)
+				return
+		else:
+			if periods: 
+				nplanets = len(periods)
+				if eccentricities and nplanets != len(eccentricities):
+					msg = red('ERROR: ') + "Length of periods and eccentricities don't match."
+					clogger.fatal(msg)
+					return
+				if semi_amplitudes and nplanets != len(semi_amplitudes):
+					msg = red('ERROR: ') + "Length of periods and semi-amplitudes don't match."
+					clogger.fatal(msg)
+					return
+			if eccentricities:
+				nplanets = len(eccentricities)
+				# if periods and nplanets != len(periods):
+				# 	msg = red('ERROR: ') + "Length of periods and eccentricities don't match."
+				# 	clogger.fatal(msg)
+				if semi_amplitudes and nplanets != len(semi_amplitudes):
+					msg = red('ERROR: ') + "Length of eccentricities and semi-amplitudes don't match."
+					clogger.fatal(msg)
+					return	
+			# if semi_amplitudes:
+			# 	nplanets = len(semi_amplitudes)
+			# 	if periods and nplanets != len(periods):
+			# 		msg = red('ERROR: ') + "Length of periods and semi-amplitudes don't match."
+			# 		clogger.fatal(msg)
+			# 	if eccentricities and nplanets != len(eccentricities):
+			# 			msg = red('ERROR: ') + "Length of eccentricities and semi-amplitudes don't match."
+			# 			clogger.fatal(msg)						
 
-		nplanets = len(periods)
-
+		# get number of observations
 		try:
 			regex = re.compile("n\((.*?)\)")
 			nobs = int(regex.findall(s)[0])
 		except IndexError:
-			nobs = np.random.randint(30, 220)
+			try:
+				nobs
+			except UnboundLocalError:
+				nobs = np.random.randint(30, 220)
 
+		# get filename to save to
 		try:
-			regex = re.compile("file\((.*?)\)")
+			regex = re.compile("out\((.*?)\)")
 			save_filename = regex.findall(s)[0]
 		except IndexError:
 			save_filename = None
 
+
 		type_noise = 'white'  # for now...
-		filename = None
 
 	else:
 
@@ -2371,18 +2449,22 @@ def do_create_planets(s):
 			else:
 				print "I don't understand that. Try 'no', w', 'r' or 'wr'."
 
+	if not '--quiet' in s:
+		print
+		msg = blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
+		if filename is not None:
+			msg += blue('    : ') + '-> sampling from %s\n' % (filename)
+			if use_only_start_end: msg += blue('    : ') + '-> using first and last timestamp\n'
+			if use_error_bars and use_number_points: msg += blue('    : ') + '-> using errorbars from this file\n'
+		else:
+			msg += blue('    : ') + '-> randomly spaced sampling\n'
+		msg += blue('    : ') + '-> %d observations\n' % (nobs)
+		msg += blue('    : ') + '-> %s noise\n' % (type_noise)
+		if save_filename:
+			msg += blue('    : ') + '-> saving output to %s\n' % save_filename
+		clogger.info(msg)
 
-	print
-	msg = blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
-	if filename is not None:
-		msg += blue('    : ') + '-> sampling from %s\n' % (filename)
-		if use_only_start_end: msg += blue('    : ') + '-> using first and last timestamp\n'
-		if use_error_bars and use_number_points: msg += blue('    : ') + '-> using errorbars from this file\n'
-	else:
-		msg += blue('    : ') + '-> randomly spaced sampling\n'
-	msg += blue('    : ') + '-> %d observations\n' % (nobs)
-	msg += blue('    : ') + '-> %s noise\n' % (type_noise)
-	clogger.info(msg)
+	return
 
 	save_filename = None
 	options = (filename, save_filename, type_noise, use_only_start_end, use_error_bars)
