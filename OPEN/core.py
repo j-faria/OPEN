@@ -744,8 +744,7 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=None, 
-	             training=None, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
+def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -820,13 +819,26 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		
 			print 
 
-			P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
-			m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
-
 			from .utils import mjup2mearth
-			m_me = m_mj * mjup2mearth
+			P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
+			P_error, K_error, ecc_error = par_sigma[5*i], par_sigma[5*i+1], par_sigma[5*i+2]
 
-			print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
+			try:
+				from uncertainties import ufloat
+				from uncertainties.umath import sqrt
+				P = ufloat(P, P_error)
+				K = ufloat(K, K_error)
+				ecc = ufloat(ecc, ecc_error)
+				m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * sqrt(1-ecc**2)
+				m_me = m_mj * mjup2mearth
+
+				print '%8s %11.3f +- %5.3f [MJup]  %11.3f +- %5.3f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
+
+			except ImportError:
+				m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
+				m_me = m_mj * mjup2mearth
+
+				print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
 
 			print 
 
