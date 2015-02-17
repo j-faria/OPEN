@@ -256,11 +256,11 @@ create_usage = \
 """
 Usage:
     create
-    create p(%f) e(%f) k(%f) N(%d) file(%s)
+    create np(%d) [p(%f)] [e(%f)] [k(%f)] [N(%d)] [out(%s)] [sample(%s)]
     create --gui
 Options:
-    p(%f) e(%f) k(%f) N(%d) file(%s)   Batch processing
-    --gui         Create data using a graphical interface (experimental)
+    np(%d) [p(%f)] [e(%f)] [k(%f)] [N(%d)] [out(%s)] [sample(%s)]   Batch processing
+    --gui    Create data using a graphical interface (experimental)
 """
 
 
@@ -1162,7 +1162,8 @@ class EmbeddedMagics(Magics):
         if '-h' in parameter_s:
             print create_usage
             return
-        print parameter_s
+        # print parameter_s
+        
         if '--gui' in parameter_s:
             core.load_plugin('create_GUI')
             return
