@@ -202,6 +202,12 @@ subroutine sort(A, N)
  
 end subroutine sort
 
-
+subroutine swap(a, b)
+	implicit none
+	real(kind=8), dimension(:), intent(inout) :: a, b
+	real(kind=8), dimension(size(a)) :: temp
+	if (size(a) /= size(b)) STOP 'Error in swap; different dimensions'
+	temp = a ; a = b ; b = temp
+end subroutine swap
 
 end module array_utils
