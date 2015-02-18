@@ -6,7 +6,7 @@ use Nested
 use params
 use like
 use priors
-use array_utils, only: linspace, get_diagonal, sort
+use array_utils, only: linspace, get_diagonal, sort, swap
 use gputils
    
 implicit none
@@ -48,10 +48,6 @@ contains
 		! on exit has the physical parameters plus a copy of any
 		! derived parameters you want to store
 		double precision Cube(nPar)
-		real(kind=8) :: P, K, ecc, omega, t0
-		real(kind=8) :: P1, K1, ecc1, omega1, t01
-		real(kind=8) :: P2, K2, ecc2, omega2, t02
-		real(kind=8) :: Vsys
 		 						
 		! Output arguments
 		double precision lnew ! loglikelihood
@@ -139,6 +135,15 @@ contains
 		do i=3,nPar-1,5
 			if (Cube(i) == 0) Cube(i+1) = 0.d0
 		end do
+
+
+! 		! this is experimental !!!!!!!!!!!
+! 		! it doesn't seem to solve the problem...
+! 		if (nplanets == 2) then
+! 			if (Cube(1) > Cube(6)) then
+! 				call swap(Cube(1:5), Cube(6:10))
+! 			end if
+! 		end if
 
 		!call loglike function here 
 		call slikelihood(Cube,lnew,context)
