@@ -198,8 +198,8 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--saveplot] [--feed] [--MAPfeed] [--restart]
-Options
+    nest [options]
+Options:
     -u            User sets the namelist file
     -r            Resume from a previous MultiNest run
     -v            Be verbose on output and plots
@@ -207,11 +207,12 @@ Options
     --jitter      Include a jitter parameter (incompatible with --gp)
     --train=None  Train the GP on quantity before using it in the RVs
     --lin=None    Include linear dependence on quantity in the model
-    --ncpu=<cpu>  Number of threads to use [default: all available]
+    --ncpu=<cpu>  Number of threads to use; by default use all available
     --noplot      Do not produce result plots
     --saveplot    Save all plots (does nothing if --noplot is given)
     --feed        Force feedback on the progress of the evidence calculation
     --MAPfeed     Force feedback on the current MAP parameters
+    --maxp=mp     Maximum number of planets to include in automatic run [default: 3]
     --restart     Fully restart a previous automatic model selection run
 """
 
@@ -998,6 +999,7 @@ class EmbeddedMagics(Magics):
         saveplot = args['--saveplot']
         dofeedback = args['--feed']
         doMAPfeedback = args['--MAPfeed']
+        maxp = args['--maxp']
         restart = args['--restart']
 
         try: 
@@ -1013,7 +1015,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user, gp, jitter,
+        core.do_multinest(system, user, gp, jitter, maxp=maxp,
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, lin=lin_quantity, 
                           doplot=doplot, saveplot=saveplot, feed=dofeedback, MAPfeed=doMAPfeedback,
