@@ -1301,8 +1301,10 @@ class MCMC_nest:
         self.jitter = False
         if self.context[2] == '2':  # model with jitter
             self.jitter = True
-            s = self.par_map.pop(-2)
-            s = self.par_mle.pop(-2)
+            self.jitter_map = self.par_map.pop(-2)
+            self.jitter_mle = self.par_mle.pop(-2)
+            self.jitter_mean = self.par_mean.pop(-2)
+            self.jitter_sigma = self.par_sigma.pop(-2)
 
 
         self.only_vsys = False
@@ -1318,7 +1320,7 @@ class MCMC_nest:
 
     def read_iterations(self):
         """
-        Read the [root]ev.dat and [root]phys_live.points files which contain the
+        Read the [root]ev.dat and [root]phys_live.points files which contain
         the set of rejected points and the current set of live points, respectively.
         First npar columns are the parameter values for each iteration + live ones
         npar+1 column are the log-likelihood values
@@ -1385,20 +1387,33 @@ class MCMC_nest:
         
             print 
 
-            P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
-            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
+        from .utils import mjup2mearth
+        P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
+        P_error, K_error, ecc_error = par_sigma[5*i], par_sigma[5*i+1], par_sigma[5*i+2]
 
-            from .utils import mjup2mearth
+        try:
+            from uncertainties import ufloat
+            from uncertainties.umath import sqrt
+            P = ufloat(P, P_error)
+            K = ufloat(K, K_error)
+            ecc = ufloat(ecc, ecc_error)
+            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * sqrt(1-ecc**2)
+            m_me = m_mj * mjup2mearth
+
+            print '%8s %11.3f +- %5.3f [MJup]  %11.3f +- %5.3f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
+
+        except ImportError:
+            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
             m_me = m_mj * mjup2mearth
 
             print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
 
-            print 
+        print 
 
         print yellow('system')
         if self.context[2] == '2':
             # jitter parameter
-            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', par_mean[-2], par_sigma[-2], par_mle[-2], par_map[-2])
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', self.jitter_mean, self.jitter_sigma, self.jitter_mle, self.jitter_map)
         if self.context[0] == '1':
             # in this case, the vsys parameters is the last one
             print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
@@ -1645,6 +1660,8 @@ class MCMC_nest:
                 args = [tt] + par + [vel]
             get_rvn(*args)
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
+            # for t in t0:
+            #     ax1.axvline(x=t, color='k', linestyle=':')
 
         # plot GP predictions
         if self.gp:
