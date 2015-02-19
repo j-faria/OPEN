@@ -178,6 +178,7 @@ contains
 
 		!write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
 		!write(*,fmt) paramConstr(nPar*3+1:nPar*4)
+		print *, maxLogLike
 
 		write(*,*) ' '
 		if (nplanets == 1 .and. using_gp) then  ! 1 planet + 4 hyper
