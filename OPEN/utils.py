@@ -54,7 +54,31 @@ def wrms(array, weights):
     # return sqrt(sum(x*x for x in array*w))
     return sqrt(sum(w*(array - np.average(array, weights=w))**2) / sum(w))
     
- 
+
+def get_tp(P, ecc, omega, tt):
+    """ 
+    Return the epoch of periastron from other orbital parameters
+        P: orbital period
+        ecc: eccentricity
+        omega: argument of periastron
+        tt: transit epoch
+     """
+    E0 = np.arctan2(np.sqrt(1. - ecc**2)*np.cos(omega), np.sin(omega) + ecc)
+    Tp = tt - P/(2.*np.pi)*(E0 - ecc * np.sin(E0))
+    return Tp
+
+def get_tt(P, ecc, omega, tp):
+    """
+    Return the transit epoch from other orbital parameters
+        P: orbital period
+        ecc: eccentricity
+        omega: argument of periastron
+        tp: epoch of periastron
+     """
+    E0 = np.arctan2(np.sqrt(1. - ecc**2)*np.cos(omega), np.sin(omega) + ecc)
+    Tt = tp + P/(2.*np.pi)*(E0 - ecc*np.sin(E0))
+    return Tt
+
 def stdout_write(msg):
 	""" Print to stdout (without carriage return) and flush right away.
 	Useful to print in the same line """
