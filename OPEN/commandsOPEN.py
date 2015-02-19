@@ -999,7 +999,7 @@ class EmbeddedMagics(Magics):
         saveplot = args['--saveplot']
         dofeedback = args['--feed']
         doMAPfeedback = args['--MAPfeed']
-        maxp = args['--maxp']
+        maxp = int(args['--maxp'])
         restart = args['--restart']
 
         try: 
