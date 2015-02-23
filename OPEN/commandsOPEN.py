@@ -1102,9 +1102,10 @@ class EmbeddedMagics(Magics):
         if args['--gui'] or args['--index']:
             if args['--index']:
                 ind_to_remove = map(int, args['--index'].split(','))
+                ind_to_remove = [i-1 for i in ind_to_remove]
                 for i in ind_to_remove:
                     x, y = take(system.time, i), take(system.vrad, i)
-                    msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i, x, y)
+                    msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i+1, x, y)
                     clogger.info(msg)
             else:
                 ind_to_remove = selectable_plot(system, style='ro')
