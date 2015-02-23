@@ -570,7 +570,7 @@ class EmbeddedMagics(Magics):
 
         args = parse_arg_string('wf', parameter_s)
         if args == 1: return
-        print args
+        # print args
         
         # use default system or user defined
         try:

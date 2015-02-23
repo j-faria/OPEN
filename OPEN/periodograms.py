@@ -6,6 +6,7 @@
 #
 from classes import PeriodogramBase
 from numpy import *
+import numpy as np
 from numpy.fft import *  
 import cmath
 import matplotlib.pyplot as plt
@@ -523,6 +524,7 @@ class gls(PeriodogramBase):
     # Build frequency array if not present
     if self.freq is None:
       plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      # plow = 0.5
       self.__buildFreq(plow=plow)
     # Circular frequencies
     omegas = 2.*pi * self.freq
@@ -1111,15 +1113,17 @@ class SpectralWindow(PeriodogramBase):
     self.amp = None
     self.phase = None
     self._calcWindowFunction()
-    self._plot(dials=True)
+    self._plot(dials=False)
 
 
   def _calcWindowFunction(self):
-    n = len(self.time)
-    W = [sum([cmath.exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq]
+    n = self.time.size
 
-    self.amp = [sqrt(w.real*w.real + w.imag*w.imag) for w in W]
-    self.phase = [arctan2(w.imag, w.real) for w in W]
+    self.W = np.fromiter((np.sum(np.exp(-2.j*pi*f*self.time))/n for f in self.freq), np.complex_, self.freq.size)
+    # self.W = array([sum([exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq])
+
+    self.amp = np.absolute(self.W)
+    self.phase = np.arctan2(self.W.imag, self.W.real)
 
 
   def _plot(self, dials=False, ndials=3):
@@ -1130,8 +1134,8 @@ class SpectralWindow(PeriodogramBase):
     self.ax = self.fig.add_subplot(1,1,1)
     # self.ax.set_title("Spectral Window Function")
     self.ax.set_xlabel("Period")
-    self.ax.set_ylabel("Power")
-    self.ax.plot(self.freq, self.amp, 'b-')
+    self.ax.set_ylabel("Window function")
+    self.ax.semilogx(1./self.freq, self.amp, 'b-')
 
     # Trying to get labels on top representing frequency - does not work!
     # self.ax2 = self.ax.twiny()
