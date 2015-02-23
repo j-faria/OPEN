@@ -98,17 +98,22 @@ contains
 
 		! prior for period(s)
 		do i = 1, nPar-nextra, 5
+			! uncomment the following line for Jeffreys prior
 			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			!if (i==1) Cube(i) = JeffreysPrior(Cube(i), 650.d0, 750.d0)
-			!if (i==6) Cube(i) = JeffreysPrior(Cube(i), 80.d0, 120.d0)
-			!if (i==1) Cube(i) = GaussianPrior(Cube(i), 0.8374907d0, 0.0000002d0)
-			!if (i==6) Cube(i) = GaussianPrior(Cube(i), 45.294301d0, 0.000048d0)
+			! uncomment the following two lines for individual prior (2 planets case)
+! 			if (i==1) Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
+! 			if (i==6) Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+
+! 			if (i==1) Cube(i) = GaussianPrior(Cube(i), 2.2185733d0, 1.9d-6)
 		end do
 
 		! priors for ecc, omega, t0
 		do i = 3, nPar-nextra, 5
+			! uncomment the following line for uniform prior for eccentricity
 ! 			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+			! uncomment the following line for beta prior for eccentricity (based on Kipping)
 			Cube(i) = BetaPrior(Cube(i), spriorran(i,1), spriorran(i,2)) ! ecc
+
 			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2)) ! omega
 			Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2)) ! t0
 		end do
@@ -121,13 +126,15 @@ contains
 		do i = 2, nPar-nextra, 5
 			!Cube(i+1) is this planet's eccentricity
 			!Cube(i-1) is this planet's period
-			!kmax = spriorran(i,2)
-			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
-			!print *, kmax
-			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			! set kmax here
+! 			kmax = spriorran(i,2)
+! 			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
+			! uncomment the following line for Modified Jeffreys prior
+! 			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			! uncomment the following line for Jeffreys prior
 			!Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), kmax)
-			!Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			!print *, Cube(i)
+			! uncomment the following line for a uniform prior			
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 		end do
 
 		! For e=0, where pericentre is undefined, ω=0 can be chosen
@@ -138,7 +145,7 @@ contains
 
 
 ! 		! this is experimental !!!!!!!!!!!
-! 		! it doesn't seem to solve the problem...
+! 		! and it doesn't seem to solve the problem...
 ! 		if (nplanets == 2) then
 ! 			if (Cube(1) > Cube(6)) then
 ! 				call swap(Cube(1:5), Cube(6:10))
