@@ -27,7 +27,7 @@ except Exception:
     print 'pyqtgraph will not be installed'
 
 import rvIO
-from .utils import unique
+from .utils import unique, get_tt
 from .logger import clogger, logging
 from shell_colors import yellow, blue
 from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
@@ -577,18 +577,18 @@ class rvSeries:
         # print min(r), max(r)
         return len(r), r
 
-    def get_time_to_plot(self, P=None):
+    def get_time_to_plot(self, P=None, oversample=10):
         """
         Returns sufficiently resolved time vector for plots
         """
         std = self.time.std()
         N = len(self.time)
-        minim = self.time.min() - 2.*std
-        maxim = self.time.max() + 2.*std
+        minim = self.time.min() - 1.*std
+        maxim = self.time.max() + 1.*std
         if P is None:
-            return np.linspace(minim, maxim, 10*N)
+            return np.linspace(minim, maxim, oversample*N)
         else:
-            return np.linspace(minim, maxim, 10*(maxim-minim)/P)
+            return np.linspace(minim, maxim, oversample*(maxim-minim)/P)
 
     def is_in_extras(self, extra):
         return extra in self.extras._fields
@@ -1600,11 +1600,11 @@ class MCMC_nest:
         plt.plot(t)
         plt.ylabel(self.trace._fields[i])
 
-    def do_plot_map(self, system, legend=True, save=None):
+    def do_plot_map(self, system, legend=True, save=None, oversample=10):
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         # tt = system.get_time_to_plot(P=self.par_map[0])
-        tt = system.get_time_to_plot()
+        tt = system.get_time_to_plot(oversample=oversample)
         vel = np.zeros_like(tt)
 
         nobserv = len(system.provenance)  # number of observatories
