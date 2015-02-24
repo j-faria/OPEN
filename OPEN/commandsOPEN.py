@@ -72,7 +72,7 @@ per_usage = \
 """
 Usage:
     per -n SYSTEM
-    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--save=filename]
+    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
     per -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
@@ -84,7 +84,9 @@ Options:
     --hifac=<hf>     hifac * Nyquist is lowest frequency used [default: 40]
     --ofac=<of>      Oversampling factor [default: 6]
     --fap            Plot false alarm probabilities
+    --bfap           Plot false alarm probabilities calculated using bootstrap
     --save=filename  Save figure as filename
+    --noplot         Don't plot the periodogram (just creates system.per* instance)
     -v --verbose     Verbose statistical output 
     -h --help        Show this help message
 """
@@ -196,8 +198,8 @@ nest_usage = \
 """
 Usage:
     nest 
-    nest [-u] [-r] [--gp] [--jitter] [-v] [--ncpu=<cpu>] [--train=None] [--lin=None] [--noplot] [--feed]
-Options
+    nest [options]
+Options:
     -u            User sets the namelist file
     -r            Resume from a previous MultiNest run
     -v            Be verbose on output and plots
@@ -205,9 +207,13 @@ Options
     --jitter      Include a jitter parameter (incompatible with --gp)
     --train=None  Train the GP on quantity before using it in the RVs
     --lin=None    Include linear dependence on quantity in the model
-    --ncpu=<cpu>  Number of threads to use [default: all available]
+    --ncpu=<cpu>  Number of threads to use; by default use all available
     --noplot      Do not produce result plots
-    --feed        Force progress feedback
+    --saveplot    Save all plots (does nothing if --noplot is given)
+    --feed        Force feedback on the progress of the evidence calculation
+    --MAPfeed     Force feedback on the current MAP parameters
+    --maxp=mp     Maximum number of planets to include in automatic run [default: 3]
+    --restart     Fully restart a previous automatic model selection run
 """
 
 restrict_usage = \
@@ -251,11 +257,11 @@ create_usage = \
 """
 Usage:
     create
-    create p(%f) e(%f) k(%f) N(%d) file(%s)
+    create np(%d) [p(%f)] [e(%f)] [k(%f)] [N(%d)] [out(%s)] [sample(%s)]
     create --gui
 Options:
-    p(%f) e(%f) k(%f) N(%d) file(%s)   Batch processing
-    --gui         Create data using a graphical interface (experimental)
+    np(%d) [p(%f)] [e(%f)] [k(%f)] [N(%d)] [out(%s)] [sample(%s)]   Batch processing
+    --gui    Create data using a graphical interface (experimental)
 """
 
 
@@ -471,6 +477,8 @@ class EmbeddedMagics(Magics):
         hf = float(args.pop('--hifac'))
         of = float(args.pop('--ofac'))
         fap = args['--fap']
+        bfap = args['--bfap']
+        showplot = not args['--noplot']
 
         # which periodogram should be calculated?
         per_fcn = None
@@ -501,32 +509,38 @@ class EmbeddedMagics(Magics):
                 if system.per.name != name:
                     raise AttributeError
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=fap, save=args['--save'])
+                if showplot:
+                    system.per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
             except AttributeError:
                 system.per = per_fcn(system, hifac=hf, ofac=of)
                 # system.per._output(verbose=verb)  # not ready
-                system.per._plot(doFAP=fap, save=args['--save'])
+                if showplot:
+                    system.per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['bis']: # periodogram of the CCF's Bisector Inverse Slope
             system.bis_per = per_fcn(system, hifac=hf, ofac=of, quantity='bis')
-            system.bis_per._plot(doFAP=fap, save=args['--save'])
+            if showplot:
+                system.bis_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['fwhm']: # periodogram of the CCF's fwhm
             system.fwhm_per = per_fcn(system, hifac=hf, ofac=of, quantity='fwhm')
-            system.fwhm_per._plot(doFAP=fap, save=args['--save'])
+            if showplot:
+                system.fwhm_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['rhk']: # periodogram of rhk
             system.rhk_per = per_fcn(system, hifac=hf, ofac=of, quantity='rhk')
-            system.rhk_per._plot(doFAP=fap, save=args['--save'])
+            if showplot:
+                system.rhk_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['contrast']: # periodogram of contrast
             system.contrast_per = per_fcn(system, hifac=hf, ofac=of, quantity='contrast')
-            system.contrast_per._plot(doFAP=fap, save=args['--save'])
-
+            if showplot:
+                system.contrast_per._plot(doFAP=fap, dobFAP=bfap, save=args['--save'])
 
         if args['resid']: # periodogram of the residuals of the current fit
             system.resid_per = per_fcn(system, hifac=hf, ofac=of, quantity='resid')
-            system.resid_per._plot()
+            if showplot:
+                system.resid_per._plot(doFAP=fap, dobFAP=bfap)
 
     @needs_local_scope
     @line_magic
@@ -556,7 +570,7 @@ class EmbeddedMagics(Magics):
 
         args = parse_arg_string('wf', parameter_s)
         if args == 1: return
-        print args
+        # print args
         
         # use default system or user defined
         try:
@@ -982,7 +996,11 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
         doplot = not args['--noplot']
+        saveplot = args['--saveplot']
         dofeedback = args['--feed']
+        doMAPfeedback = args['--MAPfeed']
+        maxp = int(args['--maxp'])
+        restart = args['--restart']
 
         try: 
             ncpu = int(args['--ncpu'])
@@ -997,10 +1015,11 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        core.do_multinest(system, user, gp, jitter,
+        core.do_multinest(system, user, gp, jitter, maxp=maxp,
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, lin=lin_quantity, 
-                          doplot=doplot, feed=dofeedback)
+                          doplot=doplot, saveplot=saveplot, feed=dofeedback, MAPfeed=doMAPfeedback,
+                          restart=restart)
 
     @needs_local_scope
     @line_magic
@@ -1087,9 +1106,10 @@ class EmbeddedMagics(Magics):
         if args['--gui'] or args['--index']:
             if args['--index']:
                 ind_to_remove = map(int, args['--index'].split(','))
+                ind_to_remove = [i-1 for i in ind_to_remove]
                 for i in ind_to_remove:
                     x, y = take(system.time, i), take(system.vrad, i)
-                    msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i, x, y)
+                    msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i+1, x, y)
                     clogger.info(msg)
             else:
                 ind_to_remove = selectable_plot(system, style='ro')
@@ -1101,7 +1121,7 @@ class EmbeddedMagics(Magics):
                 return
 
             if ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
-                system.provenance.values()[0][1] = n
+                system.provenance.values()[0][1] += n
                 # remove observations with indices ind_to_remove from
                 # system.(time,vrad,error); leave *_full arrays intact
                 system.time = delete(system.time, ind_to_remove)
@@ -1149,7 +1169,8 @@ class EmbeddedMagics(Magics):
         if '-h' in parameter_s:
             print create_usage
             return
-        print parameter_s
+        # print parameter_s
+        
         if '--gui' in parameter_s:
             core.load_plugin('create_GUI')
             return

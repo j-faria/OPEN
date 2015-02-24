@@ -82,6 +82,12 @@ contains
     integer :: iter
     real(dp) :: EA_new, EA_old
     
+    ! catch special case
+    if (ecc .eq. 0.d0) then
+      E = M
+      return
+    endif
+
     iter = 0
     EA_old = 0.5_dp * pi 
     if (ecc < 0.8d0) then

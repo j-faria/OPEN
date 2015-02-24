@@ -9,7 +9,7 @@
 import warnings
 import datetime, time
 import subprocess
-import sys, os
+import sys, os, shutil, glob
 import random
 from collections import namedtuple
 from string import ascii_lowercase
@@ -47,10 +47,14 @@ except ImportError:
 
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date, ask_yes_no, get_number_cores
+from .prior_funcs import random_from_jeffreys, random_from_modjeffreys
 import train_gp
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 pi = np.pi
+
+def updated_timestamp():
+	return datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 
 def do_fit(system, verbose):
 	try:
@@ -740,7 +744,7 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, feed=False):
+def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -748,13 +752,16 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		user: the user sets up the namelist file and we just run MultiNest using that
 		gp:
 		jitter: include a jitter parameter
+		maxp: maximum number of planets to consider in automatic run
 		resume: whether to resume from a previous run. This option takes precedence over `user`
 		verbose: plot and print more information at the end of the run
 		ncpu: number of cpu cores to run MultiNest on
 		training:
 		lin:
 		doplot: whether to show plots at the end of the run. Takes precedence over `verbose`
+		saveplot: save all plots from automatic run
 		feed: when running automatic model selection, whether to provide sampling feedback
+		restart: whether to restart a previous automatic run
 	"""
 	from time import sleep, time
 	from commands import getoutput
@@ -813,13 +820,26 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		
 			print 
 
-			P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
-			m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
-
 			from .utils import mjup2mearth
-			m_me = m_mj * mjup2mearth
+			P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
+			P_error, K_error, ecc_error = par_sigma[5*i], par_sigma[5*i+1], par_sigma[5*i+2]
 
-			print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
+			try:
+				from uncertainties import ufloat
+				from uncertainties.umath import sqrt
+				P = ufloat(P, P_error)
+				K = ufloat(K, K_error)
+				ecc = ufloat(ecc, ecc_error)
+				m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * sqrt(1-ecc**2)
+				m_me = m_mj * mjup2mearth
+
+				print '%8s %11.3f +- %5.3f [MJup]  %11.3f +- %5.3f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
+
+			except ImportError:
+				m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
+				m_me = m_mj * mjup2mearth
+
+				print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
 
 			print 
 
@@ -853,7 +873,7 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 
 	# write data to file to be read by MultiNest
 	nest_filename = 'input.rv'
-	nest_header = 'file automatically generated for MultiNest analysis, ' + timestamp
+	nest_header = 'file automatically generated for MultiNest analysis, ' + updated_timestamp()
 
 	d = system.provenance
 	nest_header += '\n' + str(len(d))  # number of files (observatories)
@@ -1006,308 +1026,201 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 	else:
 		# OPEN is in control and will try to run a full model selection
 		# analysis, editing the namelist accordingly.
+		
+		# try to find name of star automatically
+		# this will be used for reading and writing in restarts
+		import re
+		filename = system.provenance.keys()[0]
+		regex = re.compile("HD[0-9]*")
+		try:
+			temp_star_name = regex.findall(filename)[0]
+		except IndexError:
+			from os.path import basename, splitext
+			temp_star_name = splitext(basename(filename))[0]
 
-		### set the namelist for 0 planet model
-		nplanets = 0
-		if gp: 
-			context = 201
-		else:
-			if jitter: 
-				context = 102
+
+		if restart:
+			import zipfile
+			msg = blue('    : ') + 'Restarting automatic run for star %s' % temp_star_name
+			clogger.info(msg)
+
+			restart_folder = os.path.join('chains', temp_star_name)
+			zipfilenames = glob.glob(os.path.join(restart_folder, '*.zip'))
+
+			# for now, we only use the most up-to-date zip files
+			zipfilenames.sort()  # the filenames have timestamps
+			zipfilenames = zipfilenames[-4:]
+
+			msg = blue('    : ') + 'Found %d/4 necessary (newest) zip files in directory %s' % (len(zipfilenames), restart_folder)
+			clogger.info(msg)
+
+			i = 0
+			for zf in zipfilenames:  # cycle all zip files in restart folder
+				ZF = zipfile.ZipFile(zf, "r")  # create the ZipFile object
+				for name in ZF.namelist():  # cycle every path in the zip file
+					# we don't actually need th namelist files here, as they would cause 
+					# rewritting issues. They are just there for reproducibility
+					if 'namelist1' in name:
+						continue
+					fname = os.path.join(restart_folder, os.path.basename(name))
+					# print 'creating', fname
+					fout = open(fname, "wb")
+					fout.write(ZF.read(name))
+					fout.close()
+					i += 1
+
+			msg = blue('    : ') + 'Created %d files for restart' % i
+			clogger.info(msg)
+
+			restart_root = os.path.join(restart_folder, 'nest-')
+			# print restart_root
+			# return
+
+		for npl in range(0, maxp+1):
+
+			##############################################################################
+			print
+			m = str(npl)+'-planet' if npl>0 else 'constant'
+			msg = blue('INFO: ') + 'Starting MultiNest for %s model.\n' % (m,)
+			msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
+			clogger.info(msg)
+
+			### set the namelist for 1 planet model
+			nplanets = npl
+			if gp: 
+				context = 201 + nplanets*10
+			else: 
+				if jitter: 
+					context = 102 + nplanets*10
+				else:
+					context = 101 + nplanets*10 
+			if restart:
+				root = restart_root + str(nplanets) + 'planet-'
 			else:
-				context = 101 
-		root = 'chains/nest-noplanet-'
-		## automatically fill the necessary parameters in the inlist
-		replacer1 = '    nest_context = %d\n' % context
-		replacer2 = '    nest_root=\'%s\'\n' % root
-		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-			if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
-			elif 'nest_root' in line: print replacer2,
-			elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
-			else: print line,
-
-		# if resuming from a previous run, set the appropriate namelist flag
-		if resume:
-			replacer = '    nest_resume=.true.\n'
+				root = 'chains/nest-' + str(nplanets) + 'planet-'
+			## automatically fill the necessary parameters in the inlist
+			replacer1 = '    nest_context = %d\n' % context
+			replacer2 = '    nest_root=\'%s\'\n' % root
 			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
-				else: print line,
-		else:
-			replacer = '    nest_resume=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
+				if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
+				elif 'nest_root' in line: print replacer2,
+				elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
 				else: print line,
 
-		# by default, feedback on the sampling progress is omitted, but
-		# the user can still request it
-		if feed:
-			replacer = '    nest_fb=.true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_fb' in line: print replacer,
-				else: print line,
-		else:
-			replacer = '    nest_fb=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_fb' in line: print replacer,
-				else: print line,
-
-		### run MultiNest
-		sleep(1)
-		start = time()
-		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
-		rc = subprocess.call(cmd, shell=True)
-
-		if (rc == 1): 
-			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
-			clogger.fatal(msg)
-			return
-
-		print  # newline
-		t = time()
-		took_min = int(t-start) / 60
-		took_sec = (t-start) - (took_min*60)
-
-		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
-		clogger.info(msg)
-
-		get_multinest_output(system, root, nplanets, context=str(context))
-		results_constant = MCMC_nest(root, context=str(context))
-		# put the results into a zip file
-		results_constant.compress_chains()
-		if doplot:
-			results_constant.do_plot_map(system)
-
-		constant_lnE = results_constant.NS_lnE
-
-		##############################################################################
-		print
-		msg = blue('INFO: ') + 'Starting MultiNest for 1-planet model.\n'
-		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
-		clogger.info(msg)
-
-		### set the namelist for 1 planet model
-		nplanets = 1
-		if gp: 
-			context = 211
-		else: 
-			if jitter: 
-				context = 112
+			# if resuming from a previous run, set the appropriate namelist flag
+			if resume:
+				replacer = '    nest_resume=.true.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_resume' in line: print replacer,
+					else: print line,
 			else:
-				context = 111 
-		root = 'chains/nest-1planet-'
-		## automatically fill the necessary parameters in the inlist
-		replacer1 = '    nest_context = %d\n' % context
-		replacer2 = '    nest_root=\'%s\'\n' % root
-		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-			if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
-			elif 'nest_root' in line: print replacer2,
-			elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
-			else: print line,
+				replacer = '    nest_resume=.false.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_resume' in line: print replacer,
+					else: print line,
 
-		# if resuming from a previous run, set the appropriate namelist flag
-		if resume:
-			replacer = '    nest_resume=.true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
-				else: print line,
-		else:
-			replacer = '    nest_resume=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
-				else: print line,
-
-		# by default, feedback on the sampling progress is omitted, but
-		# the user can still request it
-		if feed:
-			replacer = '    nest_fb=.true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_fb' in line: print replacer,
-				else: print line,
-		else:
-			replacer = '    nest_fb=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_fb' in line: print replacer,
-				else: print line,
-
-
-		sleep(1)
-		start = time()
-		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
-		rc = subprocess.call(cmd, shell=True)
-
-		if (rc == 1): 
-			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
-			clogger.fatal(msg)
-			return
-
-		print  # newline
-		t = time()
-		took_min = int(t-start) / 60
-		took_sec = (t-start) - (took_min*60)
-
-		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
-		clogger.info(msg)
-
-		get_multinest_output(system, root, nplanets, context=str(context))
-		results_one_planet = MCMC_nest(root, context=str(context))
-		# put the results into a zip file
-		results_one_planet.compress_chains()
-		if doplot:
-			results_one_planet.do_plot_map(system)
-			if verbose:
-				results_one_planet.do_plot_map_phased(system)
-				results_one_planet.do_hist_plots()
-
-		one_planet_lnE = results_one_planet.NS_lnE
-
-		##############################################################################
-		print  # newline
-		msg = blue('INFO: ') + 'Starting MultiNest for 2-planet model.\n'
-		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
-		clogger.info(msg)
-
-		nplanets = 2
-		if gp: 
-			context = 221
-		else: 
-			if jitter: 
-				context = 122
+			# by default, feedback on the sampling progress is omitted, but
+			# the user can still request it
+			if feed:
+				replacer = '    nest_fb=.true.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_fb' in line: print replacer,
+					else: print line,
 			else:
-				context = 121 
-		root = 'chains/nest-2planet-'
-		## automatically fill the necessary parameters in the inlist
-		replacer1 = '    nest_context = %d\n' % context
-		replacer2 = '    nest_root=\'%s\'\n' % root
-		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-			if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
-			elif 'nest_root' in line: print replacer2,
-			elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
-			else: print line,
-
-		# if resuming from a previous run, set the appropriate namelist flag
-		if resume:
-			replacer = '    nest_resume=.true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
-				else: print line,
-		else:
-			replacer = '    nest_resume=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
-				else: print line,
-
-		sleep(1)
-		start = time()
-		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
-		rc = subprocess.call(cmd, shell=True)
-
-		if (rc == 1): 
-			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
-			clogger.fatal(msg)
-			return
-
-		print  # newline
-		t = time()
-		took_min = int(t-start) / 60
-		took_sec = (t-start) - (took_min*60)
-
-		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
-		clogger.info(msg)
+				replacer = '    nest_fb=.false.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_fb' in line: print replacer,
+					else: print line,
 
 
-		get_multinest_output(system, root, nplanets, context=str(context))
-		results_two_planet = MCMC_nest(root, context=str(context))
-		# put the results into a zip file
-		results_two_planet.compress_chains()
-		if doplot:
-			results_two_planet.do_plot_map(system)
-			if verbose:
-				results_two_planet.do_plot_map_phased(system)
-				results_two_planet.do_hist_plots()
+			sleep(1)
+			start = time()
+			cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
+			rc = subprocess.call(cmd, shell=True)
 
-		two_planet_lnE = results_two_planet.NS_lnE
+			if (rc == 1): 
+				msg = red('ERROR: ') + 'MultiNest terminated prematurely'
+				clogger.fatal(msg)
+				return
 
+			print  # newline
+			t = time()
+			took_min = int(t-start) / 60
+			took_sec = (t-start) - (took_min*60)
 
-		##############################################################################
-		print
-		msg = blue('INFO: ') + 'Starting MultiNest for 3-planet model.\n'
-		msg += blue('    : ') + '(using %d threads). Please wait...' % (ncpu,)
-		clogger.info(msg)
+			msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
+			clogger.info(msg)
 
-		### set the namelist for 3 planet model
-		nplanets = 3
-		if gp: 
-			context = 201 + nplanets*10
-		else: 
-			if jitter: 
-				context = 102 + nplanets*10
-			else:
-				context = 101 + nplanets*10
-		root = 'chains/nest-1planet-'
-		## automatically fill the necessary parameters in the inlist
-		replacer1 = '    nest_context = %d\n' % context
-		replacer2 = '    nest_root=\'%s\'\n' % root
-		for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-			if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
-			elif 'nest_root' in line: print replacer2,
-			elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
-			else: print line,
+			get_multinest_output(system, root, nplanets, context=str(context))
 
-		# if resuming from a previous run, set the appropriate namelist flag
-		if resume:
-			replacer = '    nest_resume=.true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
-				else: print line,
-		else:
-			replacer = '    nest_resume=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_resume' in line: print replacer,
-				else: print line,
+			if nplanets == 0:
+				results_constant = MCMC_nest(root, context=str(context))
+				results_constant.model_name = 'd0'
+				# put the results into a zip file
+				zip_filename_constant = results_constant.compress_chains()
 
-		# by default, feedback on the sampling progress is omitted, but
-		# the user can still request it
-		if feed:
-			replacer = '    nest_fb=.true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_fb' in line: print replacer,
-				else: print line,
-		else:
-			replacer = '    nest_fb=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
-				if 'nest_fb' in line: print replacer,
-				else: print line,
+				map_plot_file_constant = 'constant_map.png' if saveplot else None
+				hist_plot_file_constant = 'constant_hist.png' if saveplot else None
 
+				if doplot:
+					results_constant.do_plot_map(system, save=map_plot_file_constant)
+					if verbose:
+						results_constant.do_hist_plots(save=hist_plot_file_constant)
 
-		sleep(1)
-		start = time()
-		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
-		rc = subprocess.call(cmd, shell=True)
+				constant_lnE = results_constant.NS_lnE
 
-		if (rc == 1): 
-			msg = red('ERROR: ') + 'MultiNest terminated prematurely'
-			clogger.fatal(msg)
-			return
+			elif nplanets == 1:
+				results_one_planet = MCMC_nest(root, context=str(context))
+				results_one_planet.model_name = 'd0k1'
+				# put the results into a zip file
+				zip_filename_one_planet = results_one_planet.compress_chains()
+				
+				map_plot_file_one_planet = 'one_planet_map.png' if saveplot else None
+				map_phased_plot_file_one_planet = 'one_planet_map_phased.png' if saveplot else None
+				hist_plot_file_one_planet = 'one_planet_hist.png' if saveplot else None
+				if doplot:
+					results_one_planet.do_plot_map(system, save=map_plot_file_one_planet)
+					if verbose:
+						results_one_planet.do_plot_map_phased(system, save=map_phased_plot_file_one_planet)
+						results_one_planet.do_hist_plots(save=hist_plot_file_one_planet)
 
-		print  # newline
-		t = time()
-		took_min = int(t-start) / 60
-		took_sec = (t-start) - (took_min*60)
+				one_planet_lnE = results_one_planet.NS_lnE
 
-		msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
-		clogger.info(msg)
+			elif nplanets == 2:
+				results_two_planet = MCMC_nest(root, context=str(context))
+				results_two_planet.model_name = 'd0k2'
+				# put the results into a zip file
+				zip_filename_two_planet = results_two_planet.compress_chains()
 
-		get_multinest_output(system, root, nplanets, context=str(context))
-		results_three_planet = MCMC_nest(root, context=str(context))
-		# put the results into a zip file
-		results_three_planet.compress_chains()
-		if doplot:
-			results_three_planet.do_plot_map(system)
-			if verbose:
-				results_three_planet.do_plot_map_phased(system)
-				results_three_planet.do_hist_plots()
+				map_plot_file_two_planet = 'two_planet_map.png' if saveplot else None
+				map_phased_plot_file_two_planet = 'two_planet_map_phased.png' if saveplot else None
+				hist_plot_file_two_planet = 'two_planet_hist.png' if saveplot else None
 
-		three_planet_lnE = results_three_planet.NS_lnE
+				if doplot:
+					results_two_planet.do_plot_map(system, save=map_plot_file_two_planet)
+					if verbose:
+						results_two_planet.do_plot_map_phased(system, save=map_phased_plot_file_two_planet)
+						results_two_planet.do_hist_plots(save=hist_plot_file_two_planet)
+
+				two_planet_lnE = results_two_planet.NS_lnE
+
+			elif nplanets == 3:
+				results_three_planet = MCMC_nest(root, context=str(context))
+				results_three_planet.model_name = 'd0k3'
+				# put the results into a zip file
+				zip_filename_three_planet = results_three_planet.compress_chains()
+
+				map_plot_file_three_planet = 'three_planet_map.png' if saveplot else None
+				map_phased_plot_file_three_planet = 'three_planet_map_phased.png' if saveplot else None
+				hist_plot_file_three_planet = 'three_planet_hist.png' if saveplot else None
+
+				if doplot:
+					results_three_planet.do_plot_map(system, save=map_plot_file_three_planet)
+					if verbose:
+						results_three_planet.do_plot_map_phased(system, save=map_phased_plot_file_three_planet)
+						results_three_planet.do_hist_plots(save=hist_plot_file_three_planet)
+
+				three_planet_lnE = results_three_planet.NS_lnE
 
 
 		##############################################################################
@@ -1316,20 +1229,24 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		clogger.info(msg)
 
 		msg1 = yellow('      : ') + 'cte lnE'.rjust(12) + ' = %12.6f' % (constant_lnE)
-		msg2 = yellow('      : ') + '1 planet lnE = %12.6f' % (one_planet_lnE)
-		msg3 = yellow('      : ') + '2 planet lnE = %12.6f' % (two_planet_lnE)
-		msg4 = yellow('      : ') + '3 planet lnE = %12.6f' % (three_planet_lnE)
+		if maxp >= 1:
+			msg2 = yellow('      : ') + '1 planet lnE = %12.6f' % (one_planet_lnE)
+		if maxp >= 2:
+			msg3 = yellow('      : ') + '2 planet lnE = %12.6f' % (two_planet_lnE)
+		if maxp == 3:
+			msg4 = yellow('      : ') + '3 planet lnE = %12.6f' % (three_planet_lnE)
 
 		## odds ratio
+		odds = []
 		import warnings
 		with warnings.catch_warnings():
 			warnings.filterwarnings('error')
 			try:
-				O11 = 1
-				O21 = np.exp(one_planet_lnE) / np.exp(constant_lnE)
-				O31 = np.exp(two_planet_lnE) / np.exp(constant_lnE)
-				O41 = np.exp(three_planet_lnE) / np.exp(constant_lnE)
-				K = np.exp(one_planet_lnE) / np.exp(two_planet_lnE)
+				odds.append(1.)  # O11
+				if maxp >= 1: odds.append(np.exp(one_planet_lnE) / np.exp(constant_lnE))  # O21
+				if maxp >= 2: odds.append(np.exp(two_planet_lnE) / np.exp(constant_lnE))  # O31
+				if maxp == 3: odds.append(np.exp(three_planet_lnE) / np.exp(constant_lnE))  # O41
+				# K = np.exp(one_planet_lnE) / np.exp(two_planet_lnE)
 			except RuntimeWarning:
 				try:
 					import mpmath
@@ -1341,17 +1258,24 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 						clogger.warning(warn)
 						O11 = O21 = O31 = O41 = np.nan
 				else:
-					O11 = 1
-					O21 = mpmath.exp(one_planet_lnE) / mpmath.exp(constant_lnE)
-					O31 = mpmath.exp(two_planet_lnE) / mpmath.exp(constant_lnE)
-					O41 = mpmath.exp(three_planet_lnE) / mpmath.exp(constant_lnE)
-					K = mpmath.exp(one_planet_lnE) / mpmath.exp(two_planet_lnE)
+					odds.append(1.)  # O11
+					if maxp >= 1: odds.append(mpmath.exp(one_planet_lnE) / mpmath.exp(constant_lnE))  # O21
+					if maxp >= 2: odds.append(mpmath.exp(two_planet_lnE) / mpmath.exp(constant_lnE))  # O31
+					if maxp == 3: odds.append(mpmath.exp(three_planet_lnE) / mpmath.exp(constant_lnE))  # O41
+					# K = mpmath.exp(one_planet_lnE) / mpmath.exp(two_planet_lnE)
 			finally:
-				msg1 += ' '*5 + 'p = %-13.8f\n' % (O11/(O11+O21+O31+O41), )
-				msg2 += ' '*5 + 'p = %-13.8f\n' % (O21/(O11+O21+O31+O41), )
-				msg3 += ' '*5 + 'p = %-13.8f\n' % (O31/(O11+O21+O31+O41), )
-				msg4 += ' '*5 + 'p = %-13.8f\n' % (O41/(O11+O21+O31+O41), )
-				msg = msg1 + msg2 + msg3 + msg4
+				msg1 += ' '*5 + 'p = %-13.8f\n' % (odds[0]/sum(odds), )
+				msg = msg1
+				if maxp >= 1: 
+					msg2 += ' '*5 + 'p = %-13.8f\n' % (odds[1]/sum(odds), )
+					msg += msg2
+				if maxp >= 2: 
+					msg3 += ' '*5 + 'p = %-13.8f\n' % (odds[2]/sum(odds), )
+					msg += msg3
+				if maxp == 3: 
+					msg4 += ' '*5 + 'p = %-13.8f\n' % (odds[3]/sum(odds), )
+					msg += msg4
+
 				clogger.info(msg)
 
 		
@@ -1389,17 +1313,140 @@ def do_multinest(system, user, gp, jitter, resume=False, verbose=False, ncpu=Non
 		# 		msg += '%-15s\t%s' % ('Kass & Raftery', kass_raftery_scale[key])
 		# clogger.info(msg)
 
-		
-		fits = {constant_lnE: results_constant,
-		        one_planet_lnE: results_one_planet,
-		        two_planet_lnE: results_two_planet}
+		if maxp == 1:
+			fits = {constant_lnE: results_constant,
+			        one_planet_lnE: results_one_planet,}
+		elif maxp == 2:
+			fits = {constant_lnE: results_constant,
+			        one_planet_lnE: results_one_planet,
+			        two_planet_lnE: results_two_planet,}
+		elif maxp == 3:
+			fits = {constant_lnE: results_constant,
+			        one_planet_lnE: results_one_planet,
+			        two_planet_lnE: results_two_planet,
+			        three_planet_lnE: results_three_planet}
+		else:
+			clogger.info(red('ERROR: ') + 'maxp should be > 0')
+			return
+
+
 		## save all fits to the system
 		system.allfits = fits
 		## save the fit with highest evidence to the system
 		system.results = fits[sorted(fits, reverse=True)[0]]
 
+		## save the zip files into a folder with the name of the star
+		## allowing for complete restarts in the future
+		if restart:
+			save_folder = os.path.dirname(root)
+		else:
+			root_dir_name = os.path.dirname(root)
+			save_folder = os.path.join(root_dir_name, temp_star_name)
+			if os.path.isdir(save_folder):  # folder already exists (shouldn't really happen)
+				clogger.info(blue('INFO: ') + 'Directory %s already exists' % save_folder)
+			else:
+				clogger.info(blue('INFO: ') + 'Creating directory %s' % save_folder)
+				os.makedirs(save_folder)
+
+		clogger.info(blue('INFO: ') + 'Copying zip files to %s to allow restarts' % save_folder)
+		shutil.copy(zip_filename_constant, save_folder)
+		shutil.copy(zip_filename_one_planet, save_folder)
+		shutil.copy(zip_filename_two_planet, save_folder)
+		shutil.copy(zip_filename_three_planet, save_folder)
+
+		if saveplot:
+			try:
+				os.remove(os.path.join(save_folder, map_plot_file_constant))
+				os.remove(os.path.join(save_folder, map_plot_file_one_planet))
+				os.remove(os.path.join(save_folder, map_plot_file_two_planet))
+				os.remove(os.path.join(save_folder, map_plot_file_three_planet))
+			except OSError:
+				pass
+			shutil.move(map_plot_file_constant, save_folder)
+			shutil.move(map_plot_file_one_planet, save_folder)
+			shutil.move(map_plot_file_two_planet, save_folder)
+			shutil.move(map_plot_file_three_planet, save_folder)
+			if verbose:
+				try:
+					os.remove(os.path.join(save_folder, map_phased_plot_file_one_planet))
+					os.remove(os.path.join(save_folder, map_phased_plot_file_two_planet))
+					os.remove(os.path.join(save_folder, map_phased_plot_file_three_planet))
+					os.remove(os.path.join(save_folder, hist_plot_file_one_planet))
+					os.remove(os.path.join(save_folder, hist_plot_file_two_planet))
+					os.remove(os.path.join(save_folder, hist_plot_file_three_planet))
+				except OSError:
+					pass
+				shutil.move(map_phased_plot_file_one_planet, save_folder)
+				shutil.move(map_phased_plot_file_two_planet, save_folder)
+				shutil.move(map_phased_plot_file_three_planet, save_folder)
+				shutil.move(hist_plot_file_one_planet, save_folder)
+				shutil.move(hist_plot_file_two_planet, save_folder)
+				shutil.move(hist_plot_file_three_planet, save_folder)				
+
+
 
 	return
+
+
+def do_RJ_DNest3(system, resume=False, verbose=False, ncpu=None):
+	"""
+	Run the Reversible Jump Diffusive Nested Sampling algorithm on the current system. 
+	Arguments
+	---------
+		resume: whether to resume from a previous run.
+		verbose: plot and print more information at the end of the run
+		ncpu: number of cpu cores to run on
+	"""
+	from time import sleep, time
+	from commands import getoutput
+
+	# determine available number of cpu cores
+	available_cpu = get_number_cores()
+	if (ncpu is None) or (ncpu > available_cpu): 
+		ncpu = available_cpu
+
+	msg = blue('INFO: ') + 'Transfering data to RJ-DNest3...'
+	clogger.info(msg)
+
+	# write data to file to be read by RJ-DNest3
+	nest_filename = 'input.rv'
+	nest_header = 'file automatically generated for RJ-DNest3 analysis, ' + updated_timestamp()
+
+	d = system.provenance
+	nest_header += '\n' + str(len(d))  # number of files (observatories)
+	# this is a hack otherwise the dict values are not ordered the right way
+	sizes_each_file = [d[k][0] if (d[k][1]==0) else (d[k][0]-d[k][1]) for k in sorted(d.keys())]
+	sizes = len(sizes_each_file) * '%d ' % tuple(sizes_each_file)
+	nest_header += '\n' + sizes  # number measurements in each file
+	nest_header += '\n' + str(len(system.time))  # total number measurements
+
+	savetxt(nest_filename, zip(system.time, system.vrad, system.error),
+			header=nest_header,
+			fmt=['%12.6f', '%7.5f', '%7.5f'])
+
+
+	msg = blue('    : ') + 'Starting RJ-DNest3 (%d threads) ...' % (ncpu,)
+	clogger.info(msg)
+
+	start = time()
+	cmd = './RJDNest3/run --ncpu %d' % (ncpu,)
+	# cmd = './RJDNest3/main -t %d -d ../input.rv' % (ncpu,)
+	rc = subprocess.call(cmd, shell=True)
+
+	if (rc == 1): 
+		msg = red('ERROR: ') + 'RJ-DNest3 terminated prematurely'
+		clogger.fatal(msg)
+		return
+
+	print  # newline
+	t = time()
+	took_min = int(t-start) / 60
+	took_sec = (t-start) - (took_min*60)
+
+	msg = blue('INFO: ') + 'RJ-DNest3 took %2dm%2.0fs' % (took_min, took_sec)
+	clogger.info(msg)
+
+
 
 def do_correlate(system, vars=(), verbose=False, remove=False):
 	"""
@@ -2085,51 +2132,129 @@ def do_set_fit(system):
 
 
 def do_create_planets(s):
-	msg = blue('INFO: ') + 'Starting the planet creator'
-	clogger.info(msg)
+	if not '--quiet' in s:
+		msg = blue('INFO: ') + 'Starting the planet creator'
+		clogger.info(msg)
 
 	if s != '':  # parse options from the command line
 		import re
+		keep_s = s
 		s = s.lower()
+
+		# match number of planets
+		regex0 = re.compile("np\((.*?)\)")
+		if regex0.match(s) is None:
+			nplanets = None
+		else:
+			nplanets_set_later = False
+			try:
+				m = regex0.findall(s)[0]
+				s = s.replace('np('+m+')', '').strip()
+				nplanets = int(m)
+			except ValueError:
+				msg = red('ERROR: ') + "Couldn't parse arguments; Try np(int)"
+				clogger.fatal(msg)
+				return
+
+		# get filename to sample from
+		try:
+			regex = re.compile("sample\((.*?)\)")
+			filename = regex.findall(keep_s)[0]
+			s = s.replace('sample('+filename.lower()+')', '').strip()
+			with open(filename) as f:
+				nobs = len(f.readlines()) - 2  # skip header
+			use_number_points = True
+			use_error_bars = True
+			use_only_start_end = False
+		except IndexError:
+			filename = None
+
+
 		try:
 			# match periods
 			regex1 = re.compile("p\((.*?)\)")
 			p = regex1.findall(s)[0]
 			periods = [float(i) for i in p.split(',')]
+		except IndexError:
+			periods = None
+		try:
 			# match eccentricities
 			regex2 = re.compile("e\((.*?)\)")
 			e = regex2.findall(s)[0]
+			s = s.replace('e('+e+')', '').strip()
 			eccentricities = [float(i) for i in e.split(',')]
+		except IndexError:
+			eccentricities = None
+		try:
 			# match semi-amplitudes
 			regex3 = re.compile("k\((.*?)\)")
 			k = regex3.findall(s)[0]
 			semi_amplitudes = [float(i) for i in k.split(',')]
 		except IndexError:
-			msg = red('ERROR: ') + "Couldn't parse arguments"
-			clogger.fatal(msg)
-			return
+			semi_amplitudes = None
 
-		if not len(periods) == len(eccentricities) == len(semi_amplitudes):
-			msg = red('ERROR: ') + 'Non-matching number of options'
-			clogger.fatal(msg)
-			return
+		# assert that everything matches
+		if nplanets:
+			if periods and len(periods) != nplanets:
+				msg = red('ERROR: ') + "Number of planets and length of periods don't match."
+				clogger.fatal(msg)
+				return
+			if eccentricities and len(eccentricities) != nplanets:
+				msg = red('ERROR: ') + "Number of planets and length of eccentricities don't match."
+				clogger.fatal(msg)
+				return
+			if semi_amplitudes and len(semi_amplitudes) != nplanets:
+				msg = red('ERROR: ') + "Number of planets and length of semi-amplitudes don't match."
+				clogger.fatal(msg)
+				return
+		else:
+			if periods: 
+				nplanets = len(periods)
+				if eccentricities and nplanets != len(eccentricities):
+					msg = red('ERROR: ') + "Length of periods and eccentricities don't match."
+					clogger.fatal(msg)
+					return
+				if semi_amplitudes and nplanets != len(semi_amplitudes):
+					msg = red('ERROR: ') + "Length of periods and semi-amplitudes don't match."
+					clogger.fatal(msg)
+					return
+			if eccentricities:
+				nplanets = len(eccentricities)
+				# if periods and nplanets != len(periods):
+				# 	msg = red('ERROR: ') + "Length of periods and eccentricities don't match."
+				# 	clogger.fatal(msg)
+				if semi_amplitudes and nplanets != len(semi_amplitudes):
+					msg = red('ERROR: ') + "Length of eccentricities and semi-amplitudes don't match."
+					clogger.fatal(msg)
+					return	
+			# if semi_amplitudes:
+			# 	nplanets = len(semi_amplitudes)
+			# 	if periods and nplanets != len(periods):
+			# 		msg = red('ERROR: ') + "Length of periods and semi-amplitudes don't match."
+			# 		clogger.fatal(msg)
+			# 	if eccentricities and nplanets != len(eccentricities):
+			# 			msg = red('ERROR: ') + "Length of eccentricities and semi-amplitudes don't match."
+			# 			clogger.fatal(msg)						
 
-		nplanets = len(periods)
-
+		# get number of observations
 		try:
 			regex = re.compile("n\((.*?)\)")
 			nobs = int(regex.findall(s)[0])
 		except IndexError:
-			nobs = np.random.randint(30, 220)
+			try:
+				nobs
+			except UnboundLocalError:
+				nobs = np.random.randint(30, 220)
 
+		# get filename to save to
 		try:
-			regex = re.compile("file\((.*?)\)")
+			regex = re.compile("out\((.*?)\)")
 			save_filename = regex.findall(s)[0]
 		except IndexError:
 			save_filename = None
 
+
 		type_noise = 'white'  # for now...
-		filename = None
 
 	else:
 
@@ -2221,31 +2346,36 @@ def do_create_planets(s):
 			else:
 				print "I don't understand that. Try 'no', w', 'r' or 'wr'."
 
+	if not '--quiet' in s:
+		print
+		msg = blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
+		if filename is not None:
+			msg += blue('    : ') + '-> sampling from %s\n' % (filename)
+			if use_only_start_end: msg += blue('    : ') + '-> using first and last timestamp\n'
+			if use_error_bars and use_number_points: msg += blue('    : ') + '-> using errorbars from this file\n'
+		else:
+			msg += blue('    : ') + '-> randomly spaced sampling\n'
+		msg += blue('    : ') + '-> %d observations\n' % (nobs)
+		msg += blue('    : ') + '-> %s noise\n' % (type_noise)
+		if save_filename:
+			msg += blue('    : ') + '-> saving output to %s\n' % save_filename
+		clogger.info(msg)
 
-	print
-	msg = blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
-	if filename is not None:
-		msg += blue('    : ') + '-> sampling from %s\n' % (filename)
-		if use_only_start_end: msg += blue('    : ') + '-> using first and last timestamp\n'
-		if use_error_bars and use_number_points: msg += blue('    : ') + '-> using errorbars from this file\n'
-	else:
-		msg += blue('    : ') + '-> randomly spaced sampling\n'
-	msg += blue('    : ') + '-> %d observations\n' % (nobs)
-	msg += blue('    : ') + '-> %s noise\n' % (type_noise)
-	clogger.info(msg)
 
 	save_filename = None
-	options = (filename, save_filename, type_noise, use_only_start_end)
+	options = (filename, save_filename, type_noise, use_only_start_end, use_error_bars)
 
 	# get rv curve with random parameters
 	def gen_rv(nplanets, nobs, options, periods, eccentricities, amplitudes, temp):
 
-		sampling_file, saving_file, type_noise, use_only_start_end = options
+		sampling_file, saving_file, type_noise, use_only_start_end, use_error_bars = options
 
 		if sampling_file is not None:  # the sampling is set in the file
 			times_sampled_from_file = np.loadtxt(sampling_file, usecols=(0,), skiprows=2)
 			times = times_sampled_from_file
 			times_full = np.linspace(min(times_sampled_from_file), max(times_sampled_from_file), 1000)
+			if use_error_bars:
+				noise = np.loadtxt(sampling_file, usecols=(2,), skiprows=2)
 		else:  # the sampling is random
 			times_full = np.linspace(2449460, 2452860, 1000)
 			# sample (N points) randomly from the data to produce unevenly sampled time series
@@ -2261,25 +2391,37 @@ def do_create_planets(s):
 		output = '# planet %d with P=%f, K=%f, e=%f, w=%f, t0=%f\n'
 		for planet in range(nplanets):
 			if periods is None: 
-				P = np.random.rand()*998. + 2.  # random period, U(2, 998)
+				# this is the prior used in MN, but truncated
+				P = 1.
+				while P<2 or P>200:
+					P = random_from_jeffreys(np.random.rand(), 0.2, np.ptp(times))
 			else: 
 				P = periods[planet]  # user-provided period
 
 			if eccentricities is None:
+				# this is the prior used in MN
 				ecc = np.random.beta(0.867, 3.03)  # from Kipping 2013
 			else:
 				ecc = eccentricities[planet]  # user-provided eccentricity
 
 			if amplitudes is None:
-				K = np.random.rand()*10. + 1.
+				# this is the prior used in MN, but truncated
+				K = 31.
+				while K > 30:
+					K = random_from_modjeffreys(np.random.rand(), 1., 2129)
 			else:
-				K = amplitudes[planet]  # user-provided eccentricity
+				K = amplitudes[planet]  # user-provided semi-amplitude
 			
 
 			omega = np.random.rand()*2.*pi 
 
 			if type_noise is 'white':
-				noise = np.random.randn(len(vel_each))  # sigma??????
+				if use_error_bars:
+					# add extra white noise with the same std as the uncertainties
+					added_noise = noise.std() * np.random.randn(len(vel_each))
+				else:
+					added_noise = np.random.randn(len(vel_each))  # sigma=1 ??????
+					noise = added_noise
 			else:
 				noise = np.ones_like(vel_each)
 
@@ -2303,7 +2445,7 @@ def do_create_planets(s):
 
 	# wrapper function that takes care of adding noise and logging to file
 	def generate_planets(nplanets, nobs, options, periods, eccentricities, amplitudes):
-		sampling_file, saving_file, type_noise, use_only_start_end = options
+		sampling_file, saving_file, type_noise, use_only_start_end, use_error_bars = options
 
 		if saving_file is None:
 			# create temporary file to store simulation info
@@ -2320,8 +2462,13 @@ def do_create_planets(s):
 		tf.write('#\n## %d observations, %s noise\n#\n' % (nobs, type_noise))
 		tf.write('# bjd \t vrad(km/s) \t svrad(km/s)\n')
 
+		if use_error_bars: 
+			e_multiplier = 1.
+		else:
+			e_multiplier = 1e-3
+
 		for t, v, e in zip(times, vel, noise):
-			tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*1e-3)))
+			tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*e_multiplier)))
 
 		try:
 			tf.delete = False

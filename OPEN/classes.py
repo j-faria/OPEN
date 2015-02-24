@@ -27,7 +27,7 @@ except Exception:
     print 'pyqtgraph will not be installed'
 
 import rvIO
-from .utils import unique
+from .utils import unique, get_tt
 from .logger import clogger, logging
 from shell_colors import yellow, blue
 from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
@@ -87,6 +87,32 @@ class rvSeries:
           msg = red('ERROR: ') + 'If your files have header lines set --skip option.\n'
           clogger.fatal(msg)
           return
+
+        # # the following is the most readable and less nested way I found of doing this
+        # def get_time(d):
+        #     try:
+        #         return d.pop('jdb')
+        #     except KeyError:
+        #         pass
+        #     try:
+        #         return d.pop('time')
+        #     except KeyError:
+        #         pass
+        #     raise IOError('The .rdb file header should have standard names: jdb/time, rv/vrad, err/svrad.')
+
+        # def get_RV(d):
+        #     try:
+        #         return d.pop('vrad'), d.pop('svrad')
+        #     except KeyError:
+        #         pass
+        #     try:
+        #         return d.pop('rv'), d.pop('err')
+        #     except KeyError:
+        #         pass
+        #     raise IOError('The .rdb file header should have standard names: jdb/time, rv/vrad, err/svrad.')
+
+        # self.time = get_time(data)
+        # self.vrad, self.error = get_RV(data)
 
         self.time, self.vrad, self.error = data.pop('jdb'), data.pop('vrad'), data.pop('svrad')
 
@@ -273,7 +299,6 @@ class rvSeries:
         # plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
 
     def do_plot_extras(self, extra, save=None):
         """ Plot other observed quantities as a function of time.
@@ -315,7 +340,6 @@ class rvSeries:
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05))
         plt.minorticks_on()
         plt.tight_layout()
-        plt.show()
 
         if save:
             msg = yellow('INFO: ') + 'Saving figure to %s' % save
@@ -392,7 +416,7 @@ class rvSeries:
         #       t, rv, err = t[m:], rv[m:], err[m:]
         #   ax.plot( np.modf(abs(tt-T0[i])/P[i])[0], final, 'k-')
 
-        plt.show()
+        # plt.show()
 
     def do_plot_resid(self, newFig=True, leg=True, save=None):
         """ Plot the residuals from a fit as a function of time.
@@ -553,18 +577,18 @@ class rvSeries:
         # print min(r), max(r)
         return len(r), r
 
-    def get_time_to_plot(self, P=None):
+    def get_time_to_plot(self, P=None, oversample=10):
         """
         Returns sufficiently resolved time vector for plots
         """
         std = self.time.std()
         N = len(self.time)
-        minim = self.time.min() - 2.*std
-        maxim = self.time.max() + 2.*std
+        minim = self.time.min() - 1.*std
+        maxim = self.time.max() + 1.*std
         if P is None:
-            return np.linspace(minim, maxim, 10*N)
+            return np.linspace(minim, maxim, oversample*N)
         else:
-            return np.linspace(minim, maxim, 10*(maxim-minim)/P)
+            return np.linspace(minim, maxim, oversample*(maxim-minim)/P)
 
     def is_in_extras(self, extra):
         return extra in self.extras._fields
@@ -702,41 +726,50 @@ class PeriodogramBase:
       return self.probInv(Prob)  
 
     def FAP_by_bootstrap(self):
-
+        from tqdm import tqdm
         name = '_' + self.__class__.__name__
-        # access the instance's __calcPeriodogramFast function
-        exec 'calc = self.' + name + '__calcPeriodogramFast'
 
         # temporaries
-        f = self.freq
-        p = self.power
+        temp_per = copy(self)
+        # access the instance's __calcPeriodogramFast function
+        exec 'calc = temp_per.' + name + '__calcPeriodogramFast'
+
+        f = temp_per.freq
+        p = temp_per.power
 
         perc01 = 0.001 # 0.1% FAP
         perc1 = 1.  # 1% FAP
-        perm = int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
+        perc10 = 10.  # 10% FAP
+        perm = 1000 # int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
 
-        maxPowers = []
-        for k in tqdm(range(perm)):
-            permutted = np.random.permutation(zip(self.y, self.error))
-            self.y = permutted[:,0]
-            self.error = permutted[:,1]
+        try:
+            self.peaks
+            if len(self.peaks) != perm: raise AttributeError
+        except AttributeError:
+            maxPowers = []
+            for k in tqdm(xrange(perm)):
+                permutted = np.random.permutation(zip(temp_per.y, temp_per.error))
+                temp_per.y = permutted[:,0]
+                temp_per.error = permutted[:,1]
 
-            calc()
-            # self._plot_pg()
-            powermaxP = self.power.max()
-            maxPowers.append(powermaxP)
-        #print maxPowers
+                calc()
+                # temp_per._plot_pg()
+                powermaxP = temp_per.power.max()
+                maxPowers.append(powermaxP)
+            self.peaks = np.sort(maxPowers)
 
-        peaks = np.sort(maxPowers)
-        # index01 = int( ((1-perc01/100.0) * len(peaks)) )
-        index1 = int( ((1-perc1/100.0) * len(peaks)) )
-        # powerFAP_01 = peaks[index01]
-        powerFAP_1 = peaks[index1]
+        index01 = int( ((1-perc01/100.0) * len(self.peaks)) )
+        index1 = int( ((1-perc1/100.0) * len(self.peaks)) )
+        index10 = int( ((1-perc10/100.0) * len(self.peaks)) )
+        powerFAP_01 = self.peaks[index01]
+        powerFAP_1 = self.peaks[index1]
+        powerFAP_10 = self.peaks[index10]
 
 
         plt.semilogx(1./f, p, 'k-')
-        # plt.axhline(powerFAP_01,c='r',ls=':')
+        plt.axhline(powerFAP_01,c='r',ls=':')
         plt.axhline(powerFAP_1,c='r',ls='--')
+        plt.axhline(powerFAP_10,c='r',ls='-')
         plt.show()
         #         if orbit == 'circ':
         #             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
@@ -745,7 +778,8 @@ class PeriodogramBase:
         # #       print k
         #         maxPowers.append(powermaxP)
 
-    def _plot(self, doFAP=False, faps=None, verts=None, newFig=True, axes=None, save=None, **kwargs):
+    def _plot(self, doFAP=False, dobFAP=False, faps=None, verts=None, 
+              newFig=True, axes=None, save=None, **kwargs):
         """
         Plot this periodogram.
         """
@@ -776,9 +810,10 @@ class PeriodogramBase:
         else:
             self.ax.semilogx(1./self.freq, self.power, 'b-', **kwargs)
         # plot FAPs
-        if doFAP and (faps is None):
-            clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
-        if doFAP: # do default FAPs of 10%, 1% and 0.1%
+        if doFAP:
+            # do default FAPs of 10%, 1% and 0.1%
+            if faps is None: clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
+
             pmin = 1./self.freq.min()
             pmax = 1./self.freq.max()
             plvl1 = self.powerLevel(0.1) # 10% FAP
@@ -788,6 +823,9 @@ class PeriodogramBase:
             self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
             self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
             self.ax.legend(frameon=True)
+        if dobFAP:
+            # calculate FAP by bootstrap
+            self.FAP_by_bootstrap()
 
         # plot vertical lines
         if verts is not None:
@@ -1121,7 +1159,7 @@ class MCMC_dream:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        # plt.show()
 
     def do_plot_trace(self, parameter):
 
@@ -1179,7 +1217,7 @@ class MCMC_dream:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        # plt.show()
 
     def do_triangle_plot(self):
 
@@ -1263,7 +1301,11 @@ class MCMC_nest:
         self.jitter = False
         if self.context[2] == '2':  # model with jitter
             self.jitter = True
-            s = self.par_map.pop(-2)
+            self.jitter_map = self.par_map.pop(-2)
+            self.jitter_mle = self.par_mle.pop(-2)
+            self.jitter_mean = self.par_mean.pop(-2)
+            self.jitter_sigma = self.par_sigma.pop(-2)
+
 
         self.only_vsys = False
         if self.npar == 1 or len(self.par_map) == 1:  # systematic velocity only
@@ -1278,7 +1320,7 @@ class MCMC_nest:
 
     def read_iterations(self):
         """
-        Read the [root]ev.dat and [root]phys_live.points files which contain the
+        Read the [root]ev.dat and [root]phys_live.points files which contain
         the set of rejected points and the current set of live points, respectively.
         First npar columns are the parameter values for each iteration + live ones
         npar+1 column are the log-likelihood values
@@ -1286,8 +1328,8 @@ class MCMC_nest:
         filename1 = self.root + 'ev.dat'
         filename2 = self.root + 'phys_live.points'
 
-        rejected_points = np.loadtxt(filename1, unpack=True)
-        live_points = np.loadtxt(filename2, unpack=True)
+        rejected_points = np.genfromtxt(filename1, unpack=True)
+        live_points = np.genfromtxt(filename2, unpack=True)
 
         j = 1 if self.jitter else 0
         j = j+4 if self.gp else j+0
@@ -1297,12 +1339,19 @@ class MCMC_nest:
         parameter_names = ['period', 'K', 'ecc', 'omega', 't0']
         parameter_names = np.array([[par + '_'+str(i) for par in parameter_names] for i in range(self.nplanets)])
 
-        p = namedtuple('parameter', parameter_names.flat)
+        # we have to name every namedtuple class differently
+        p = namedtuple('parameter'+str(self.nplanets), parameter_names.flat)
+        # and assign it to the module globals, so that pickle doesn't complain
+        globals()[p.__name__] = p
 
         # this makes a namedtuple of all the parameter values
         self.trace = p._make(self.posterior_samples[:-1-j,:])
 
     def compress_chains(self):
+        """
+        Save all MultiNest output files in a zip file, allowing for future restarts.
+        Returns the zip file name.
+        """
         tstr = strftime("%Y%m%d-%H%M%S")
         zfilename = 'chains/nest-out-'+tstr+'.zip'
         nest_output_files = set(glob.glob(self.root+'*')) - set(glob.glob(self.root+'*.zip'))
@@ -1310,25 +1359,67 @@ class MCMC_nest:
         with ZipFile(zfilename, 'a', compression=8) as zf:
             for f in nest_output_files:
                 zf.write(f)
+            # include the namelist used to run MultiNest
             zf.write('OPEN/multinest/namelist1')
 
         msg = blue('INFO: ') + 'Saved output files to %s' % zfilename
         clogger.info(msg)
 
-    def print_best_solution(self):
-        ## output best solution
-        best_ind = np.argmax(self.chains[1, :])
-        par_best = self.chains[2:, best_ind]
-        print # newline
-        msg = yellow('RESULT: ') + 'Best solution is'
+        return zfilename
+
+    def print_best_solution(self, system):
+
+        par_mean, par_sigma, par_mle, par_map = self.par_mean, self.par_sigma, self.par_mle, self.par_map
+
+        msg = yellow('RESULT: ') + 'Parameters summary'
         clogger.info(msg)
+
+        print '%8s %14s %9s %14s %14s' % ('', 'mean', '+- sigma', 'ML', 'MAP')
         ## loop over planets
-        print("%3s %12s %10s %10s %10s %15s %9s" % \
-            ('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
+        i = -1
         for i, planet in enumerate(list(ascii_lowercase)[:self.nplanets]):
-            P, K, ecc, omega, T0, gam = [par_best[j::6] for j in range(6)]
-            print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % 
-                                (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
+            print yellow(planet)
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('P',     par_mean[5*i], par_sigma[5*i], par_mle[5*i], par_map[5*i])
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('K',     par_mean[5*i+1], par_sigma[5*i+1], par_mle[5*i+1], par_map[5*i+1])
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('ecc',   par_mean[5*i+2], par_sigma[5*i+2], par_mle[5*i+2], par_map[5*i+2])
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('omega', par_mean[5*i+3], par_sigma[5*i+3], par_mle[5*i+3], par_map[5*i+3])
+            print '%8s %14.2f %9.2f %14.2f %14.2f' % ('t0',    par_mean[5*i+4], par_sigma[5*i+4], par_mle[5*i+4], par_map[5*i+4])
+        
+            print 
+
+        from .utils import mjup2mearth
+        P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
+        P_error, K_error, ecc_error = par_sigma[5*i], par_sigma[5*i+1], par_sigma[5*i+2]
+
+        try:
+            from uncertainties import ufloat
+            from uncertainties.umath import sqrt
+            P = ufloat(P, P_error)
+            K = ufloat(K, K_error)
+            ecc = ufloat(ecc, ecc_error)
+            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * sqrt(1-ecc**2)
+            m_me = m_mj * mjup2mearth
+
+            print '%8s %11.3f +- %5.3f [MJup]  %11.3f +- %5.3f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
+
+        except ImportError:
+            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
+            m_me = m_mj * mjup2mearth
+
+            print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
+
+        print 
+
+        print yellow('system')
+        if self.context[2] == '2':
+            # jitter parameter
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', self.jitter_mean, self.jitter_sigma, self.jitter_mle, self.jitter_map)
+        if self.context[0] == '1':
+            # in this case, the vsys parameters is the last one
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
+        elif self.context[0] == '2':
+            # in this case, the vsys is before the hyperparameters
+            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
 
     def confidence_intervals(self):
         try:
@@ -1487,7 +1578,7 @@ class MCMC_nest:
         plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        # plt.show()
 
     def do_plot_trace(self, parameter):
         try:
@@ -1509,11 +1600,11 @@ class MCMC_nest:
         plt.plot(t)
         plt.ylabel(self.trace._fields[i])
 
-    def do_plot_map(self, system):
+    def do_plot_map(self, system, legend=True, save=None, oversample=10):
         colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         # tt = system.get_time_to_plot(P=self.par_map[0])
-        tt = system.get_time_to_plot()
+        tt = system.get_time_to_plot(oversample=oversample)
         vel = np.zeros_like(tt)
 
         nobserv = len(system.provenance)  # number of observatories
@@ -1545,11 +1636,11 @@ class MCMC_nest:
 
         newFig=True
         if newFig:
-            plt.figure()
+            fig = plt.figure()
 
         gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
-        ax1 = plt.subplot(gs[0])
-        ax2 = plt.subplot(gs[1], sharex=ax1)
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1], sharex=ax1)
 
         if self.only_vsys:  # systematic velocity only
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
@@ -1569,6 +1660,8 @@ class MCMC_nest:
                 args = [tt] + par + [vel]
             get_rvn(*args)
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
+            # for t in t0:
+            #     ax1.axvline(x=t, color='k', linestyle=':')
 
         # plot GP predictions
         if self.gp:
@@ -1610,12 +1703,17 @@ class MCMC_nest:
         ax2.set_xlabel('Time [days]')
         ax1.set_ylabel('RV [%s]'%system.units)
         ax2.set_ylabel('Residuals [%s]'%system.units)
-        ax1.legend()
-        plt.tight_layout()
-        plt.ticklabel_format(useOffset=False)
-        plt.show()
+        if legend: ax1.legend()
+        fig.tight_layout()
+        # fig.ticklabel_format(useOffset=False)
 
-    def do_plot_map_phased(self, system, noname=False, plot_gp=True):
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            fig.savefig(save)
+
+
+    def do_plot_map_phased(self, system, legend=True, plot_gp=True, save=None):
         # if systematic velocity only, there is nothing to do here
         if self.only_vsys: return
 
@@ -1707,15 +1805,161 @@ class MCMC_nest:
             ax.axhline(y=vsys, ls='--', color='k', alpha=0.3)
 
             ax.set_xlim([-0.2, 1.2])
-            ax.set_xlabel('Phase (P=%5.2f)' % P[planeti])
+            ax.set_xlabel('Phase (P =%5.2f)' % P[planeti])
             ax.set_ylabel('RV [%s]'%system.units)
 
-        if not noname: plt.legend()
+        if legend: plt.legend()
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        plt.show()
+        
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
 
-    def do_hist_plots(self, show_priors=True):
+
+    def do_plot_map_and_ml(self, system, legend=True, save=None):
+        colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
+        t, rv, err = system.time, system.vrad, system.error # temporaries
+        # tt = system.get_time_to_plot(P=self.par_map[0])
+        tt = system.get_time_to_plot()
+        vel_map = np.zeros_like(tt)
+        vel_mle = np.zeros_like(tt)
+
+        nobserv = len(system.provenance)  # number of observatories
+        j = 4 if self.gp else 0
+        if nobserv > 1:
+            map_vsys = self.par_map[-nobserv+1:]
+            mle_vsys = self.par_mle[-nobserv+1:]
+            get_rvn = get_rvn_ms
+        else:
+            map_vsys = self.par_map[-1-j]
+            mle_vsys = self.par_mle[-1-j]
+            get_rvn = get_rvn_os
+
+        ## MAP estimate of the parameters
+        if self.only_vsys:  # systematic velocity only
+            vel_map = self.par_map[0] * np.ones_like(tt)
+        elif self.gp:
+            par_map = self.par_map[:-4] 
+            hyper_map = self.par_map[-4:]
+            if self.gp_only:
+                pred = gp_predictor(t, rv, err, par_map, hyper_map, 'constant')
+            else:
+                pred = gp_predictor(t, rv, err, par_map, hyper_map, 'keplerian')
+        else:
+            par_map = self.par_map
+
+        ## ML estimate of the parameters
+        if self.only_vsys:  # systematic velocity only
+            vel_mle = self.par_mle[0] * np.ones_like(tt)
+        elif self.gp:
+            par_mle = self.par_mle[:-4] 
+            hyper_mle = self.par_mle[-4:]
+            if self.gp_only:
+                pred = gp_predictor(t, rv, err, par_mle, hyper_mle, 'constant')
+            else:
+                pred = gp_predictor(t, rv, err, par_mle, hyper_mle, 'keplerian')
+        else:
+            par_mle = self.par_mle
+
+
+        newFig=True
+        if newFig:
+            fig = plt.figure()
+
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2,1])
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1], sharex=ax1)
+
+        if self.only_vsys:  # systematic velocity only
+            ax1.plot(tt, vel_map, '-g', lw=2.5, label='MAP')
+            ax1.plot(tt, vel_mle, '--r', lw=2.5, label='ML')
+        elif not self.gp_only:
+            # plot best solution
+            map_P = par_map[:-1:5]
+            map_K = par_map[1:-1:5]
+            map_ecc = par_map[2:-1:5]
+            map_omega = par_map[3:-1:5]
+            map_t0 = par_map[4:-1:5]
+            par = [map_P, map_K, map_ecc, map_omega, map_t0, map_vsys]
+
+            if nobserv > 1:
+                observ = np.ones_like(vel_map)
+                args = [tt] + par + [observ] + [vel_map]
+            else:
+                args = [tt] + par + [vel_map]
+            get_rvn(*args)
+            ax1.plot(tt, vel_map, '-g', lw=2.5, label='MAP')
+
+            mle_P = par_mle[:-1:5]
+            mle_K = par_mle[1:-1:5]
+            mle_ecc = par_mle[2:-1:5]
+            mle_omega = par_mle[3:-1:5]
+            mle_t0 = par_mle[4:-1:5]
+            par = [mle_P, mle_K, mle_ecc, mle_omega, mle_t0, mle_vsys]
+
+            if nobserv > 1:
+                observ = np.ones_like(vel_mle)
+                args = [tt] + par + [observ] + [vel_mle]
+            else:
+                args = [tt] + par + [vel_mle]
+            get_rvn(*args)
+            ax1.plot(tt, vel_mle, '--r', lw=2.5, label='ML')
+
+
+
+        # plot GP predictions
+        if self.gp:
+            ax1.plot(self.pred_t, self.pred_y, '-k', lw=1.5, label='GP mean')
+            ax1.fill_between(self.pred_t, y1=self.pred_y-2*self.pred_std, y2=self.pred_y+2*self.pred_std,
+                                          color='k', alpha=0.3, label='2*std')
+
+        vel = np.zeros_like(t)
+        if self.gp_only or self.only_vsys:
+            vel = self.par_map[0] * np.ones_like(tt)
+        else:
+            args = [t] + par + [vel]
+            get_rvn(*args)
+
+        for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+
+            # plot each files' values
+            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
+            # plot residuals
+            if self.gp:
+                ax2.errorbar(t[:m], rv[:m]-pred[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+            else:
+                ax2.errorbar(t[:m], rv[:m]-vel[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+
+            t, rv, err = t[m:], rv[m:], err[m:]
+
+
+        # plot systematic velocity
+        ax1.axhline(y=map_vsys, ls='--', color='k', alpha=0.3)
+
+        ax2.set_xlabel('Time [days]')
+        ax1.set_ylabel('RV [%s]'%system.units)
+        ax2.set_ylabel('Residuals [%s]'%system.units)
+        if legend: ax1.legend()
+        fig.tight_layout()
+        # fig.ticklabel_format(useOffset=False)
+
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            fig.savefig(save)
+
+
+    def do_hist_plots(self, show_priors=True, save=None):
         try:
             self.trace
         except AttributeError:
@@ -1726,7 +1970,7 @@ class MCMC_nest:
 
         if show_priors: 
             from .prior_funcs import uniform, jeffreys, modjeffreys, beta
-            print 
+            # print 
             # msg = blue('INFO: ') + 'Plotting logP. prior(P)=Jeffreys, prior(logP)=Uniform'
             # clogger.info(msg)
 
@@ -1801,7 +2045,11 @@ class MCMC_nest:
 
 
         plt.tight_layout()
-        plt.show()
+
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
 
     def do_triangle_plot(self, planet='both'):
         """

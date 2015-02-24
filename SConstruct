@@ -55,4 +55,6 @@ else:
 	print "Try cloning the MultiNest submodule:\n$ git submodule init\n$ git submodule update"
 	Exit(1)
 
+
 SConscript(['RJDNest3/SConscript'])
+
