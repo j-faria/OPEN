@@ -7,7 +7,7 @@
     ! additional information to pass to low-level routines
     ! we use this to set the problem
     ! nob is the number of observatories
-    nest_context = 102
+    nest_context = 112
     ! nest_context has three numbers: xyz
     !         x=1 "normal" regression, x=2 gaussian process regression, x=3 gaussian process without planets
     !         y= number of planets in the model
@@ -37,16 +37,16 @@
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
     !iterations or convergence criterion has been satisfied
-    nest_maxIter=1000
+    nest_maxIter=100000
     
     !feedback on the sampling progress?
-    nest_fb=.false.
+    nest_fb=.true.
 
     !feedback on current MAP parameters?
-    nest_MAPfb=.false.
+    nest_MAPfb=.true.
 
     !live plot?
-    nest_liveplot=.true.
+    nest_liveplot=.false.
 
 
     !train the gaussian process beforehand (only effective if nest_context = 2yz)
