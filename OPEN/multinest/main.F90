@@ -240,13 +240,14 @@ program main
 		!! Period, Jeffreys, 0.2d - 365000d
 		spriorran(i,1)= 0.2d0 !0.2d0
 		!spriorran(i,2)= 365000d0 !365000.d0
-        spriorran(i,2)= 4.*(maxval(times) - minval(times)) ! don't look for periods longer than 4*timespan
+        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than 1*timespan
 
 		!! semi amplitude K, Mod. Jeffreys
-		spriorran(i+1,1)=1.d0
-        !spriorran(i+1,2)= maxval(rvs) - minval(rvs)
+! 		spriorran(i+1,1)=1.d0
+        spriorran(i+1,1)=0.d0
+        spriorran(i+1,2)= maxval(rvs) - minval(rvs)
 		! the true upper limit depends on e and P, and it will only be set when rescaling.
-		spriorran(i+1,2)=kmax 
+		!spriorran(i+1,2)=kmax 
         !spriorran(i+1,2)=30.d0
         ! when the data is in km/s
         !spriorran(i+1,1) = 0.001d0  ! 1 m/s
@@ -254,7 +255,7 @@ program main
 
 		!! eccentricity, Uniform, 0-1
 ! 		spriorran(i+2,1)=0d0
-! 		spriorran(i+2,2)=1d0
+! 		spriorran(i+2,2)=0d0
         !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
         spriorran(i+2,1)=0.867d0
         spriorran(i+2,2)=3.03d0
@@ -267,6 +268,8 @@ program main
 		!! chi, Uniform, 
 		spriorran(i+4,1)= minval(times)
 		spriorran(i+4,2)= spriorran(5,1) + spriorran(1,2)
+!         spriorran(i+4,1)=2453988.24856
+!         spriorran(i+4,2)=2453988.24896
 	end do
 
 	if (using_jitter) then
