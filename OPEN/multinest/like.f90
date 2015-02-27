@@ -54,11 +54,9 @@ contains
 		character(len=100) :: fmt
 
 		! times, rvs and errors are defined in params and initialized/read in main
-		! Cube(1:nest_nPar) = P, K, ecc, omega, t0, Vsys
-		!write(*,*) Cube(3)
- 		ss = 1.d0
- 		alpha = 1.d0
- 		tau = 1.d0
+ 		ss = 0.d0
+!  		alpha = 1.d0
+!  		tau = 1.d0
 
  		if (using_gp) then
 			!call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
@@ -93,6 +91,14 @@ contains
  		n = size(times)
  		slhood=-huge(1.d0)*epsilon(1.d0)
 
+!  		write(*,'(f10.3, i3)') (rvs(i), observ(i), i=1,n)
+ 		iendpar = nest_nPar-nobserv
+	    do i=1,nobserv
+	      where(observ == i) vel = Cube(iendpar+i)
+	    end do
+
+! 	    stop
+
  		! get the radial velocity model with these parameters (in vel)
  		if (nplanets > 0) then
  			! this works for one observatory using OPEN/ext/get_rvN.f90
@@ -102,28 +108,31 @@ contains
 						 Cube(3:nest_nPar-1:5), & ! ecc for all planets
 						 Cube(4:nest_nPar-1:5), & ! omega for all planets
 						 Cube(5:nest_nPar-1:5), & ! t0 for all planets
-						 Cube(nest_nPar), & ! systematic velocity
+						 0.d0, & ! systematic velocity
 						 vel, n, nplanets)
 
 			! this works from more than one observatory using OPEN/ext/get_rvN_MultiSite.f90
 			! well not just yet
-		!	iendpar = nest_nPar - nobserv
-		!	call get_rvN(times, &
-		!				 Cube(1:iendpar:5), & ! periods for all planets
-		!				 Cube(2:iendpar:5), & ! K for all planets
-		!				 Cube(3:iendpar:5), & ! ecc for all planets
-		!				 Cube(4:iendpar:5), & ! omega for all planets
-		!				 Cube(5:iendpar:5), & ! t0 for all planets
-		!				 Cube(iendpar+1:), & ! systematic velocity
-		!				 observ, & ! array with observatory indices
-		!				 vel, n, nplanets, nobserv)
+			
+! 			call get_rvN(times, &
+! 						 Cube(1:iendpar:5), & ! periods for all planets
+! 						 Cube(2:iendpar:5), & ! K for all planets
+! 						 Cube(3:iendpar:5), & ! ecc for all planets
+! 						 Cube(4:iendpar:5), & ! omega for all planets
+! 						 Cube(5:iendpar:5), & ! t0 for all planets
+! 						 Cube(iendpar+1:), & ! systematic velocity(ies)
+! 						 observ, & ! array with observatory indices
+! 						 vel, n, nplanets, nobserv)
 
 			! this doesn't work...
 	    	!call get_rvN(times, &
 	    	!           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
 	    	!           Cube(6), vel, n, nplanets)
 		else
-			vel = Cube(nest_nPar)
+ 			iendpar = nest_nPar-nobserv
+	    	do i=1,nobserv
+	      		where(observ == i) vel = Cube(iendpar+i)
+	    	end do
 		end if
 
 	    dist = rvs - vel
@@ -133,8 +142,10 @@ contains
 	    !lhood = lhood_test(1,1) - 0.5d0*log(twopi**n * det)
 
 		if (using_jitter) then
-	    	jitter = Cube(nest_nPar-1)
+	    	jitter = Cube(nest_nPar-nextra+1)
 	    	sigma = errors**2 + jitter**2
+! 	    	print *, jitter
+! 	    	print *, sigma
 	    	!lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * dist**2 / sigma)
 	    	lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(dist**2 / sigma)
 	    else

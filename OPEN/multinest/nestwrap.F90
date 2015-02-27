@@ -57,16 +57,15 @@ contains
 		double precision kmax
 		integer i, j
 		
-
 		! Transform parameters to physical space using assigned priors
-		! Cube(1:nPar) = P, K, ecc, omega, t0  for each planet     |
-		!				 jitter at the next to last position	   | - if jitter model				
-		!                vsys at the last position                 |
+		! Cube(1:nPar) = P, K, ecc, omega, t0  for each planet             |
+		!				 jitter at the next to last position	           | - if jitter model				
+		!                vsys for each observatory at the last positions   |
 		!
 		! Cube(1:nPar) = P, K, ecc, omega, t0  for each planet						|
 		!				 vsys for each observatory at the next to last positions	| - if GP model				
 		!                hyperparameters at the last positions						|
-		
+
 		if (using_jitter) then
 			! prior for jitter
 			i = nPar-nextra+1 ! index of jitter parameter
@@ -74,12 +73,13 @@ contains
 			!Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 
 			! prior for systematic velocity
-			i = npar-nextra+2 ! index of systematic velocity
-			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))			
+			i = npar-nextra+2 ! index of (first) systematic velocity
+			Cube(i:) = UniformPrior(Cube(i:), spriorran(i:,1), spriorran(i:,2))			
 
 		else if (using_gp) then
 			! prior for systematic velocity
 			i = nPar-nextra+1 
+			!!!! this needs to be fixed for more than 1 observatory !!!!
 			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 
 			! prior for hyperparameters
@@ -90,9 +90,8 @@ contains
 
 		else
 			! prior for systematic velocity
-			i = npar-nextra+1 ! index of systematic velocity
-			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			!Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2))
+			i = npar-nextra+1 ! index of (first) systematic velocity
+			Cube(i:) = UniformPrior(Cube(i:), spriorran(i:,1), spriorran(i:,2))
 		end if
 
 
@@ -146,14 +145,16 @@ contains
 
 ! 		! this is experimental !!!!!!!!!!!
 ! 		! and it doesn't seem to solve the problem...
-! 		if (nplanets == 2) then
-! 			if (Cube(1) > Cube(6)) then
-! 				call swap(Cube(1:5), Cube(6:10))
-! 			end if
-! 		end if
+		if (nplanets == 2) then
+			if (Cube(1) > Cube(6)) then
+				call swap(Cube(1:5), Cube(6:10))
+			end if
+		end if
 
+! 		print *, Cube
 		!call loglike function here 
 		call slikelihood(Cube,lnew,context)
+! 		stop
 
 	end subroutine getLogLike
 
@@ -223,7 +224,7 @@ contains
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+5)
-			write(fmt,'(a,i2,a)')  '(',7,'f13.4)'
+			write(fmt,'(a,i2,a)')  '(',nPar-5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+6:nPar*4)
 
 		else if (nplanets == 2) then  ! 2 planets
@@ -268,7 +269,7 @@ contains
 
 		else if (nplanets == 0 .and. using_jitter) then  ! jitter + vsys
 			write(*,'(2a13)') (/"    s", " vsys" /)
-			write(fmt,'(a,i2,a)')  '(', 2, 'f13.4)'
+			write(fmt,'(a,i2,a)')  '(', 1+nobserv, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:)
 
 		else if (nplanets == 0) then  ! one systematic velocity
