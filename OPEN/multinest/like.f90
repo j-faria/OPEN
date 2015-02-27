@@ -10,6 +10,7 @@ module like
   
 	real(kind=8), parameter :: pi = 3.1415926535897932384626433832795029d0
 	real(kind=8), parameter :: twopi = 2.d0 * pi 
+	real(kind=8), parameter :: lntwopi = log(twopi)
 	real(kind=8), parameter :: lnstwopi = log(sqrt(twopi))
 
 
@@ -134,8 +135,8 @@ contains
 	      		where(observ == i) vel = Cube(iendpar+i)
 	    	end do
 		end if
-
 	    dist = rvs - vel
+!  	    print *, dist
 	    !call get_covmat(times, errors, observ, ss, alpha, tau, covmat, det, inv_covmat)
 
 	    !lhood_test = -0.5d0 * matmul(matmul(reshape(dist, (/1,n/)), covmat), reshape(dist, (/n,1/)))
@@ -147,16 +148,19 @@ contains
 ! 	    	print *, jitter
 ! 	    	print *, sigma
 	    	!lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * dist**2 / sigma)
-	    	lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(dist**2 / sigma)
+	    	lhood = -0.5d0*n*lntwopi - n*sum(log(sqrt(sigma))) -0.5d0*sum(dist**2 / sigma)
+! 	    	print *, lhood
+! 	    	lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(dist**2 / sigma)
+! 	    	print *, lhood
 	    else
 			lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
 	    end if
 
-! 	    print *, slhood, lhood, product(sqrt(sigma))
+!  	    print *, slhood, lhood, product(sqrt(sigma)), sum(dist**2 / sigma)
 		slhood = logSumExp(slhood,lhood)
 		!print *, Cube(1:nest_nPar)
 ! 		print*, slhood
-		!stop
+! 		stop
 		if (doing_debug) write(*,'(f8.3)', advance='no') slhood
 
 	end subroutine slikelihood
