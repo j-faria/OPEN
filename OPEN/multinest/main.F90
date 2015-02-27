@@ -1,28 +1,28 @@
 program main
 
-	use params
-	use nestwrapper
-	use like
+    use params
+    use nestwrapper
+    use like
 
-	use strings
-	use gputils
+    use strings
+    use gputils
     use array_utils, only: linspace
 
-	implicit none
+    implicit none
 
-	integer i
-	integer :: iou, ierr
+    integer i
+    integer :: iou, ierr
     integer :: PGOPEN
-	integer :: n
-	character(len=40) line
-	character(len=1) delim
-	character(len=5), dimension(10) :: args
+    integer :: n
+    character(len=40) line
+    character(len=1) delim
+    character(len=5), dimension(10) :: args
     character(len=100) :: fmt
-	integer :: nargs, k, ind1, ind2
-	integer, dimension(:), allocatable :: n_each_observ
+    integer :: nargs, k, ind1, ind2
+    integer, dimension(:), allocatable :: n_each_observ
 
-	real(kind=8), parameter :: kmax = 2129d0 ! m/s
-	real(kind=8), dimension(6) :: a
+    real(kind=8), parameter :: kmax = 2129d0 ! m/s
+    real(kind=8), dimension(6) :: a
 
     namelist /NEST_parameters/ sdim, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &
@@ -72,59 +72,59 @@ program main
 !        (nest_context == 112 .and. sdim < 7) .or. &
 !        (nest_context == 121 .and. sdim < 11) .or. &
 !        (nest_context == 122 .and. sdim < 12) ) then
-!		stop 'Conflict between "sdim" and "nest_context"'
+!        stop 'Conflict between "sdim" and "nest_context"'
 !    end if
 
     if (mod(nest_context, 10) == 2) then
-    	if (nest_context / 100 == 2) then
+        if (nest_context / 100 == 2) then
 #ifdef MPI
-    		call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-    		if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
-    		call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-    		call MPI_ABORT(MPI_COMM_WORLD,1)
+            call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+            if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
+            call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+            call MPI_ABORT(MPI_COMM_WORLD,1)
 #else
             stop '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
 #endif
-    	end if
-    	using_jitter = .true.
-    	nextra = 1
+        end if
+        using_jitter = .true.
+        nextra = 1
     else
-    	using_jitter = .false.
-    	nextra = 0
-    	if (nest_context / 100 == 2 .or. nest_context / 100 == 3) then
+        using_jitter = .false.
+        nextra = 0
+        if (nest_context / 100 == 2 .or. nest_context / 100 == 3) then
             ! if 2, using GP plus planets; if 3, using GP only, without planets
-    		using_gp = .true.
-    		nextra = 4  ! hyperparameters of GP
-    	end if
+            using_gp = .true.
+            nextra = 4  ! hyperparameters of GP
+        end if
     end if
 
-	!doing debug?
-	doing_debug = .false.
+    !doing debug?
+    doing_debug = .false.
 
 
-	!! load data
-	open(unit=15, file='input.rv', status="old")
-	read(15, *) line ! header
+    !! load data
+    open(unit=15, file='input.rv', status="old")
+    read(15, *) line ! header
 
-	read(15, '(a)') line
-	line = trim(line(index(line, "#")+1:))
-	read(line, *) nobserv ! number of observatories
+    read(15, '(a)') line
+    line = trim(line(index(line, "#")+1:))
+    read(line, *) nobserv ! number of observatories
     if (nobserv < 1) stop 'Error parsing input file (1)'
 
-	allocate(n_each_observ(nobserv)) ! number of measurements in each observatory
-	read(15, '(a)') line
-	line = trim(line(index(line, "#")+1:)) ! remove the #
-	delim = ' '
-	call parse(line, delim, args, nargs) ! split whitespaces
-	if (nargs /= nobserv) stop 'Error parsing input file (2)'
-	do k=1, nargs
-		read( args(k), '(i5)' ) n_each_observ(k) ! store
-	end do
+    allocate(n_each_observ(nobserv)) ! number of measurements in each observatory
+    read(15, '(a)') line
+    line = trim(line(index(line, "#")+1:)) ! remove the #
+    delim = ' '
+    call parse(line, delim, args, nargs) ! split whitespaces
+    if (nargs /= nobserv) stop 'Error parsing input file (2)'
+    do k=1, nargs
+        read( args(k), '(i5)' ) n_each_observ(k) ! store
+    end do
 
-	read(15, '(a)') line
-	line = trim(line(index(line, "#")+1:))
-	read(line, *) n  ! total number of measurements
-	if (n /= sum(n_each_observ)) stop 'Error parsing input file (3)'
+    read(15, '(a)') line
+    line = trim(line(index(line, "#")+1:))
+    read(line, *) n  ! total number of measurements
+    if (n /= sum(n_each_observ)) stop 'Error parsing input file (3)'
 
 
     !! some parameters and allocations depend on the ones set on the namelist / input file
@@ -143,8 +143,8 @@ program main
     end if
 
 
-	!! initialize data size dependant variables
-	call likelihood_init(n)
+    !! initialize data size dependant variables
+    call likelihood_init(n)
 
     !include linear dependences in the model
     if (lin_dep) then
@@ -160,7 +160,7 @@ program main
             allocate(linvar3(n))
         end if
     end if
-	
+    
     do i = 1, n
         if (lin_dep) then
             if (n_lin_dep == 1) read(15, *) times(i), rvs(i), errors(i), linvar1(i)
@@ -184,14 +184,14 @@ program main
 
 
     if (nobserv == 1) then ! if only one observatory, observ is always 1
-    	observ = 1
+        observ = 1
     else ! else it takes a different value for each observatory
-    	observ(1:n_each_observ(1)) = 1
-    	do i = 1, nobserv-1
-    		ind1 = sum(n_each_observ(:i))
-    		ind2 = sum(n_each_observ(:i+1))
-    		observ(ind1+1:ind2) = i+1
-    	end do
+        observ(1:n_each_observ(1)) = 1
+        do i = 1, nobserv-1
+            ind1 = sum(n_each_observ(:i))
+            ind2 = sum(n_each_observ(:i+1))
+            observ(ind1+1:ind2) = i+1
+        end do
     end if
 
 #ifdef PLOT 
@@ -203,10 +203,10 @@ program main
     !! initialize the GP "object"
     if (using_gp) then
         !write(*,*) 'Using Gaussian Process model'
-    	!k3 = DiagonalKernel((/1.d0/))
-    	!kernel_to_pass => k3
-    	k5 = ExpSquaredKernel((/ 1.d0 /))
-    	!kernel_to_pass => k5
+        !k3 = DiagonalKernel((/1.d0/))
+        !kernel_to_pass => k3
+        k5 = ExpSquaredKernel((/ 1.d0 /))
+        !kernel_to_pass => k5
         k6 = ExpSineSquaredKernel((/ 1.d0, 25.d0 /))
 
         k8 = ProductKernels((/1.d0, 1.d0 /))
@@ -214,7 +214,7 @@ program main
         k8%kernel2 => k6
         kernel_to_pass => k8
 
-    	gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
+        gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
         if (nest_context / 100 == 2) then
             gp1%mean_fun => mean_fun_keplerian
             print *, 'Setting Keplerian mean function'
@@ -222,8 +222,8 @@ program main
             gp1%mean_fun => mean_fun_constant
         endif
         !print *, gp1%gp_kernel%pars
-		gp_n_planets = nplanets
-		gp_n_planet_pars = 5*nplanets + nobserv
+        gp_n_planets = nplanets
+        gp_n_planet_pars = 5*nplanets + nobserv
     end if
 
     !! extra parameters are systematic velocities for each observatory 
@@ -231,62 +231,62 @@ program main
     nextra = nextra + nobserv
 
 
-	!no parameters to wrap around
-	nest_pWrap = 0
-	
-	! here we set prior limits, 
-	! the mathematical form is only used when rescaling
-	do i = 1, sdim-nextra, 5
-		!! Period, Jeffreys, 0.2d - 365000d
-		spriorran(i,1)= 0.2d0 !0.2d0
-		!spriorran(i,2)= 365000d0 !365000.d0
-        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than 1*timespan
+    !no parameters to wrap around
+    nest_pWrap = 0
+    
+    ! here we set prior limits, 
+    ! the mathematical form is only used when rescaling
+    do i = 1, sdim-nextra, 5
+        !! Period, Jeffreys, 0.2d - 365000d
+        spriorran(i,1)= 0.2d0
+        !spriorran(i,2)= 365000d0
+        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
 
-		!! semi amplitude K, Mod. Jeffreys
-! 		spriorran(i+1,1)=1.d0
+!         spriorran(i,1)= 1500.d0
+!         spriorran(i,2)= 1900.d0
+
+        !! semi amplitude K, Mod. Jeffreys (or Uniform)
         spriorran(i+1,1)=0.d0
+!         spriorran(i+1,1)=1.d0
         spriorran(i+1,2)= maxval(rvs) - minval(rvs)
-		! the true upper limit depends on e and P, and it will only be set when rescaling.
-		!spriorran(i+1,2)=kmax 
+        ! the true upper limit depends on e and P, and it will only be set when rescaling.
+        !spriorran(i+1,2)=kmax 
         !spriorran(i+1,2)=30.d0
-        ! when the data is in km/s
-        !spriorran(i+1,1) = 0.001d0  ! 1 m/s
-        !spriorran(i+1,2) = kmax * 1d-3
 
-		!! eccentricity, Uniform, 0-1
-! 		spriorran(i+2,1)=0d0
-! 		spriorran(i+2,2)=0d0
+        !! eccentricity, Uniform, 0-1
+!         spriorran(i+2,1)=0d0
+!         spriorran(i+2,2)=1d0
         !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
         spriorran(i+2,1)=0.867d0
         spriorran(i+2,2)=3.03d0
 
-		!! long. periastron, Uniform, 0-2pi rad
-		spriorran(i+3,1)=0d0
-		spriorran(i+3,2)=twopi
-        !nest_pWrap(i+3) = 1  ! wrap around this parameter
+        !! long. periastron, Uniform, 0-2pi rad
+        spriorran(i+3,1)=0d0
+        spriorran(i+3,2)=twopi
+        nest_pWrap(i+3) = 1  ! wrap around this parameter
 
-		!! chi, Uniform, 
-		spriorran(i+4,1)= minval(times)
-		spriorran(i+4,2)= spriorran(5,1) + spriorran(1,2)
+        !! chi, Uniform, 
+        spriorran(i+4,1)= minval(times)
+        spriorran(i+4,2)= spriorran(5,1) + spriorran(1,2)
 !         spriorran(i+4,1)=2453988.24856
 !         spriorran(i+4,2)=2453988.24896
-	end do
+    end do
 
-	if (using_jitter) then
+    if (using_jitter) then
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], jitter, vsys_obs1, [vsys_obs2]
-		i = sdim-nextra+1 ! index of jitter parameter
-		spriorran(i,1)= 1d0
-		spriorran(i,2)= kmax
+        i = sdim-nextra+1 ! index of jitter parameter
+        spriorran(i,1)= 1d0
+        spriorran(i,2)= kmax
         ! when data is in km/s
 !         spriorran(i,1)= 0.001d0
 !         spriorran(i,2)= kmax * 1d-3
         
 
-		!! systematic velocity(ies), Uniform, -kmax - kmax
-		i = sdim-nextra+2 
-		spriorran(i:,1)= -kmax
-		spriorran(i:,2)= kmax
+        !! systematic velocity(ies), Uniform, -kmax - kmax
+        i = sdim-nextra+2 
+        spriorran(i:,1)= -kmax/100.d0
+        spriorran(i:,2)= kmax/100.d0
 
     else if (using_gp) then
     ! parameter array organization in this case:
@@ -330,15 +330,15 @@ program main
             spriorran(i+3,2)= 10d0
         end if
         
-	else
+    else
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2]
-		!! systematic velocity(ies), Uniform, -kmax - kmax
-		i = sdim-nextra+1
-		spriorran(i:,1)= -500.d0
-		spriorran(i:,2)= 500.d0
+        !! systematic velocity(ies), Uniform, -kmax - kmax
+        i = sdim-nextra+1
+        spriorran(i:,1)= -500.d0
+        spriorran(i:,2)= 500.d0
 
-	end if	
+    end if    
 
 !    call MPI_INIT(ierr)
 !    call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
@@ -351,14 +351,14 @@ program main
 !    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
 !    print *, training, trained_parameters
-! 	stop "we have to stop here"
+!     stop "we have to stop here"
 
-   	call nest_Sample
+       call nest_Sample
 
-   	! deallocate memory
-   	!call nullify(kernel_to_pass)
-   	deallocate(n_each_observ)
-   	call likelihood_finish
+       ! deallocate memory
+       !call nullify(kernel_to_pass)
+       deallocate(n_each_observ)
+       call likelihood_finish
 
 #ifdef PLOT 
     if (nest_liveplot) then
