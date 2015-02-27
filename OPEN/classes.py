@@ -210,7 +210,7 @@ class rvSeries:
 
             
 
-    def do_plot_obs(self, newFig=True, leg=True, save=None):
+    def do_plot_obs(self, newFig=True, leg=True, save=None, offsets=None):
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled.
         """
@@ -231,6 +231,10 @@ class rvSeries:
         ax2.plot(years, np.ones_like(years), alpha=0) # Create a dummy plot
 
         # plot each files' values
+        if offsets:
+            assert isinstance(offsets, list)
+            assert len(offsets) == len(self.provenance)
+
         for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
             m = n-nout # how many values are there after restriction
             
@@ -240,7 +244,8 @@ class rvSeries:
                                 # pen={'color': 0.8, 'width': 2})
             # p.addItem(e)
             # p.plot(t[:m], rv[:m], symbol='o')
-            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], \
+            offs = offsets[i] if offsets else 0.
+            ax1.errorbar(t[:m], rv[:m]+offs, yerr=err[:m], \
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
