@@ -154,7 +154,8 @@ contains
 !             lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(dist**2 / sigma)
 !             print *, lhood
         else
-            lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
+        	lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(dist**2 / errors**2)
+!             lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
         end if
 
 !          print *, slhood, lhood, product(sqrt(sigma)), sum(dist**2 / sigma)
