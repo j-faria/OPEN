@@ -31,8 +31,8 @@ from .utils import unique, get_tt
 from .logger import clogger, logging
 from shell_colors import yellow, blue
 from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
-from ext.get_rvN import get_rvn as get_rvn_os
-from ext.get_rvN_MultiSite import get_rvn as get_rvn_ms
+from ext.get_rvN import get_rvn
+# from ext.get_rvN_MultiSite import get_rvn as get_rvn_ms
 from ext.gp import gp_predictor
 from ext.julian import caldat
 
@@ -1257,6 +1257,18 @@ class MCMC_nest:
             if context[0] == '3': 
                 self.gp_only = True
 
+        if self.context[2] == '2':  # model with jitter
+            self.jitter = True
+        else:
+            self.jitter = False
+
+        # number of planets (this is set in the namelist so it should be bullet-proof)
+        self.nplanets = int(context[1])
+        # number of obervatories (we avoid reading the input.rv file)
+        self.nobserv = self.npar - 5*self.nplanets # subtract planets' parameters
+        if self.jitter: self.nobserv -= 1 # subtract jitter parameter
+        if self.gp: self.nobserv -= 4 # subtract hyperparameters (assumed 4 for now)
+
         self.read_stats_file()
 
     def read_stats_file(self):
@@ -1267,13 +1279,13 @@ class MCMC_nest:
             stats = f.readlines()
 
         npar = self.npar
-        if self.gp:
-            self.nplanets = (npar-4)/5
-        elif self.gp and (npar == 5): 
-            self.nplanets = 0
-            self.gp_only = True
-        else:
-            self.nplanets = npar/5
+        # if self.gp:
+        #     self.nplanets = (npar-4)/5
+        # elif self.gp and (npar == 5): 
+        #     self.nplanets = 0
+        #     self.gp_only = True
+        # else:
+        #     self.nplanets = npar/5
         
 
         try:
@@ -1303,17 +1315,17 @@ class MCMC_nest:
         self.par_map = [float(s.split()[1]) for s in stats[start:end]]
         # P_map, K_map, ecc_map, omega_map, t0_map, vsys_map = par_map
 
-        self.jitter = False
-        if self.context[2] == '2':  # model with jitter
-            self.jitter = True
-            self.jitter_map = self.par_map.pop(-2)
-            self.jitter_mle = self.par_mle.pop(-2)
-            self.jitter_mean = self.par_mean.pop(-2)
-            self.jitter_sigma = self.par_sigma.pop(-2)
+        if self.jitter:
+            i = -self.nobserv-1
+            self.jitter_map = self.par_map.pop(i)
+            self.jitter_mle = self.par_mle.pop(i)
+            self.jitter_mean = self.par_mean.pop(i)
+            self.jitter_sigma = self.par_sigma.pop(i)
 
 
         self.only_vsys = False
-        if self.npar == 1 or len(self.par_map) == 1:  # systematic velocity only
+        j = 1 if self.jitter else 0
+        if self.npar-j == self.nobserv:  # systematic velocity only
             self.only_vsys = True
 
     def read_gp_file(self):
@@ -1392,39 +1404,42 @@ class MCMC_nest:
         
             print 
 
-        from .utils import mjup2mearth
-        P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
-        P_error, K_error, ecc_error = par_sigma[5*i], par_sigma[5*i+1], par_sigma[5*i+2]
+            from .utils import mjup2mearth
+            P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
+            P_error, K_error, ecc_error = par_sigma[5*i], par_sigma[5*i+1], par_sigma[5*i+2]
 
-        try:
-            from uncertainties import ufloat
-            from uncertainties.umath import sqrt
-            P = ufloat(P, P_error)
-            K = ufloat(K, K_error)
-            ecc = ufloat(ecc, ecc_error)
-            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * sqrt(1-ecc**2)
-            m_me = m_mj * mjup2mearth
+            try:
+                from uncertainties import ufloat
+                from uncertainties.umath import sqrt
+                P = ufloat(P, P_error)
+                K = ufloat(K, K_error)
+                ecc = ufloat(ecc, ecc_error)
+                m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * sqrt(1-ecc**2)
+                m_me = m_mj * mjup2mearth
 
-            print '%8s %11.3f +- %5.3f [MJup]  %11.3f +- %5.3f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
+                print '%8s %11.3f +- %5.3f [MJup]  %11.3f +- %5.3f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
 
-        except ImportError:
-            m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
-            m_me = m_mj * mjup2mearth
+            except ImportError:
+                m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
+                m_me = m_mj * mjup2mearth
 
-            print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
+                print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
 
-        print 
+            print 
 
         print yellow('system')
-        if self.context[2] == '2':
+        if self.jitter:
             # jitter parameter
             print '%8s %14.3f %9.3f %14.3f %14.3f' % ('jitter', self.jitter_mean, self.jitter_sigma, self.jitter_mle, self.jitter_map)
-        if self.context[0] == '1':
-            # in this case, the vsys parameters is the last one
-            print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[-1], par_sigma[-1], par_mle[-1], par_map[-1])
-        elif self.context[0] == '2':
+        if self.gp:
             # in this case, the vsys is before the hyperparameters
             print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
+        else:
+            # in this case, the vsys parameters are the last ones
+            nobs = self.nobserv
+            for i in range(nobs):
+                j = -nobs+i
+                print '%8s %14.3f %9.3f %14.3f %14.3f' % ('offs'+str(i+1), par_mean[j], par_sigma[j], par_mle[j], par_map[j])
 
     def confidence_intervals(self):
         try:
@@ -1446,17 +1461,22 @@ class MCMC_nest:
         
         t, rv, err = system.time, system.vrad, system.error # temporaries
         vel = np.zeros_like(t)
+        
+        # if only one observatory, observ is always 1
+        observ = np.ones_like(vel, dtype=int)
+        # else it takes a different integer value for each observatory
+        if self.nobserv > 1:
+            n_each_observ = [v[0] for v in system.provenance.values()]
+            chunks = np.split(observ, np.cumsum(n_each_observ))[:-1]
+            for i in range(self.nobserv):
+                chunks[i] = chunks[i] * (i+1)
 
-        nobserv = len(system.provenance)  # number of observatories
-        if nobserv > 1:
-            vsys = self.par_map[-nobserv+1:]
-            get_rvn = get_rvn_ms
+            observ = np.concatenate(chunks)
+
+        if self.nobserv > 1:
+            vsys = self.par_map[-self.nobserv:]
         else:
-            vsys = self.par_map[-1]
-            get_rvn = get_rvn_os
-
-        if self.only_vsys:  # systematic velocity only
-            vel = self.par_map[0]
+            vsys = self.par_map[-1] # this doesn't always work
 
         ## MAP estimate of the parameters
         if self.gp and not self.only_vsys:
@@ -1469,16 +1489,24 @@ class MCMC_nest:
         elif not self.only_vsys:
             par_map = self.par_map
 
-            P = par_map[:-1:5]
-            K = par_map[1:-1:5]
-            ecc = par_map[2:-1:5]
-            omega = par_map[3:-1:5]
-            t0 = par_map[4:-1:5]
-            par = [P, K, ecc, omega, t0, vsys]
+            # only planet(s)' parameters
+            planets_par_map = par_map[:-self.nobserv]
+
+            P = planets_par_map[::5]
+            K = planets_par_map[1::5]
+            ecc = planets_par_map[2::5]
+            omega = planets_par_map[3::5]
+            t0 = planets_par_map[4::5]
+            # vsys goes as 0. into get_rvn
+            par = [P, K, ecc, omega, t0, 0.]
 
             args = [t] + par + [vel]
             get_rvn(*args)
 
+        # we add the velocity offsets here
+        for i in range(self.nobserv):
+            ind = np.where(observ==(i+1))[0]
+            vel[ind] += vsys[i]
 
         system.fit['params'] = self.par_map
         system.fit['residuals'] = system.vrad - vel
@@ -1606,30 +1634,39 @@ class MCMC_nest:
         plt.ylabel(self.trace._fields[i])
 
     def do_plot_map(self, system, legend=True, save=None, oversample=10):
-        colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
         # tt = system.get_time_to_plot(P=self.par_map[0])
         tt = system.get_time_to_plot(oversample=oversample)
         vel = np.zeros_like(tt)
+        velt = np.zeros_like(t)
 
-        nobserv = len(system.provenance)  # number of observatories
+        # if only one observatory, observ is always 1
+        observ = np.ones_like(velt, dtype=int)
+        # else it takes a different integer value for each observatory
+        if self.nobserv > 1:
+            n_each_observ = [v[0] for v in system.provenance.values()]
+            chunks = np.split(observ, np.cumsum(n_each_observ))[:-1]
+            for i in range(self.nobserv):
+                chunks[i] = chunks[i] * (i+1)
+
+            observ = np.concatenate(chunks)
+
         j = 4 if self.gp else 0
-        if nobserv > 1:
-            vsys = self.par_map[-nobserv+1:]
-            get_rvn = get_rvn_ms
+        if self.nobserv > 1:
+            vsys = self.par_map[-self.nobserv:]
         else:
             vsys = self.par_map[-1-j]
-            get_rvn = get_rvn_os
 
-        # if self.context[2] == '2':  # model with jitter
-        #     self.jitter = True
-        #     print self.par_map
-        #     s = self.par_map.pop(-2)
+        # we add the velocity offsets here
+        for i in range(self.nobserv):
+            # ind = np.where(observ==(i+1))[0]
+            # vel[ind] += vsys[i]
+            ind = np.where(observ==(i+1))[0]
+            velt[ind] += vsys[i]
 
         ## MAP estimate of the parameters
-        if self.only_vsys:  # systematic velocity only
-            vel = self.par_map[0] * np.ones_like(tt)
-        elif self.gp:
+        if self.gp:
             par_map = self.par_map[:-4] 
             hyper_map = self.par_map[-4:]
             if self.gp_only:
@@ -1647,26 +1684,28 @@ class MCMC_nest:
         ax1 = fig.add_subplot(gs[0])
         ax2 = fig.add_subplot(gs[1], sharex=ax1)
 
-        if self.only_vsys:  # systematic velocity only
-            ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
-        elif not self.gp_only:
+        if self.gp_only or self.only_vsys:
+            pass
+        else:
             # plot best solution
-            P = par_map[:-1:5]
-            K = par_map[1:-1:5]
-            ecc = par_map[2:-1:5]
-            omega = par_map[3:-1:5]
-            t0 = par_map[4:-1:5]
-            par = [P, K, ecc, omega, t0, vsys]
+            # only planet(s)' parameters
+            planets_par_map = par_map[:-self.nobserv]
 
-            if nobserv > 1:
-                observ = np.ones_like(vel)
-                args = [tt] + par + [observ] + [vel]
-            else:
-                args = [tt] + par + [vel]
+            P = planets_par_map[::5]
+            K = planets_par_map[1::5]
+            ecc = planets_par_map[2::5]
+            omega = planets_par_map[3::5]
+            t0 = planets_par_map[4::5]
+            par = [P, K, ecc, omega, t0, 0.]
+
+            args = [tt] + par + [vel]
             get_rvn(*args)
             ax1.plot(tt, vel, '-g', lw=2.5, label='MAP')
             # for t in t0:
-            #     ax1.axvline(x=t, color='k', linestyle=':')
+            # t0s = t0 + P * np.arange(-150, 51)
+            # tts = get_tt(P[0], ecc[0], omega[0], t0s)
+            # ax1.vlines(x=t0s, ymin=-500, ymax=500, color='k', alpha=0.8)
+            # ax1.vlines(x=tts, ymin=-500, ymax=500, color='r', alpha=0.8)
 
         # plot GP predictions
         if self.gp:
@@ -1674,11 +1713,11 @@ class MCMC_nest:
             ax1.fill_between(self.pred_t, y1=self.pred_y-2*self.pred_std, y2=self.pred_y+2*self.pred_std,
                                           color='k', alpha=0.3, label='2*std')
 
-        vel = np.zeros_like(t)
+        # vel = np.zeros_like(t)
         if self.gp_only or self.only_vsys:
             vel = self.par_map[0] * np.ones_like(tt)
         else:
-            args = [t] + par + [vel]
+            args = [t] + par + [velt]
             get_rvn(*args)
 
         for i, (fname, [n, nout]) in enumerate(sorted(system.provenance.iteritems())):
@@ -1691,19 +1730,24 @@ class MCMC_nest:
             # p.addItem(e)
             # p.plot(t[:m], rv[:m], symbol='o')
 
-            # plot each files' values
-            ax1.errorbar(t[:m], rv[:m], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
+            # plot each files' values offset by systematic velocities
+            # (because we add vsys to the model RV, we subtract them from the observations)
+            ax1.errorbar(t[:m], rv[:m]-vsys[i], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
             # plot residuals
             if self.gp:
                 ax2.errorbar(t[:m], rv[:m]-pred[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+                pred = pred[m:]
             else:
-                ax2.errorbar(t[:m], rv[:m]-vel[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+                ax2.errorbar(t[:m], rv[:m]-velt[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
+                velt = velt[m:]
 
             t, rv, err = t[m:], rv[m:], err[m:]
 
 
+
         # plot systematic velocity
-        ax1.axhline(y=vsys, ls='--', color='k', alpha=0.3)
+        for i, v in enumerate(vsys):
+            ax1.axhline(y=v, ls='--', color=colors[i], alpha=0.3)
 
         ax2.set_xlabel('Time [days]')
         ax1.set_ylabel('RV [%s]'%system.units)
