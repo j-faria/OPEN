@@ -272,10 +272,10 @@ contains
 			write(fmt,'(a,i2,a)')  '(', 1+nobserv, 'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:)
 
-		else if (nplanets == 0) then  ! one systematic velocity
+		else if (nplanets == 0) then  ! systematic velocity
 			write(*,'(a13)') (/" vsys" /)
-			write(fmt,'(a,i2,a)')  '(', 1, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+1)
+			write(fmt,'(a,i2,a)')  '(', nobserv, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:)
 
 		end if
 		write(*,*) ' '
