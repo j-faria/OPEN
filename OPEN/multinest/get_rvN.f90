@@ -27,17 +27,18 @@ subroutine get_rvN(time, P, K, ecc, omega, t0, vsys, vel, nt, np)
     real (kind=8) :: vsys
 
 ! Local variables
-    integer,parameter :: sp = selected_real_kind(p=6,r=37)
+    !integer,parameter :: sp = selected_real_kind(p=6,r=37)
     integer,parameter :: dp = selected_real_kind(p=15,r=307)
     integer :: i
 
     real(dp), parameter :: pi = 3.1415926535897932384626433832795029_dp
     real(dp), parameter :: twopi = 2.0_dp * pi 
 
-    vel = vsys
+!     vel = vsys
     do i=1,np
       vel = vel + rv_curve(time, P(i), K(i), ecc(i), omega(i), t0(i))
-    end do 
+    end do
+    vel = vel + vsys
     
 
 contains
