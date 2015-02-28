@@ -767,8 +767,6 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 	from commands import getoutput
 
 	def get_multinest_output(system, root, nplanets, context='111'):
-		msg = blue('INFO: ') + 'Analysing output...'
-		clogger.info(msg)
 
 		with open(root+'stats.dat') as f:
 			stats = f.readlines()
@@ -1013,7 +1011,11 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		# save fit in the system
 		system.results.save_fit_to(system)
 
-		get_multinest_output(system, root_path, nplanets, context=full_context)
+		msg = blue('INFO: ') + 'Analysing output...'
+		clogger.info(msg)
+
+		system.results.print_best_solution(system)
+		# get_multinest_output(system, root_path, nplanets, context=full_context)
 
 		if doplot:
 			system.results.do_plot_map(system)
@@ -1226,7 +1228,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		##############################################################################
 		print  # newline
 		msg = yellow('RESULT: ') + 'Evidence results'
-		clogger.info(msg)
+		
 
 		msg1 = yellow('      : ') + 'cte lnE'.rjust(12) + ' = %12.6f' % (constant_lnE)
 		if maxp >= 1:
@@ -1242,14 +1244,16 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		with warnings.catch_warnings():
 			warnings.filterwarnings('error')
 			try:
-				odds.append(1.)  # O11
 				if maxp >= 1: odds.append(np.exp(one_planet_lnE) / np.exp(constant_lnE))  # O21
 				if maxp >= 2: odds.append(np.exp(two_planet_lnE) / np.exp(constant_lnE))  # O31
 				if maxp == 3: odds.append(np.exp(three_planet_lnE) / np.exp(constant_lnE))  # O41
+				# this needs to be here to allow RuntimeWarning to be raised without side effects
+				odds.insert(0, 1.) # O11
 				# K = np.exp(one_planet_lnE) / np.exp(two_planet_lnE)
 			except RuntimeWarning:
 				try:
 					import mpmath
+					print 'imported mpmath'
 				except ImportError:
 					try:
 						from sympy import mpmath
@@ -1264,6 +1268,8 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 					if maxp == 3: odds.append(mpmath.exp(three_planet_lnE) / mpmath.exp(constant_lnE))  # O41
 					# K = mpmath.exp(one_planet_lnE) / mpmath.exp(two_planet_lnE)
 			finally:
+				clogger.info(msg) # print the previous message
+
 				msg1 += ' '*5 + 'p = %-13.8f\n' % (odds[0]/sum(odds), )
 				msg = msg1
 				if maxp >= 1: 
@@ -1349,39 +1355,56 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				os.makedirs(save_folder)
 
 		clogger.info(blue('INFO: ') + 'Copying zip files to %s to allow restarts' % save_folder)
-		shutil.copy(zip_filename_constant, save_folder)
-		shutil.copy(zip_filename_one_planet, save_folder)
-		shutil.copy(zip_filename_two_planet, save_folder)
-		shutil.copy(zip_filename_three_planet, save_folder)
+		if maxp >= 1:
+			shutil.copy(zip_filename_constant, save_folder)
+			shutil.copy(zip_filename_one_planet, save_folder)
+		if maxp >= 2:
+			shutil.copy(zip_filename_two_planet, save_folder)
+		if maxp == 3:
+			shutil.copy(zip_filename_three_planet, save_folder)
 
 		if saveplot:
 			try:
-				os.remove(os.path.join(save_folder, map_plot_file_constant))
-				os.remove(os.path.join(save_folder, map_plot_file_one_planet))
-				os.remove(os.path.join(save_folder, map_plot_file_two_planet))
-				os.remove(os.path.join(save_folder, map_plot_file_three_planet))
+				if maxp >= 1:
+					os.remove(os.path.join(save_folder, map_plot_file_constant))
+					os.remove(os.path.join(save_folder, map_plot_file_one_planet))
+				if maxp >= 2:
+					os.remove(os.path.join(save_folder, map_plot_file_two_planet))
+				if maxp == 3:
+					os.remove(os.path.join(save_folder, map_plot_file_three_planet))
 			except OSError:
 				pass
-			shutil.move(map_plot_file_constant, save_folder)
-			shutil.move(map_plot_file_one_planet, save_folder)
-			shutil.move(map_plot_file_two_planet, save_folder)
-			shutil.move(map_plot_file_three_planet, save_folder)
+
+			if maxp >= 1:
+				shutil.move(map_plot_file_constant, save_folder)
+				shutil.move(map_plot_file_one_planet, save_folder)
+			if maxp >= 2:
+				shutil.move(map_plot_file_two_planet, save_folder)
+			if maxp == 3:
+				shutil.move(map_plot_file_three_planet, save_folder)
 			if verbose:
 				try:
-					os.remove(os.path.join(save_folder, map_phased_plot_file_one_planet))
-					os.remove(os.path.join(save_folder, map_phased_plot_file_two_planet))
-					os.remove(os.path.join(save_folder, map_phased_plot_file_three_planet))
-					os.remove(os.path.join(save_folder, hist_plot_file_one_planet))
-					os.remove(os.path.join(save_folder, hist_plot_file_two_planet))
-					os.remove(os.path.join(save_folder, hist_plot_file_three_planet))
+					if maxp >= 1:
+						os.remove(os.path.join(save_folder, map_phased_plot_file_one_planet))
+						os.remove(os.path.join(save_folder, hist_plot_file_one_planet))
+					if maxp >= 2:
+						os.remove(os.path.join(save_folder, map_phased_plot_file_two_planet))
+						os.remove(os.path.join(save_folder, hist_plot_file_two_planet))
+					if maxp == 3:
+						os.remove(os.path.join(save_folder, map_phased_plot_file_three_planet))
+						os.remove(os.path.join(save_folder, hist_plot_file_three_planet))
 				except OSError:
 					pass
-				shutil.move(map_phased_plot_file_one_planet, save_folder)
-				shutil.move(map_phased_plot_file_two_planet, save_folder)
-				shutil.move(map_phased_plot_file_three_planet, save_folder)
-				shutil.move(hist_plot_file_one_planet, save_folder)
-				shutil.move(hist_plot_file_two_planet, save_folder)
-				shutil.move(hist_plot_file_three_planet, save_folder)				
+
+				if maxp >= 1:
+					shutil.move(map_phased_plot_file_one_planet, save_folder)
+					shutil.move(hist_plot_file_one_planet, save_folder)
+				if maxp >= 2:
+					shutil.move(map_phased_plot_file_two_planet, save_folder)
+					shutil.move(hist_plot_file_two_planet, save_folder)
+				if maxp == 3:
+					shutil.move(map_phased_plot_file_three_planet, save_folder)
+					shutil.move(hist_plot_file_three_planet, save_folder)				
 
 
 
