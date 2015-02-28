@@ -434,7 +434,7 @@ class rvSeries:
         colors = 'bgrcmykw' # lets hope for less than 9 data-sets
         t, err = self.time, self.error # temporaries
         r = self.fit['residuals']
-        
+
         if newFig: 
             fig = plt.figure()
         ax2 = fig.add_subplot(111)
@@ -458,7 +458,7 @@ class rvSeries:
             # p.plot(t[:m], rv[:m], symbol='o')
             ax1.errorbar(t[:m], r[:m], yerr=err[:m], \
                          fmt='o'+colors[i], label=os.path.basename(fname))
-            t, err = t[m:], err[m:]
+            t, r, err = t[m:], r[m:], err[m:]
         
         ax1.axhline(y=0, ls='--', color='k')
 
