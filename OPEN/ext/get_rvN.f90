@@ -27,17 +27,18 @@ subroutine get_rvN(time, P, K, ecc, omega, t0, vsys, vel, nt, np)
     real (kind=8) :: vsys
 
 ! Local variables
-    integer,parameter :: sp = selected_real_kind(p=6,r=37)
+    !integer,parameter :: sp = selected_real_kind(p=6,r=37)
     integer,parameter :: dp = selected_real_kind(p=15,r=307)
     integer :: i
 
     real(dp), parameter :: pi = 3.1415926535897932384626433832795029_dp
     real(dp), parameter :: twopi = 2.0_dp * pi 
 
-    vel = vsys
+!     vel = vsys
     do i=1,np
-      vel = vel - rv_curve(time, P(i), K(i), ecc(i), omega(i), t0(i))
-    end do 
+      vel = vel + rv_curve(time, P(i), K(i), ecc(i), omega(i), t0(i))
+    end do
+    vel = vel + vsys
     
 
 contains
@@ -50,17 +51,27 @@ contains
 
     M = twopi * (time-t0)/P
     f = true_anom(M, ecc)
-    vel = K * (sin(f+omega) + ecc*sin(omega))
+    !vel = K * (sin(f+omega) + ecc*sin(omega))
+    vel = K * (cos(omega+f) + ecc*cos(omega))
 
   end function rv_curve
 
 
   elemental real(dp) function true_anom(M, ecc) result(nu)
     real(dp), intent(in) :: M, ecc
-    real(dp) :: E
+    real(dp) :: E, cosE
 
     E = ecc_anom(M, ecc)
-    nu = atan2(sqrt(1._dp-ecc*ecc)*sin(E),cos(E)-ecc)
+
+    !! eq 2.6 of Perryman 2011
+    !cosE = cos(E)
+    !nu = acos((cosE-ecc) / (1._dp-ecc*cosE))
+
+    !! eq 2.7 of Perryman 2011 (seems a tiny bit faster)
+    nu = 2.d0 * atan( sqrt((1.d0 + ecc)/(1.d0 - ecc)) * tan(E/2.d0))
+
+    !! old version
+    !nu = atan2(sqrt(1._dp-ecc*ecc)*sin(E), cos(E)-ecc)
   
   end function true_anom
   
@@ -68,10 +79,16 @@ contains
 
   elemental real(dp) function ecc_anom(M, ecc) result(E)
     real(dp), intent(in) :: M, ecc
-    real(dp), parameter :: derror = 1.0d-3
+    real(dp), parameter :: derror = 1.0d-7
     integer :: iter
     real(dp) :: EA_new, EA_old
     
+    ! catch special case
+    if (ecc .eq. 0.d0) then
+      E = M
+      return
+    endif
+
     iter = 0
     EA_old = 0.5_dp * pi 
     if (ecc < 0.8d0) then

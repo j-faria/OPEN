@@ -14,11 +14,16 @@ import os
 import subprocess
 
 import numpy as np
-import matplotlib.pyplot as pl
+import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Ellipse
 import matplotlib.cm as cm
+
+
+mjup2mearth  = 317.828
+
+
 
 ## this code from 
 ##   http://code.activestate.com/recipes/502263-yet-another-unique-function/
@@ -40,9 +45,40 @@ def day2year(day):
     
     
 def rms(array):
-    return sqrt(sum(n*n for n in array)/len(array))
+    """ Root mean square of array"""
+    return sqrt(sum(x*x for x in array)/len(array))
+
+def wrms(array, weights):
+    """ Root mean square of array"""
+    w = weights #/ sum(weights)
+    # return sqrt(sum(x*x for x in array*w))
+    return sqrt(sum(w*(array - np.average(array, weights=w))**2) / sum(w))
     
-    
+
+def get_tp(P, ecc, omega, tt):
+    """ 
+    Return the epoch of periastron from other orbital parameters
+        P: orbital period
+        ecc: eccentricity
+        omega: argument of periastron
+        tt: transit epoch
+     """
+    E0 = np.arctan2(np.sqrt(1. - ecc**2)*np.cos(omega), np.sin(omega) + ecc)
+    Tp = tt - P/(2.*np.pi)*(E0 - ecc * np.sin(E0))
+    return Tp
+
+def get_tt(P, ecc, omega, tp):
+    """
+    Return the transit epoch from other orbital parameters
+        P: orbital period
+        ecc: eccentricity
+        omega: argument of periastron
+        tp: epoch of periastron
+     """
+    E0 = np.arctan2(np.sqrt(1. - ecc**2)*np.cos(omega), np.sin(omega) + ecc)
+    Tt = tp + P/(2.*np.pi)*(E0 - ecc*np.sin(E0))
+    return Tt
+
 def stdout_write(msg):
 	""" Print to stdout (without carriage return) and flush right away.
 	Useful to print in the same line """
@@ -52,39 +88,46 @@ def stdout_write(msg):
 
 
 ### Matplotlib advanced plot interaction stuff
-from matplotlib.widgets import RectangleSelector
-import numpy as np
-import matplotlib.pyplot as plt
+def selectable_plot(system, **kwargs):
+    from shell_colors import yellow, blue
+    from .logger import clogger
+    msg = blue('INFO: ') + 'Click on a point in the plot to remove it.'
+    clogger.info(msg)
+    msg = blue('    : ') + 'Press ENTER when you are finished'
+    clogger.info(msg)
 
-def line_select_callback(eclick, erelease):
-    'eclick and erelease are the press and release events'
-    x1, y1 = eclick.xdata, eclick.ydata
-    x2, y2 = erelease.xdata, erelease.ydata
-    print ("(%3.2f, %3.2f) --> (%3.2f, %3.2f)" % (x1, y1, x2, y2))
-    print (" The button you used were: %s %s" % (eclick.button, erelease.button))
+    indices_to_remove = []
+    global times
+    times = 0
+    def onpick3(event):
+        global times
 
-def toggle_selector(event):
-    print (' Key pressed.')
-    if event.key in ['Q', 'q'] and toggle_selector.RS.active:
-        print (' RectangleSelector deactivated.')
-        toggle_selector.RS.set_active(False)
-    if event.key in ['A', 'a'] and not toggle_selector.RS.active:
-        print (' RectangleSelector activated.')
-        toggle_selector.RS.set_active(True)
+        ind = event.ind
+        i, x, y = ind[0], np.take(system.time, ind)[0], np.take(system.vrad, ind)[0]
+        indices_to_remove.append(i)
 
-def selectable_plot(*args, **kwargs):
-    fig, current_ax = plt.subplots()                    # make a new plotingrange
+        # if times == 0:
+        #     print
+        #     msg = blue('INFO: ')
+        #     times += 1
+        # else:
+        msg = blue('    : ')
 
-    plt.plot(*args, **kwargs)  # plot something
+        msg += 'going to remove observation %d -> %8.2f, %8.2f' % (i+1, x, y)
+        clogger.info(msg)
+        # print 'onpick3 scatter:', ind, np.take(system.time, ind), np.take(system.vrad, ind)
+        # ax.scatter(np.take(system.time, ind), np.take(system.vrad, ind), color='r')
+        # fig.show()
 
-    # drawtype is 'box' or 'line' or 'none'
-    toggle_selector.RS = RectangleSelector(current_ax, line_select_callback,
-                                           drawtype='box', useblit=True,
-                                           button=[1,3], # don't use middle button
-                                           minspanx=5, minspany=5,
-                                           spancoords='pixels')
-    plt.connect('key_press_event', toggle_selector)
+    fig, ax = plt.subplots()
+    col = ax.scatter(system.time, system.vrad, picker=True)
+    ax.set_xlabel('Time [days]')
+    ax.set_ylabel('RV [%s]'%system.units)
+    fig.canvas.mpl_connect('pick_event', onpick3)
     plt.show()
+    raw_input('')
+
+    return unique(indices_to_remove)
 
 def julian_day_to_date(J):
     """ Returns the date corresponding to a julian day number"""
@@ -155,6 +198,40 @@ def notnan(v):
     return v[~np.isnan(v)]
 
 
+
+### get number of cpus
+def get_number_cores():
+    """ Returns the number of available cpus in the machine """
+    # Python 2.6+
+    try:
+        import multiprocessing
+        return multiprocessing.cpu_count()
+    except (ImportError, NotImplementedError):
+        pass
+    # http://code.google.com/p/psutil/
+    try:
+        import psutil
+        return psutil.NUM_CPUS
+    except (ImportError, AttributeError):
+        pass
+    # POSIX
+    try:
+        res = int(os.sysconf('SC_NPROCESSORS_ONLN'))
+        if res > 0:
+            return res
+    except (AttributeError, ValueError):
+        pass
+    # Linux
+    try:
+        res = open('/proc/cpuinfo').read().count('processor\t:')
+
+        if res > 0:
+            return res
+    except IOError:
+        pass
+    # if all else fails
+    return None
+
 def triangle_plot(xs, labels=None, extents=None, truths=None, truth_color="#4682b4",
                   scale_hist=False, quantiles=[], **kwargs):
     """
@@ -203,7 +280,7 @@ def triangle_plot(xs, labels=None, extents=None, truths=None, truth_color="#4682
     whspace = 0.05         # w/hspace size
     plotdim = factor * K + factor * (K - 1.) * whspace
     dim = lbdim + plotdim + trdim
-    fig = pl.figure(figsize=(dim, dim))
+    fig = plt.figure(figsize=(dim, dim))
     lb = lbdim / dim
     tr = (lbdim + plotdim) / dim
     fig.subplots_adjust(left=lb, bottom=lb, right=tr, top=tr,
@@ -248,7 +325,7 @@ def triangle_plot(xs, labels=None, extents=None, truths=None, truth_color="#4682
 
         for j, y in enumerate(xs[:i]):
             ax = fig.add_subplot(K, K, (i * K + j) + 1)
-            pl.plot(y, x, '.')
+            plt.plot(y, x, '.')
 
             if truths is not None:
                 ax.plot(truths[j], truths[i], "s", color=truth_color)
@@ -326,7 +403,7 @@ def triangle_plot_kde(xs, labels=None, extents=None, truths=None, truth_color="#
     whspace = 0.05         # w/hspace size
     plotdim = factor * K + factor * (K - 1.) * whspace
     dim = lbdim + plotdim + trdim
-    fig = pl.figure(figsize=(dim, dim))
+    fig = plt.figure(figsize=(dim, dim))
     lb = lbdim / dim
     tr = (lbdim + plotdim) / dim
     fig.subplots_adjust(left=lb, bottom=lb, right=tr, top=tr,
@@ -379,7 +456,7 @@ def triangle_plot_kde(xs, labels=None, extents=None, truths=None, truth_color="#
 
         for j, y in enumerate(xs[:i]):
             ax = fig.add_subplot(K, K, (i * K + j) + 1)
-            pl.plot(y, x, '.')
+            plt.plot(y, x, '.')
 
             if truths is not None:
                 ax.plot(truths[j], truths[i], "s", color=truth_color)

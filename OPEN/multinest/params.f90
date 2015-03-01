@@ -1,4 +1,5 @@
 module params
+    use gputils
     implicit none
 
 ! Debug
@@ -6,16 +7,26 @@ module params
 
 ! Data
     real(kind=8), allocatable, dimension(:) :: times, rvs, errors
+    real(kind=8), allocatable, dimension(:) :: train_var
 
 ! Model Parameters
    	
     !dimensionality
     integer sdim
-    !number of planets, 
+    !number of planets,
     !number of extra parameters besides the 5*nplanets
     !number of observatories
     integer nplanets, nextra, nobserv
-    logical using_jitter
+    !considering a jitter parameter
+    !using the gaussian process thing
+    logical using_jitter, using_gp
+    !train the gaussian process beforehand
+    logical training
+    real(kind=8), dimension(4) :: trained_parameters
+    !extra linear dependence in the model
+    !how many variables
+    logical lin_dep
+    integer n_lin_dep
 
     !priors on the parameters are set in main.f90
     real(kind=8), allocatable, dimension(:,:) :: spriorran  !(sdim,2)
@@ -24,9 +35,22 @@ module params
     integer, allocatable, dimension(:) :: observ
     real(kind=8), allocatable, dimension(:) :: ss, alpha, tau
     real(kind=8), allocatable, dimension(:) :: vel, dist, sigma
+    real(kind=8), allocatable, dimension(:) :: times_oversampled, vel_oversampled
+    real(kind=8), allocatable, dimension(:, :) :: last_vel_oversampled
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
 
     integer nest_context
+
+! Gaussian process variables
+    type(WhiteKernel), target :: k2
+    type(DiagonalKernel), target :: k3
+    type(ExpKernel), target :: k4
+    type(ExpSquaredKernel), target :: k5
+    type(ExpSineSquaredKernel), target :: k6
+    type(SumKernels), target :: k7
+    type(ProductKernels), target :: k8
+    type(GP) gp1
+    class(Kernel), pointer :: kernel_to_pass
 
 
 ! Parameters for MultiNest
@@ -37,7 +61,7 @@ module params
 	
     !whether to do multimodal sampling
 	logical nest_mmodal 
- 	parameter(nest_mmodal=.false.)
+ 	parameter(nest_mmodal=.true.)
 	
     !sample with constant efficiency
     ! If ceff is set to True, then the enlargement factor of the 
@@ -49,7 +73,7 @@ module params
 	
     !max no. of live points
     integer nest_nlive
-	parameter(nest_nlive=300) !300
+	parameter(nest_nlive=500) !300
       
     !total number of parameters, 
     !should be sdim in most cases but if you need to store some 
@@ -90,8 +114,7 @@ module params
     parameter(nest_maxModes=10)
       
     !number of parameters to cluster (for mode detection)
-    integer nest_nClsPar
-    parameter(nest_nClsPar=2)
+    integer nest_nClsPar  ! usually set to 3
 
     !whether to resume from a previous run
     logical nest_resume
@@ -104,7 +127,7 @@ module params
     !initialize MPI routines?, relevant only if compiling with MPI
 	!set to False if you want your main program to handle MPI initialization
     logical nest_initMPI
-    parameter(nest_initMPI=.true.)
+    parameter(nest_initMPI=.false.)
       
     !points with loglike < nest_logZero will be ignored by MultiNest
     double precision nest_logZero
@@ -123,7 +146,12 @@ module params
 	
     !feedback on the sampling progress?
     logical nest_fb 
-    !parameter(nest_fb=.false.)
+
+    !feedback on current MAP parameters?
+    logical nest_MAPfb
+    
+    !live plot with pgplot?
+    logical nest_liveplot
 
 
 end module params

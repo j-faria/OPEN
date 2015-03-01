@@ -1,17 +1,21 @@
 &NEST_parameters
 
     !dimensionality
-    ! 5*nplanets (+ jitter) + nob
-    sdim = 6
+    ! set to 0 as it is automatically determined from nest_context
+    sdim = 0
 
     ! additional information to pass to low-level routines
     ! we use this to set the problem
     ! nob is the number of observatories
-    nest_context = 11
-    ! nest_context = 11   ! 1-planet model (5+nob parameters)
-    ! nest_context = 12   ! 1-planet model with jitter term (6+nob parameters)
-    ! nest_context = 21   ! 2-planet model (10+nob parameters)
-    ! nest_context = 22   ! 2-planet model with jitter term (11+nob parameters)
+    nest_context = 112
+    ! nest_context has three numbers: xyz
+    !         x=1 "normal" regression, x=2 gaussian process regression, x=3 gaussian process without planets
+    !         y= number of planets in the model
+    !         z=1 don't include jitter term, z=2 include jitter term
+    ! nest_context = 111   ! 1-planet model (5+nob parameters)
+    ! nest_context = 112   ! 1-planet model with jitter term (6+nob parameters)
+    ! nest_context = 121   ! 2-planet model (10+nob parameters)
+    ! nest_context = 122   ! 2-planet model with jitter term (11+nob parameters)
 
 
 	!whether to use Nested Importance Sampling
@@ -25,7 +29,7 @@
     !files should be updated 
     !posterior files are updated and dumper routine is called
     !after every updInt*10 iterations
-    nest_updInt=500
+    nest_updInt=50
 
     !whether to resume from a previous run
     nest_resume=.false.
@@ -33,9 +37,26 @@
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
     !iterations or convergence criterion has been satisfied
-    nest_maxIter=1000000
+    nest_maxIter=100000
     
     !feedback on the sampling progress?
-    nest_fb=.false.
+    nest_fb=.true.
+
+    !feedback on current MAP parameters?
+    nest_MAPfb=.true.
+
+    !live plot?
+    nest_liveplot=.false.
+
+
+    !train the gaussian process beforehand (only effective if nest_context = 2yz)
+    training = .false.
+    !values of the trained parameters
+    trained_parameters = 0.d0, 0.d0, 0.d0, 0.d0
+
+
+    !extra linear dependences in the model
+    lin_dep = .false.
+    n_lin_dep = 0
 
 /

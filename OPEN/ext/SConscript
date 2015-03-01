@@ -1,0 +1,124 @@
+import os  # for path-related things
+import shutil
+import commands
+import sys
+from distutils import sysconfig  # to help in building Python extension modules
+import numpy
+
+Import('f2py_exec')
+# the build of Python extension modules is based on
+# http://www.eliteraspberries.com/blog/2013/03/build-python-extension-modules-with-scons.html
+
+launch_dir = GetLaunchDir()
+current_dir = os.getcwd()
+
+
+# this can be a python function or external (shell) command line
+def CopySOAction(target = None, source = None, env = None):
+    """
+    Copy the .so files create by f2py from launch_dir to the OPEN/ext directory.
+      target: a Node object representing the target file
+      source: a Node object representing the source file
+      env: the construction environment used for building the target file
+      The target and source arguments may be lists of Node objects if there 
+      is more than one target file or source file.
+    """
+    so_file = os.path.basename(str(target[0]))
+    fr = os.path.join(launch_dir, so_file)
+    to = os.path.join(launch_dir, str(target[0]))
+    if os.path.isfile(fr):
+        shutil.move(fr, to)
+    # target_file_names = map(lambda x: str(x), target)
+    # print target_file_names
+    return 0
+
+
+env = Environment()
+
+GCC_VERSION = commands.getoutput(env['F90'] + ' -dumpversion')
+
+
+f2py_flags = ' --quiet '
+f2py_flags += '--f90flags="-ffree-line-length-none" '
+f2py_flags += '--opt="-O3" -lgomp --fcompiler=gnu95 '
+
+## allow use to pass path to fortran compiler
+if GetOption('gfortran') is None:
+	pass
+else:
+	f2py_flags += '--f90exec=' + GetOption('gfortran')
+
+
+bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES 1>> f2py-warn.log' + f2py_flags)
+
+env.Append(BUILDERS={'F2PY': bld})
+
+
+def print_cmd_line(s, target, src, env):
+    """s is the original command line, target and src are lists of target
+    and source nodes respectively, and env is the environment."""
+    # print s
+    if 'CopySOAction' in s: return
+    sys.stdout.write(" Compiling extension %s...\n"% (' and '.join([str(x) for x in target])))
+
+env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
+# env['F2PYCOM'] += " 2> gcc-c-output.txt"
+
+## compile bayesian lomb scargle periodogram
+blombscargle = env.F2PY(MODULE='blombscargle',
+	                    target='blombscargle.so',
+	                    source='lombscargle_bayes.f90')
+env.AddPostAction(blombscargle, CopySOAction)
+
+## compile generalized lomb scargle periodogram
+glombscargle = env.F2PY(MODULE='glombscargle',
+	                    target='glombscargle.so',
+	                    source='lombscargle_generalized.f90')
+env.AddPostAction(glombscargle, CopySOAction)
+
+## compile radial velocity curve builders
+get_rv = env.F2PY(MODULE='get_rv',
+	              target='get_rv.so',
+	              source='get_rv.f90')
+get_rvN = env.F2PY(MODULE='get_rvN',
+	               target='get_rvN.so',
+	               source='get_rvN.f90')
+get_rvN_MultiSite = env.F2PY(MODULE='get_rvN_MultiSite',
+	                         target='get_rvN_MultiSite.so',
+	                         source='get_rvN_MultiSite.f90')
+env.AddPostAction(get_rv, CopySOAction)
+env.AddPostAction(get_rvN, CopySOAction)
+env.AddPostAction(get_rvN_MultiSite, CopySOAction)
+
+## compile low-pass filter function
+lopast = env.F2PY(MODULE='lopast', target='lopast.so', source='lopast.f90')
+env.AddPostAction(lopast, CopySOAction)
+
+## compile Julian date conversion functions
+src_files = Split('julday.f caldat.f')
+julian = env.F2PY(MODULE='julian', target='julian.so', source=src_files)
+env.AddPostAction(julian, CopySOAction)
+
+
+include_paths = [sysconfig.get_python_inc(), numpy.get_include()+'/numpy']
+
+## compile Dawson-Fabrycky special periodogram
+periodogram_DF = env.LoadableModule('periodogram_DF.so',
+                                    ['periodogram_DF.c'],
+                                    CPPFLAGS='-O3',
+                                    CPPPATH = include_paths,
+                                    # CCCOM=" 1>> f2py-warn.log",
+                                    LIBPATH = [sysconfig.get_config_var('LIBDIR')],
+                                    LIBS = ['python' + sysconfig.get_config_var('VERSION')],
+                                    LIBPREFIX = '')
+
+## compile CLEAN algorithm periodogram
+periodogram_CLEAN = env.LoadableModule('periodogram_CLEAN.so',
+                                    ['periodogram_CLEAN.c'],
+                                    CPPFLAGS='-O3',
+                                    CPPPATH = include_paths,
+                                    # CCCOMSTR="f2py-warn.log",
+                                    LIBPATH = [sysconfig.get_config_var('LIBDIR')],
+                                    LIBS = ['python' + sysconfig.get_config_var('VERSION')],
+                                    LIBPREFIX = '')
+
