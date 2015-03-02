@@ -1478,7 +1478,7 @@ class MCMC_nest:
         if self.nobserv > 1:
             vsys = self.par_map[-self.nobserv:]
         else:
-            vsys = self.par_map[-1] # this doesn't always work
+            vsys = [self.par_map[-1]]# this doesn't always work
 
         ## MAP estimate of the parameters
         if self.gp and not self.only_vsys:
@@ -1658,7 +1658,7 @@ class MCMC_nest:
         if self.nobserv > 1:
             vsys = self.par_map[-self.nobserv:]
         else:
-            vsys = self.par_map[-1-j]
+            vsys = [self.par_map[-1-j]]
 
         # we add the velocity offsets here
         for i in range(self.nobserv):
