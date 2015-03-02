@@ -770,12 +770,13 @@ class PeriodogramBase:
         powerFAP_1 = self.peaks[index1]
         powerFAP_10 = self.peaks[index10]
 
-
-        plt.semilogx(1./f, p, 'k-')
-        plt.axhline(powerFAP_01,c='r',ls=':')
-        plt.axhline(powerFAP_1,c='r',ls='--')
-        plt.axhline(powerFAP_10,c='r',ls='-')
-        plt.show()
+        # plt.figure()
+        ax = plt.subplot(111)
+        # ax.semilogx(1./f, p, 'k-')
+        ax.axhline(powerFAP_10,c='g', lw=2, ls='-', label='10%')
+        ax.axhline(powerFAP_1,c='g', lw=2, ls='--', label='1%')
+        ax.axhline(powerFAP_01,c='g', lw=2, ls=':', label='0.1%')
+        # plt.show()
         #         if orbit == 'circ':
         #             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
         #         if orbit == 'kep':
@@ -831,6 +832,7 @@ class PeriodogramBase:
         if dobFAP:
             # calculate FAP by bootstrap
             self.FAP_by_bootstrap()
+            self.ax.legend(frameon=True)
 
         # plot vertical lines
         if verts is not None:
