@@ -1134,6 +1134,20 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 					if 'nest_fb' in line: print replacer,
 					else: print line,
 
+			# by default, feedback on the current MAP parameters is omitted, but
+			# the user can still request it
+			if MAPfeed:
+				replacer = '    nest_MAPfb=.true.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_MAPfb' in line: print replacer,
+					else: print line,
+			else:
+				replacer = '    nest_MAPfb=.false.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_MAPfb' in line: print replacer,
+					else: print line,
+
+
 
 			sleep(1)
 			start = time()
@@ -1153,11 +1167,12 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 			clogger.info(msg)
 
-			get_multinest_output(system, root, nplanets, context=str(context))
+			# get_multinest_output(system, root, nplanets, context=str(context))
 
 			if nplanets == 0:
 				results_constant = MCMC_nest(root, context=str(context))
 				results_constant.model_name = 'd0'
+				results_constant.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_constant = results_constant.compress_chains()
 
@@ -1174,6 +1189,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			elif nplanets == 1:
 				results_one_planet = MCMC_nest(root, context=str(context))
 				results_one_planet.model_name = 'd0k1'
+				results_one_planet.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_one_planet = results_one_planet.compress_chains()
 				
@@ -1191,6 +1207,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			elif nplanets == 2:
 				results_two_planet = MCMC_nest(root, context=str(context))
 				results_two_planet.model_name = 'd0k2'
+				results_two_planet.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_two_planet = results_two_planet.compress_chains()
 
@@ -1209,6 +1226,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			elif nplanets == 3:
 				results_three_planet = MCMC_nest(root, context=str(context))
 				results_three_planet.model_name = 'd0k3'
+				results_three_planet.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_three_planet = results_three_planet.compress_chains()
 
@@ -1253,7 +1271,6 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			except RuntimeWarning:
 				try:
 					import mpmath
-					print 'imported mpmath'
 				except ImportError:
 					try:
 						from sympy import mpmath
@@ -1340,6 +1357,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		system.allfits = fits
 		## save the fit with highest evidence to the system
 		system.results = fits[sorted(fits, reverse=True)[0]]
+		system.results.save_fit_to(system)
 
 		## save the zip files into a folder with the name of the star
 		## allowing for complete restarts in the future
@@ -1406,7 +1424,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 					shutil.move(map_phased_plot_file_three_planet, save_folder)
 					shutil.move(hist_plot_file_three_planet, save_folder)				
 
-
+		os.system("notify-send 'OPEN has finished an automatic MN run'")
 
 	return
 
