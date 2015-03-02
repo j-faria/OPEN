@@ -249,14 +249,14 @@ contains
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+10)
-			write(fmt,'(a,i2,a)')  '(',7,'f13.4)'
+			write(fmt,'(a,i2,a)')  '(',nPar-10,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+11:nPar*4)
 
 		else if (nplanets == 3) then  ! 3 planets
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+10)
-			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
+			write(fmt,'(a,i2,a)')  '(',nPar-10,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+11:nPar*4)
 
 		else if (nplanets == 0 .and. using_gp) then  ! 4 hyper (plus one systematic velocity)
