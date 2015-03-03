@@ -1436,6 +1436,9 @@ class MCMC_nest:
         if self.gp:
             # in this case, the vsys is before the hyperparameters
             print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
+            print yellow('GP')
+            for j in sorted(range(1, 5), reverse=True):
+                print '%8s %14.3f %9.3f %14.3f %14.3f' % ('sigma'+str(5-j), par_mean[-j], par_sigma[-j], par_mle[-j], par_map[-j])
         else:
             # in this case, the vsys parameters are the last ones
             nobs = self.nobserv
@@ -1475,10 +1478,12 @@ class MCMC_nest:
 
             observ = np.concatenate(chunks)
 
+        j = 4 if self.gp else 0
         if self.nobserv > 1:
             vsys = self.par_map[-self.nobserv:]
         else:
-            vsys = [self.par_map[-1]]# this doesn't always work
+            vsys = [self.par_map[-1-j]]
+
 
         ## MAP estimate of the parameters
         if self.gp and not self.only_vsys:
@@ -1671,6 +1676,7 @@ class MCMC_nest:
         if self.gp:
             par_map = self.par_map[:-4] 
             hyper_map = self.par_map[-4:]
+            # print par_map, hyper_map
             if self.gp_only:
                 pred = gp_predictor(t, rv, err, par_map, hyper_map, 'constant')
             else:
@@ -1686,7 +1692,7 @@ class MCMC_nest:
         ax1 = fig.add_subplot(gs[0])
         ax2 = fig.add_subplot(gs[1], sharex=ax1)
 
-        if self.gp_only or self.only_vsys:
+        if self.gp or self.only_vsys:
             pass
         else:
             # plot best solution
@@ -1716,8 +1722,9 @@ class MCMC_nest:
                                           color='k', alpha=0.3, label='2*std')
 
         # vel = np.zeros_like(t)
-        if self.gp_only or self.only_vsys:
-            vel = self.par_map[0] * np.ones_like(tt)
+        if self.gp or self.only_vsys:
+            # vel = self.par_map[0] * np.ones_like(tt)
+            pass
         else:
             args = [t] + par + [velt]
             get_rvn(*args)
@@ -1733,8 +1740,12 @@ class MCMC_nest:
             # p.plot(t[:m], rv[:m], symbol='o')
 
             # plot each files' values offset by systematic velocities
-            # (because we add vsys to the model RV, we subtract them from the observations)
-            ax1.errorbar(t[:m], rv[:m]-vsys[i], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
+            if self.gp:
+                # here we don't remove vsys yet but this needs to be taken care of!!
+                ax1.errorbar(t[:m], rv[:m], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
+            else:
+                # (because we add vsys to the model RV, we subtract them from the observations)
+                ax1.errorbar(t[:m], rv[:m]-vsys[i], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
             # plot residuals
             if self.gp:
                 ax2.errorbar(t[:m], rv[:m]-pred[:m], yerr=err[:m], fmt='o'+colors[i], label=fname)
