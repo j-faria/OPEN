@@ -1602,7 +1602,7 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
 
 
 
-def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=True, full=False):
+def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=False, full=False):
 	try:
 		system.per
 	except AttributeError:
@@ -1614,7 +1614,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 			system.per = gls(system)
 
 	if prot is None:
-		prot = system.per.get_peaks(output_period=True)[1]
+		prot = system.per.get_peaks(output_period=True)[0][0]
 	else:
 		prot = float(prot)
 
@@ -1631,7 +1631,8 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 	if fix_p:
 		msg = blue('INFO: ') + 'Removing Prot=%.2f days (exactly) from %s \n' % (prot, quantity)
 	else:
-		msg = blue('INFO: ') + 'Removing Prot=%.2f days (fitting it) from %s\n' % (prot, quantity)
+		msg = blue('INFO: ') + 'Removing Prot~%.2f days (fitting it) from %s\n' % (prot, quantity)
+
 	msg += blue('    : ') + 'plus %d harmonics' % (nrem-1)
 	clogger.info(msg)
 
@@ -1648,7 +1649,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 			# P = args
 			return (v - (As*np.sin(2.*pi*t/P) + Ac*np.cos(2.*pi*t/P)) ) / err
 
-		starting_values = [0.001, 0.001]
+		starting_values = [np.ptp(v)]*2
 		if not fix_p: starting_values = starting_values + [prot]
 		rot_param = leastsq(func, starting_values, maxfev=50000)[0]
 		print rot_param
@@ -1692,7 +1693,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 	if fix_p: 
 		prot_fit = prot
 	else: 
-		prot_fit = rot_param[4] # the period that we ended up removing
+		prot_fit = rot_param[-1] # the period that we ended up removing
 
 	print 'Phase = ', np.arctan2(rot_param[1], rot_param[0])
 
@@ -1711,7 +1712,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 		else:
 			As1, Ac1, P = rot_param
 		
-		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)), 'o-')
+		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)), '-')
 
 	if nrem==2:
 		if fix_p:
@@ -1721,7 +1722,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 			As1, Ac1, As2, Ac2, P = rot_param
 
 		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
-		             (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), 'o-')
+		             (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), '-')
 	
 	if nrem==3:
 		if fix_p:
@@ -1732,7 +1733,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 
 		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
 					 (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)) + \
-					 (As3*np.sin(6.*pi*xx/P) + Ac3*np.cos(6.*pi*xx/P)), 'o-')
+					 (As3*np.sin(6.*pi*xx/P) + Ac3*np.cos(6.*pi*xx/P)), '-')
 
 	plt.errorbar(system.time, system.vrad - vrad_mean, yerr=err, fmt='ro')
 
