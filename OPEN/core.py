@@ -1924,12 +1924,15 @@ def do_Dawson_Fabrycky(system):
 	def specwindow(freq,time):
 		""" Calculate the spectral window function and its phase angles """
 		n = len(time)
-		W = [sum([np.exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
-		amp = [np.sqrt(t.real*t.real + t.imag*t.imag) for t in W]
-		phase = [np.arctan2(t.imag,t.real) for t in W]
-		return amp,phase
+		W = np.fromiter((np.sum(np.exp(-2.j*pi*f*time))/n for f in freq), np.complex_, freq.size)
+		# W = [sum([np.exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
+		amp = np.absolute(W)
+		# amp = [np.sqrt(t.real*t.real + t.imag*t.imag) for t in W]
+		phase = np.arctan2(W.imag, W.real)
+		# phase = [np.arctan2(t.imag,t.real) for t in W]
+		return amp, phase
 
-	plow = 0.5
+	plow = 1.5
 	n = len(err)
 
 	### GET THE REAL PERIODOGRAM
@@ -1990,9 +1993,8 @@ def do_Dawson_Fabrycky(system):
 	plt.figure(num = 1)
 
 	plt.subplot(4,1,1)
-	plt.title('window function + periodogram')
-	plt.semilogx(1/freq,amp,'r-', alpha=0.3)
-	plt.semilogx(1/freq,power,'k-')
+	plt.semilogx(1/freq, amp, 'r-', alpha=0.3, label='window function')
+	plt.semilogx(1/freq, power, 'k-', label='GLS')
 
 	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
@@ -2005,6 +2007,8 @@ def do_Dawson_Fabrycky(system):
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
 
+	plt.legend(fontsize=12)
+
 	### PLOT FAKE PERIODOGRAMS + DIALS
 	#### 1st FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake1, errfake, ofac, plow)
@@ -2016,11 +2020,13 @@ def do_Dawson_Fabrycky(system):
 	plt.subplot(4,1,2)
 
 	plt.semilogx([1./i for i in freq], power, 'k-')
-	plt.fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
+	fb = plt.fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
 
 	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+
+	vl = plt.axvline(x=1./fmax1)
 
 	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
 	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
@@ -2028,6 +2034,8 @@ def do_Dawson_Fabrycky(system):
 
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
+
+	plt.legend([vl], ['assumed correct'], fontsize=12)
 
 	#### 2nd FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake2, errfake, ofac, plow)
@@ -2045,12 +2053,16 @@ def do_Dawson_Fabrycky(system):
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
+	vl = plt.axvline(x=1./fmax2)
+
 	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
 	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
 	plt.semilogx([1./fmax3,1./fmax3+0.045*np.cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind3])],'k-',lw=1)
 
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
+
+	plt.legend([vl], ['assumed correct'], fontsize=12)
 
 	#### 3rd FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake3, errfake, ofac, plow)
@@ -2068,6 +2080,8 @@ def do_Dawson_Fabrycky(system):
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
+	vl = plt.axvline(x=1./fmax3)
+
 	plt.semilogx([1./fmax3,1./fmax3+0.045*np.cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind3])],'k-',lw=1)
 	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
 	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
@@ -2075,7 +2089,10 @@ def do_Dawson_Fabrycky(system):
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
 
+	plt.legend([vl], ['assumed correct'], fontsize=12)
+
 	# savefig(name+'_DF.ps',orientation = 'Landscape')
+	plt.tight_layout()
 	plt.show()
 
 
@@ -2088,7 +2105,7 @@ def do_clean(system):
 		return
 
 	time, rv, err = system.time, system.vrad, system.error
-	plow = 0.5
+	plow = 1.5
 
 	msg = blue('INFO: ') + 'Running CLEAN...'
 	clogger.info(msg)
