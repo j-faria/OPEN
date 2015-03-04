@@ -306,11 +306,13 @@ class EmbeddedMagics(Magics):
     @line_magic
     def develop(self, parameter_s=''):
         # reload(classes)
-        import reimport
+        import reimport, os
         mod = reimport.modified()
         reimport.reimport(*mod)
+        print 'Done re-importing'
         # reload(periodograms)
         # reload(core)
+        os.system('python scons/scons.py --gfortran=/home/joao/Software/mesasdk/bin/gfortran')
 
 
     @needs_local_scope
