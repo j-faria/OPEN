@@ -1078,6 +1078,10 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# print restart_root
 			# return
 
+
+		# this is hardcoded, for now
+		nlive_dict = {0:300, 1:500, 2:700}
+
 		for npl in range(0, maxp+1):
 
 			##############################################################################
@@ -1147,6 +1151,12 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 					if 'nest_MAPfb' in line: print replacer,
 					else: print line,
 
+			# set nlive
+			nlive = nlive_dict[npl]
+			replacer = '    nest_nlive = %d\n' % nlive
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_nlive' in line: print replacer,
+				else: print line,
 
 
 			sleep(1)
