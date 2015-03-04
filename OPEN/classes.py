@@ -1659,6 +1659,7 @@ class MCMC_nest:
 
             observ = np.concatenate(chunks)
 
+        # get the RV offsets
         j = 4 if self.gp else 0
         if self.nobserv > 1:
             vsys = self.par_map[-self.nobserv:]
@@ -1666,6 +1667,7 @@ class MCMC_nest:
             vsys = [self.par_map[-1-j]]
 
         # we add the velocity offsets here
+        # residuals will be RV-velt
         for i in range(self.nobserv):
             # ind = np.where(observ==(i+1))[0]
             # vel[ind] += vsys[i]
@@ -1744,7 +1746,7 @@ class MCMC_nest:
                 # here we don't remove vsys yet but this needs to be taken care of!!
                 ax1.errorbar(t[:m], rv[:m], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
             else:
-                # (because we add vsys to the model RV, we subtract them from the observations)
+                # because we add each offset to the model RV, we subtract them from the observations
                 ax1.errorbar(t[:m], rv[:m]-vsys[i], yerr=err[:m], fmt='o'+colors[i], label=os.path.basename(fname))
             # plot residuals
             if self.gp:
@@ -1761,6 +1763,7 @@ class MCMC_nest:
         # plot systematic velocity
         for i, v in enumerate(vsys):
             ax1.axhline(y=v, ls='--', color=colors[i], alpha=0.3)
+        ax2.axhline(y=0., ls='--', color='k', alpha=0.3)
 
         ax2.set_xlabel('Time [days]')
         ax1.set_ylabel('RV [%s]'%system.units)
@@ -1775,18 +1778,21 @@ class MCMC_nest:
             fig.savefig(save)
 
 
-    def do_plot_map_phased(self, system, legend=True, plot_gp=True, save=None):
+    def do_plot_map_phased(self, system, legend=False, plot_gp=True, save=None, oversample=10):
         # if systematic velocity only, there is nothing to do here
         if self.only_vsys: return
 
-        get_rvn = get_rvn_os
-        colors = 'kbgrcmyw' # lets hope for less than 9 data-sets
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
         t, rv, err = system.time, system.vrad, system.error # temporaries
-        tt = system.get_time_to_plot()
+        tt = system.get_time_to_plot(oversample=oversample)
         vel = np.zeros_like(tt)
 
-        # if self.gp:
-        #     self.npar
+        # get the RV offsets
+        j = 4 if self.gp else 0
+        if self.nobserv > 1:
+            vsys = self.par_map[-self.nobserv:]
+        else:
+            vsys = [self.par_map[-1-j]]
 
         ## MAP estimate of the parameters
         if self.gp:
@@ -1798,34 +1804,38 @@ class MCMC_nest:
         if newFig:
             plt.figure()
 
-        # map parameters
-        P = par_map[:-1:5]
-        K = par_map[1:-1:5]
-        ecc = par_map[2:-1:5]
-        omega = par_map[3:-1:5]
-        t0 = par_map[4:-1:5]
-        vsys = par_map[-1]
+        # only planet(s)' parameters
+        planets_par_map = par_map[:-self.nobserv]
+
+        P = np.array(planets_par_map[::5])
+        K = np.array(planets_par_map[1::5])
+        ecc = np.array(planets_par_map[2::5])
+        omega = np.array(planets_par_map[3::5])
+        t0 = np.array(planets_par_map[4::5])
 
         for planeti in range(self.nplanets):
             if self.nplanets > 1:
-                # index of the other planet
-                otherplaneti = int(not bool(planeti))
+                # indices of the other planets
+                otherplaneti = np.delete(np.arange(self.nplanets), planeti)
+                # otherplaneti = int(not bool(planeti))
                 otheri = otherplaneti
 
             t, rv, err = system.time, system.vrad, system.error # temporaries
-            tt = system.get_time_to_plot()
+            tt = system.get_time_to_plot(oversample=oversample)
             vel = np.zeros_like(tt)
             vel_other = np.zeros_like(t)
 
             # one subplot per planet
             ax = plt.subplot(self.nplanets, 1, planeti+1)
 
-            # print P[planeti]
-            par = [P[planeti], K[planeti], ecc[planeti], omega[planeti], t0[planeti], vsys]
+            # parameters for this planet (planeti)
+            par = [P[planeti], K[planeti], ecc[planeti], omega[planeti], t0[planeti], 0.]
+            # print par
             args = [tt] + par + [vel]
             get_rvn(*args)
             phase = ((tt - t0[planeti]) / P[planeti]) % 1.0
 
+            # plot the MAP curve for this planet only (planeti)
             ax.plot(np.sort(phase), vel[np.argsort(phase)], '-g', lw=2.5, label='MAP')
             ax.plot(np.sort(phase)+1, vel[np.argsort(phase)], '-g', lw=2.5)
             ax.plot(np.sort(phase)-1, vel[np.argsort(phase)], '-g', lw=2.5)
@@ -1840,8 +1850,9 @@ class MCMC_nest:
                 #                  y2=self.pred_y[indices]+2*self.pred_std[indices],
                 #                  color='k', alpha=0.3, label='2*std')
 
+            # the curves for the other planets (otherplaneti)
             if self.nplanets > 1:
-                par = [P[otheri], K[otheri], ecc[otheri], omega[otheri], t0[otheri], vsys]
+                par = [P[otheri], K[otheri], ecc[otheri], omega[otheri], t0[otheri], 0.]
                 args = [t] + par + [vel_other]
                 get_rvn(*args)
             else:
@@ -1852,22 +1863,23 @@ class MCMC_nest:
                 m = n-nout # how many values are there after restriction
 
                 phase = ((t[:m] - t0[planeti]) / P[planeti]) % 1.0
-                ax.errorbar(np.sort(phase), rv[np.argsort(phase)] - vel_other[np.argsort(phase)],
+                ax.errorbar(np.sort(phase), rv[np.argsort(phase)] - vsys[i] - vel_other[np.argsort(phase)],
                              yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i], label=os.path.basename(fname))
-                ax.errorbar(np.sort(phase)+1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)],
+                ax.errorbar(np.sort(phase)+1, rv[np.argsort(phase)] - vsys[i] - vel_other[np.argsort(phase)],
                              yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i])
-                ax.errorbar(np.sort(phase)-1, rv[np.argsort(phase)] - vel_other[np.argsort(phase)],
+                ax.errorbar(np.sort(phase)-1, rv[np.argsort(phase)] - vsys[i] - vel_other[np.argsort(phase)],
                              yerr=err[np.argsort(phase)],
                              fmt='o'+colors[i])
                 t, rv, err = t[m:], rv[m:], err[m:]
 
             # plot systematic velocity
-            ax.axhline(y=vsys, ls='--', color='k', alpha=0.3)
+            for i, v in enumerate(vsys):
+                ax.axhline(y=v, ls='--', color=colors[i], alpha=0.3)
 
             ax.set_xlim([-0.2, 1.2])
-            ax.set_xlabel('Phase (P =%5.2f)' % P[planeti])
+            ax.set_xlabel('Phase (P=%5.2f)' % P[planeti])
             ax.set_ylabel('RV [%s]'%system.units)
 
         if legend: plt.legend()
