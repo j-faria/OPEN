@@ -357,12 +357,13 @@ class EmbeddedMagics(Magics):
             mean_vrad = mean(default.vrad)
 
             if not args['--quiet']:
-                msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
+                # msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
+                msg = blue('INFO: ') + 'Converting to m/s'
                 clogger.info(msg)
 
-            default.vrad = (default.vrad - mean(default.vrad)) * 1e3
+            default.vrad = (default.vrad - mean_vrad)*1e3 + mean_vrad
             default.error *= 1e3
-            default.vrad_full = (default.vrad_full - mean(default.vrad_full)) * 1e3
+            default.vrad_full = (default.vrad_full - mean(default.vrad_full))*1e3 + mean(default.vrad_full)
             default.error_full *= 1e3
             default.units = 'm/s'
 
