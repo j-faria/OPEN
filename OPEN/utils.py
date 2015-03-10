@@ -143,6 +143,13 @@ def julian_day_to_date(J):
     Y = e/p - y + (n + m - M)/n
     return (Y, M, D)
 
+def date_to_julian_day(day, month, year):
+    """ Returns the julian day corresponding to the date day,month,year """
+    a = (14-month)/12
+    y = year + 4800 - a
+    m = month + 12*a - 3
+    return day + ((153*m+2)/5) + 365*y + y/4 - 32083
+
 
 ### Yorbit related I/O
 def write_yorbit_macro(system):
