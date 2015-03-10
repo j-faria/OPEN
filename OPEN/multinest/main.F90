@@ -256,11 +256,11 @@ program main
         !spriorran(i+1,2)=30.d0
 
         !! eccentricity, Uniform, 0-1
-        spriorran(i+2,1)=0d0
-        spriorran(i+2,2)=1d0
+!         spriorran(i+2,1)=0d0
+!         spriorran(i+2,2)=1d0
         !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
-!         spriorran(i+2,1)=0.867d0
-!         spriorran(i+2,2)=3.03d0
+        spriorran(i+2,1)=0.867d0
+        spriorran(i+2,2)=3.03d0
 
         !! long. periastron, Uniform, 0-2pi rad
         spriorran(i+3,1)=0d0
