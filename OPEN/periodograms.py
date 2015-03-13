@@ -534,6 +534,15 @@ class gls(PeriodogramBase):
 
     self.N = len(self.y)
     # Normalization:
+    self._normalize()
+    
+    # Output statistics
+    if self._stats:
+      self._output()
+    # if self._showPlot:
+    #   self._plot()
+
+  def _normalize(self):
     if self.norm == "Scargle":
       popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
       self.power = self._upow/float(popvar)
@@ -541,12 +550,16 @@ class gls(PeriodogramBase):
       self.power = (self.N-1.)/2.*self._upow
     if self.norm == "Cumming":
       self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
-    
-    # Output statistics
-    if self._stats:
-      self._output()
-    # if self._showPlot:
-    #   self._plot()
+
+  def _normalize_value(self, a):
+    # normalize the value (or array) a
+    if self.norm == "Scargle":
+      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      return a/float(popvar)
+    if self.norm == "HorneBaliunas":
+      return (self.N-1.)/2.*a
+    if self.norm == "Cumming":
+      return (self.N-3.)/2. * a/(1.-max(np.atleast_1d(a)))    
 
   def __buildFreq(self, plow=0.5):
     """
