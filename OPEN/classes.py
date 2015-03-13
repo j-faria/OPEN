@@ -822,53 +822,61 @@ class PeriodogramBase:
       Prob = 1.-(1.-FAPlevel)**(1./self.M)
       return self.probInv(Prob)  
 
-    def FAP_by_bootstrap(self):
+    def FAP_by_bootstrap(self, axes, color='g'):
         from tqdm import tqdm
         name = '_' + self.__class__.__name__
 
+        if name == '_gls':
+            from OPEN.ext.glombscargle import glombscargle
+
         # temporaries
-        print self
         temp_per = copy(self)
         # access the instance's __calcPeriodogramFast function
         exec 'calc = temp_per.' + name + '__calcPeriodogramFast'
 
         f = temp_per.freq
-        p = temp_per.power
+        omegas = 2.*np.pi*temp_per.freq
+        p = temp_per._upow
 
         perc01 = 0.001 # 0.1% FAP
         perc1 = 1.  # 1% FAP
         perc10 = 10.  # 10% FAP
-        perm = 1000 # int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
+        perm = 100 # int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
 
         try:
             self.peaks
             if len(self.peaks) != perm: raise AttributeError
         except AttributeError:
             maxPowers = []
+            t = temp_per.t
             for k in tqdm(xrange(perm)):
                 permutted = np.random.permutation(zip(temp_per.y, temp_per.error))
-                temp_per.y = permutted[:,0]
-                temp_per.error = permutted[:,1]
+                # temp_per.y = permutted[:,0]
+                y = permutted[:,0]
+                # temp_per.error = permutted[:,1]
+                err = permutted[:,1]
 
-                calc()
+                power = glombscargle(t, y, err, omegas)[0]
+                # calc()
                 # temp_per._plot_pg()
-                powermaxP = temp_per.power.max()
+                # powermaxP = temp_per.power.max()
+                powermaxP = power.max()
                 maxPowers.append(powermaxP)
             self.peaks = np.sort(maxPowers)
 
         index01 = int( ((1-perc01/100.0) * len(self.peaks)) )
         index1 = int( ((1-perc1/100.0) * len(self.peaks)) )
         index10 = int( ((1-perc10/100.0) * len(self.peaks)) )
-        self.powerFAP_01 = self.peaks[index01]
-        self.powerFAP_1 = self.peaks[index1]
-        self.powerFAP_10 = self.peaks[index10]
+        self.powerFAP_01 = self._normalize_value(self.peaks[index01])
+        self.powerFAP_1 = self._normalize_value(self.peaks[index1])
+        self.powerFAP_10 = self._normalize_value(self.peaks[index10])
 
         # plt.figure()
-        ax = plt.subplot(111)
+        ax = axes
         # ax.semilogx(1./f, p, 'k-')
-        ax.axhline(self.powerFAP_10, c='g', lw=2, ls='-', label='10%')
-        ax.axhline(self.powerFAP_1, c='g', lw=2, ls='--', label='1%')
-        ax.axhline(self.powerFAP_01, c='g', lw=2, ls=':', label='0.1%')
+        # ax.axhline(self.powerFAP_10, c='g', lw=2, ls='-', label='10%')
+        ax.axhline(self.powerFAP_1, c=color, lw=2, ls='--', label='1%')
+        ax.axhline(self.powerFAP_01, c=color, lw=2, ls=':', label='0.1%')
         # plt.show()
         #         if orbit == 'circ':
         #             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
@@ -885,6 +893,10 @@ class PeriodogramBase:
         xlabel = 'Period [d]'
         ylabel = 'Power'
         do_title = kwargs.pop('title', True)
+        do_legend = kwargs.pop('legend', True)
+        do_labels = kwargs.pop('labels', True)
+        color = kwargs.pop('color', 'b')
+        FAPcolor = kwargs.pop('FAPcolor', 'k')
 
         if newFig and save:
             self.fig = plt.figure(figsize=(8,4))
@@ -901,13 +913,14 @@ class PeriodogramBase:
         if do_title:
             self.ax.set_title("Normalized periodogram")
 
-        self.ax.set_xlabel(xlabel)
-        self.ax.set_ylabel(ylabel)
+        if do_labels:
+            self.ax.set_xlabel(xlabel)
+            self.ax.set_ylabel(ylabel)
         if self.power.max() < 1e-300:  # apparently, Metplotlib can't plot these small values
             clogger.warning(yellow('Warning: ')+'Max value < 1e-300, plotting normalized periodogram')
-            self.ax.semilogx(1./self.freq, self.power/self.power.max(), 'b-', **kwargs)
+            self.ax.semilogx(1./self.freq, self.power/self.power.max(), color=color, ls='-', **kwargs)
         else:
-            self.ax.semilogx(1./self.freq, self.power, 'b-', **kwargs)
+            self.ax.semilogx(1./self.freq, self.power, color=color, ls='-', **kwargs)
         # plot FAPs
         if doFAP:
             # do default FAPs of 10%, 1% and 0.1%
@@ -921,11 +934,13 @@ class PeriodogramBase:
             self.ax.axhline(y=plvl1, color='k', ls='-', label='10%')
             self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
             self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
-            self.ax.legend(frameon=True)
+            if do_legend: 
+                self.ax.legend(frameon=True)
         if dobFAP:
             # calculate FAP by bootstrap
-            self.FAP_by_bootstrap()
-            self.ax.legend(frameon=True)
+            self.FAP_by_bootstrap(self.ax, FAPcolor)
+            if do_legend: 
+                self.ax.legend(frameon=True)
 
         # plot vertical lines
         if verts is not None:
@@ -934,7 +949,7 @@ class PeriodogramBase:
                 # if v==18:
                 #   self.ax.axvline(x=v, color='r', ls='--', lw=2) 
 
-        plt.tight_layout()
+        # plt.tight_layout()
 
         if save:
             msg = yellow('INFO: ') + 'Saving figure to %s' % save
@@ -2121,7 +2136,7 @@ class MCMC_nest:
                     ax.axhline(y=v, ls='--', color=colors[i], alpha=0.3)
 
                 ax.set_xlim([-0.2, 1.2])
-                ax.set_xlabel('phase (P=%5.2f)' % P[planeti])
+                ax.set_xlabel('phase (P=%3.2f)' % P[planeti])
                 ax.set_ylabel('RV [%s]'%system.units)
                 ax.minorticks_on()
                 ax.xaxis.set_major_formatter(MyFormatter())

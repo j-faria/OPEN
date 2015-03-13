@@ -1,6 +1,7 @@
 # In order to plot the periodogram of the RV and the FWHM together 'run -i' this script:
 magic = get_ipython().magic
 
+import sys
 import matplotlib.pyplot as plt
 # import matplotlib.ticker as ticker
 from matplotlib.ticker import ScalarFormatter, IndexFormatter
@@ -74,6 +75,10 @@ with plt.rc_context(params):
 	
 	fig.tight_layout()
 
-	fig.savefig('/home/joao/phd/CoRoT7_mahmoud/final_periodograms.pdf')
+	try:
+		sf = sys.argv[1]
+		fig.savefig(sf)
+	except IndexError:
+		pass
 plt.show()
 
