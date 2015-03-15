@@ -20,7 +20,7 @@ Options:
 """
 
 # standard library imports
-import sys
+# import sys
 # intra-package imports
 from OPEN.ipshell import EmbedShell, cfg
 from OPEN.docopt import docopt
@@ -36,8 +36,8 @@ if __name__ == "__main__":
     # command-line argument parser
     args = docopt(__doc__, version=version)
 
-    if '--art' in sys.argv:
-        with open('./OPEN/asciiart.txt', 'r') as f: print f.read()
+    # if '--art' in sys.argv:
+    #     with open('./OPEN/asciiart.txt', 'r') as f: print f.read()
 
     banner =  u'Welcome to ' + version + '\n'
     banner += u'Created by João Faria | joao.faria@astro.up.pt\n\n'

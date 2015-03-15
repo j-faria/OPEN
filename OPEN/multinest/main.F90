@@ -24,7 +24,7 @@ program main
     real(kind=8), parameter :: kmax = 2129d0 ! m/s
     real(kind=8), dimension(6) :: a
 
-    namelist /NEST_parameters/ sdim, &
+    namelist /NEST_parameters/ sdim, nest_nlive, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &
                                nest_root, nest_context, &
                                training, trained_parameters, &
@@ -79,9 +79,11 @@ program main
         if (nest_context / 100 == 2) then
 #ifdef MPI
             call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-            if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
-            call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-            call MPI_ABORT(MPI_COMM_WORLD,1)
+            if (i==0) then
+                print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
+                call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+                call MPI_ABORT(MPI_COMM_WORLD,1)
+            end if
 #else
             stop '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
 #endif
@@ -246,8 +248,8 @@ program main
 !         spriorran(i,2)= 1900.d0
 
         !! semi amplitude K, Mod. Jeffreys (or Uniform)
+!         spriorran(i+1,1)=0.d0
         spriorran(i+1,1)=0.d0
-!         spriorran(i+1,1)=1.d0
         spriorran(i+1,2)= maxval(rvs) - minval(rvs)
         ! the true upper limit depends on e and P, and it will only be set when rescaling.
         !spriorran(i+1,2)=kmax 
@@ -285,8 +287,8 @@ program main
 
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+2 
-        spriorran(i:,1)= -kmax/100.d0
-        spriorran(i:,2)= kmax/100.d0
+        spriorran(i:,1)= -kmax
+        spriorran(i:,2)= kmax
 
     else if (using_gp) then
     ! parameter array organization in this case:
@@ -318,13 +320,13 @@ program main
             ! amplitude of GP
             i = sdim-nextra+nobserv+1
             spriorran(i,1)= 0.d0
-            spriorran(i,2)= 10d0
+            spriorran(i,2)= maxval(rvs) - minval(rvs)
             ! timescale for growth / decay of active regions (d)
-            spriorran(i+1,1)= 20d0
+            spriorran(i+1,1)= 1d0
             spriorran(i+1,2)= 50.d0
             ! periodicity (recurrence) timescale -> rotation period of the star
-            spriorran(i+2,1)= 10.d0
-            spriorran(i+2,2)= 20.d0
+            spriorran(i+2,1)= 30.d0
+            spriorran(i+2,2)= 50.d0
             ! smoothing parameter (?)
             spriorran(i+3,1)= 0.1d0
             spriorran(i+3,2)= 10d0
@@ -341,14 +343,15 @@ program main
     end if    
 
 !    call MPI_INIT(ierr)
-!    call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-!    if (i==0) then
-!        write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
-!        write(*, fmt) spriorran(:,1)
-!        write(*, fmt) spriorran(:,2)
+!     call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+!     if (i==0) then
+!         print *, 'Prior limits:'
+!         write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
+!         write(*, fmt) spriorran(:,1)
+!         write(*, fmt) spriorran(:,2)
 !        !write(*,*) observ
-!    end if
-!    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+!     end if
+!     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
 !    print *, training, trained_parameters
 !     stop "we have to stop here"

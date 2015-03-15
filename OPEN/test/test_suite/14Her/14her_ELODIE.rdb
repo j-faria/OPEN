@@ -1,3 +1,14 @@
+# Title: The ELODIE survey for northern extra-solar planets. III. Three planetary 
+#        candidates detected with ELODIE.
+# Authors: Naef D., Mayor M., Beuzit J.L., Perrier C., Queloz D., Sivan J.P., Udry S.
+# Table: Radial velocity measurements for 14 Her (=HD 145675)
+# -----------------------------------------------------------------------------------
+#  Format Units Label  Explanations
+# -----------------------------------------------------------------------------------
+#  F10.4  d     BJD    Barycentric Julian date minus 2400000
+#   F6.1  m/s   RV     Barycentric radial velocity
+#   F4.1  m/s   e_RV   Full RV uncertainty
+#------------------------------------------------------------------------------------
 jdb	vrad	svrad
 ---	----	-----
 49464.5956	 43.5	8.0

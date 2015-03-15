@@ -71,8 +71,8 @@ Options:
 per_usage = \
 """
 Usage:
-    per -n SYSTEM
-    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
+    per 
+    per [-n SYSTEM] (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
     per -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
@@ -283,34 +283,16 @@ command_list = \
 @magics_class
 class EmbeddedMagics(Magics):
 
-    # @line_magic
-    # def kill_embedded(self, parameter_s=''):
-    #     """%kill_embedded : deactivate for good the current embedded IPython.
-
-    #     This function (after asking for confirmation) sets an internal flag so
-    #     that an embedded IPython will never activate again.  This is useful to
-    #     permanently disable a shell that is being called inside a loop: once
-    #     you've figured out what you needed from it, you may then kill it and
-    #     the program will then continue to run without the interactive shell
-    #     interfering again.
-    #     """
-
-    #     kill = ask_yes_no("Are you sure you want to kill this embedded instance "
-    #                      "(y/n)? [y/N] ",'n')
-    #     if kill:
-    #         self.shell.embedded_active = False
-    #         print ("This embedded IPython will not reactivate anymore "
-    #                "once you exit.")
-
-
     @line_magic
     def develop(self, parameter_s=''):
         # reload(classes)
-        import reimport
+        import reimport, os
         mod = reimport.modified()
         reimport.reimport(*mod)
+        print 'Done re-importing'
         # reload(periodograms)
         # reload(core)
+        os.system('python scons/scons.py --gfortran=/home/joao/Software/mesasdk/bin/gfortran')
 
 
     @needs_local_scope
@@ -355,12 +337,13 @@ class EmbeddedMagics(Magics):
             mean_vrad = mean(default.vrad)
 
             if not args['--quiet']:
-                msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
+                # msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
+                msg = blue('INFO: ') + 'Converting to m/s'
                 clogger.info(msg)
 
-            default.vrad = (default.vrad - mean(default.vrad)) * 1e3
+            default.vrad = (default.vrad - mean_vrad)*1e3 + mean_vrad
             default.error *= 1e3
-            default.vrad_full = (default.vrad_full - mean(default.vrad_full)) * 1e3
+            default.vrad_full = (default.vrad_full - mean(default.vrad_full))*1e3 + mean(default.vrad_full)
             default.error_full *= 1e3
             default.units = 'm/s'
 

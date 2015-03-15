@@ -615,9 +615,9 @@ contains
 		if (rc /= 0) STOP 'Error in cholesky. Matrix is not positive definite?'
 
 		xsol = yy_m(:, 1)
-		lnlike = - sum(log(get_diagonal(cov_cho_factor)))
-		lnlike = lnlike - N*const1
-		lnlike = lnlike - 0.5d0 * dot_product(yy, xsol)
+		lnlike = - sum(log(get_diagonal(cov_cho_factor))) ! -0.5*log(det K)
+		lnlike = lnlike - N*const1 ! -(N/2)*ln(2*pi)
+		lnlike = lnlike - 0.5d0 * dot_product(yy, xsol) ! -0.5*r.T*K.I*r with K.I*r from DPOTRS
 
 	end function get_lnlikelihood
 

@@ -1078,6 +1078,10 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# print restart_root
 			# return
 
+
+		# this is hardcoded, for now
+		nlive_dict = {0:300, 1:500, 2:700}
+
 		for npl in range(0, maxp+1):
 
 			##############################################################################
@@ -1134,6 +1138,26 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 					if 'nest_fb' in line: print replacer,
 					else: print line,
 
+			# by default, feedback on the current MAP parameters is omitted, but
+			# the user can still request it
+			if MAPfeed:
+				replacer = '    nest_MAPfb=.true.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_MAPfb' in line: print replacer,
+					else: print line,
+			else:
+				replacer = '    nest_MAPfb=.false.\n'
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'nest_MAPfb' in line: print replacer,
+					else: print line,
+
+			# set nlive
+			nlive = nlive_dict[npl]
+			replacer = '    nest_nlive = %d\n' % nlive
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'nest_nlive' in line: print replacer,
+				else: print line,
+
 
 			sleep(1)
 			start = time()
@@ -1153,11 +1177,12 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			msg = blue('INFO: ') + 'MultiNest took %2dm%2.0fs' % (took_min, took_sec)
 			clogger.info(msg)
 
-			get_multinest_output(system, root, nplanets, context=str(context))
+			# get_multinest_output(system, root, nplanets, context=str(context))
 
 			if nplanets == 0:
 				results_constant = MCMC_nest(root, context=str(context))
 				results_constant.model_name = 'd0'
+				results_constant.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_constant = results_constant.compress_chains()
 
@@ -1174,6 +1199,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			elif nplanets == 1:
 				results_one_planet = MCMC_nest(root, context=str(context))
 				results_one_planet.model_name = 'd0k1'
+				results_one_planet.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_one_planet = results_one_planet.compress_chains()
 				
@@ -1191,6 +1217,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			elif nplanets == 2:
 				results_two_planet = MCMC_nest(root, context=str(context))
 				results_two_planet.model_name = 'd0k2'
+				results_two_planet.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_two_planet = results_two_planet.compress_chains()
 
@@ -1209,6 +1236,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			elif nplanets == 3:
 				results_three_planet = MCMC_nest(root, context=str(context))
 				results_three_planet.model_name = 'd0k3'
+				results_three_planet.print_best_solution(system)
 				# put the results into a zip file
 				zip_filename_three_planet = results_three_planet.compress_chains()
 
@@ -1253,7 +1281,6 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			except RuntimeWarning:
 				try:
 					import mpmath
-					print 'imported mpmath'
 				except ImportError:
 					try:
 						from sympy import mpmath
@@ -1340,6 +1367,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		system.allfits = fits
 		## save the fit with highest evidence to the system
 		system.results = fits[sorted(fits, reverse=True)[0]]
+		system.results.save_fit_to(system)
 
 		## save the zip files into a folder with the name of the star
 		## allowing for complete restarts in the future
@@ -1406,7 +1434,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 					shutil.move(map_phased_plot_file_three_planet, save_folder)
 					shutil.move(hist_plot_file_three_planet, save_folder)				
 
-
+		os.system("notify-send 'OPEN has finished an automatic MN run'")
 
 	return
 
@@ -1574,7 +1602,7 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
 
 
 
-def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=True, full=False):
+def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=False, full=False):
 	try:
 		system.per
 	except AttributeError:
@@ -1586,7 +1614,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 			system.per = gls(system)
 
 	if prot is None:
-		prot = system.per.get_peaks(output_period=True)[1]
+		prot = system.per.get_peaks(output_period=True)[0][0]
 	else:
 		prot = float(prot)
 
@@ -1603,7 +1631,8 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 	if fix_p:
 		msg = blue('INFO: ') + 'Removing Prot=%.2f days (exactly) from %s \n' % (prot, quantity)
 	else:
-		msg = blue('INFO: ') + 'Removing Prot=%.2f days (fitting it) from %s\n' % (prot, quantity)
+		msg = blue('INFO: ') + 'Removing Prot~%.2f days (fitting it) from %s\n' % (prot, quantity)
+
 	msg += blue('    : ') + 'plus %d harmonics' % (nrem-1)
 	clogger.info(msg)
 
@@ -1620,7 +1649,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 			# P = args
 			return (v - (As*np.sin(2.*pi*t/P) + Ac*np.cos(2.*pi*t/P)) ) / err
 
-		starting_values = [0.001, 0.001]
+		starting_values = [np.ptp(v)]*2
 		if not fix_p: starting_values = starting_values + [prot]
 		rot_param = leastsq(func, starting_values, maxfev=50000)[0]
 		print rot_param
@@ -1664,7 +1693,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 	if fix_p: 
 		prot_fit = prot
 	else: 
-		prot_fit = rot_param[4] # the period that we ended up removing
+		prot_fit = rot_param[-1] # the period that we ended up removing
 
 	print 'Phase = ', np.arctan2(rot_param[1], rot_param[0])
 
@@ -1683,7 +1712,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 		else:
 			As1, Ac1, P = rot_param
 		
-		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)), 'o-')
+		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)), '-')
 
 	if nrem==2:
 		if fix_p:
@@ -1693,7 +1722,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 			As1, Ac1, As2, Ac2, P = rot_param
 
 		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
-		             (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), 'o-')
+		             (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)), '-')
 	
 	if nrem==3:
 		if fix_p:
@@ -1704,7 +1733,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=T
 
 		plt.plot(xx, (As1*np.sin(2.*pi*xx/P) + Ac1*np.cos(2.*pi*xx/P)) + \
 					 (As2*np.sin(4.*pi*xx/P) + Ac2*np.cos(4.*pi*xx/P)) + \
-					 (As3*np.sin(6.*pi*xx/P) + Ac3*np.cos(6.*pi*xx/P)), 'o-')
+					 (As3*np.sin(6.*pi*xx/P) + Ac3*np.cos(6.*pi*xx/P)), '-')
 
 	plt.errorbar(system.time, system.vrad - vrad_mean, yerr=err, fmt='ro')
 
@@ -1895,12 +1924,15 @@ def do_Dawson_Fabrycky(system):
 	def specwindow(freq,time):
 		""" Calculate the spectral window function and its phase angles """
 		n = len(time)
-		W = [sum([np.exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
-		amp = [np.sqrt(t.real*t.real + t.imag*t.imag) for t in W]
-		phase = [np.arctan2(t.imag,t.real) for t in W]
-		return amp,phase
+		W = np.fromiter((np.sum(np.exp(-2.j*pi*f*time))/n for f in freq), np.complex_, freq.size)
+		# W = [sum([np.exp(-2.j*pi*f*t) for t in time])/float(n) for f in freq]
+		amp = np.absolute(W)
+		# amp = [np.sqrt(t.real*t.real + t.imag*t.imag) for t in W]
+		phase = np.arctan2(W.imag, W.real)
+		# phase = [np.arctan2(t.imag,t.real) for t in W]
+		return amp, phase
 
-	plow = 0.5
+	plow = 1.5
 	n = len(err)
 
 	### GET THE REAL PERIODOGRAM
@@ -1961,9 +1993,8 @@ def do_Dawson_Fabrycky(system):
 	plt.figure(num = 1)
 
 	plt.subplot(4,1,1)
-	plt.title('window function + periodogram')
-	plt.semilogx(1/freq,amp,'r-', alpha=0.3)
-	plt.semilogx(1/freq,power,'k-')
+	plt.semilogx(1/freq, amp, 'r-', alpha=0.3, label='window function')
+	plt.semilogx(1/freq, power, 'k-', label='GLS')
 
 	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
@@ -1976,6 +2007,8 @@ def do_Dawson_Fabrycky(system):
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
 
+	plt.legend(fontsize=12)
+
 	### PLOT FAKE PERIODOGRAMS + DIALS
 	#### 1st FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake1, errfake, ofac, plow)
@@ -1987,11 +2020,13 @@ def do_Dawson_Fabrycky(system):
 	plt.subplot(4,1,2)
 
 	plt.semilogx([1./i for i in freq], power, 'k-')
-	plt.fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
+	fb = plt.fill_between(1/freq_real, power_real, 0., color='k', alpha=0.5)
 
 	plt.semilogx(1./fmax1,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
+
+	vl = plt.axvline(x=1./fmax1)
 
 	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
 	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
@@ -1999,6 +2034,8 @@ def do_Dawson_Fabrycky(system):
 
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
+
+	plt.legend([vl], ['assumed correct'], fontsize=12)
 
 	#### 2nd FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake2, errfake, ofac, plow)
@@ -2016,12 +2053,16 @@ def do_Dawson_Fabrycky(system):
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
+	vl = plt.axvline(x=1./fmax2)
+
 	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
 	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
 	plt.semilogx([1./fmax3,1./fmax3+0.045*np.cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind3])],'k-',lw=1)
 
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
+
+	plt.legend([vl], ['assumed correct'], fontsize=12)
 
 	#### 3rd FAKE
 	freq,power,a_cos,b_sin,c_cte,phi,fNy,xdif = periodogram_DF(timefake, rv_fake3, errfake, ofac, plow)
@@ -2039,6 +2080,8 @@ def do_Dawson_Fabrycky(system):
 	plt.semilogx(1./fmax2,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 	plt.semilogx(1./fmax3,max(power)+0.1,marker = '$\circ$',markersize=10,c='k',mew=0.3)
 
+	vl = plt.axvline(x=1./fmax3)
+
 	plt.semilogx([1./fmax3,1./fmax3+0.045*np.cos(phi[ind3])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind3])],'k-',lw=1)
 	plt.semilogx([1./fmax1,1./fmax1+0.045*np.cos(phi[ind1])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind1])],'k-',lw=1)
 	plt.semilogx([1./fmax2,1./fmax2+0.045*np.cos(phi[ind2])],[max(power)+0.1,max(power)+0.1+0.045*np.sin(phi[ind2])],'k-',lw=1)
@@ -2046,7 +2089,10 @@ def do_Dawson_Fabrycky(system):
 	plt.xlim(plow,xdiff*ofac)
 	plt.ylim(0.0,max(power)+0.2)
 
+	plt.legend([vl], ['assumed correct'], fontsize=12)
+
 	# savefig(name+'_DF.ps',orientation = 'Landscape')
+	plt.tight_layout()
 	plt.show()
 
 
@@ -2059,7 +2105,7 @@ def do_clean(system):
 		return
 
 	time, rv, err = system.time, system.vrad, system.error
-	plow = 0.5
+	plow = 1.5
 
 	msg = blue('INFO: ') + 'Running CLEAN...'
 	clogger.info(msg)

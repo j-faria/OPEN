@@ -7,7 +7,7 @@
     ! additional information to pass to low-level routines
     ! we use this to set the problem
     ! nob is the number of observatories
-    nest_context = 112
+    nest_context = 101
     ! nest_context has three numbers: xyz
     !         x=1 "normal" regression, x=2 gaussian process regression, x=3 gaussian process without planets
     !         y= number of planets in the model
@@ -40,10 +40,10 @@
     nest_maxIter=100000
     
     !feedback on the sampling progress?
-    nest_fb=.true.
+    nest_fb=.false.
 
     !feedback on current MAP parameters?
-    nest_MAPfb=.true.
+    nest_MAPfb=.false.
 
     !live plot?
     nest_liveplot=.false.
