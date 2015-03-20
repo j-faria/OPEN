@@ -84,7 +84,7 @@ contains
 
 			! prior for hyperparameters
 			i = nPar-nextra+nobserv+1
-			do j = i, i+3
+			do j = i, i+4
 				Cube(j) = UniformPrior(Cube(j), spriorran(j,1), spriorran(j,2))
 			end do
 

@@ -3,7 +3,7 @@ module like
     use params
     use gputils, only: gp_n_planet_pars
     use utils1, only: logSumExp
-    !use Nested, only: MPI_COMM_WORLD
+    use Nested, only: MPI_COMM_WORLD
 
     !use lib_matrix, only: inverse, determinant
     implicit none
@@ -60,29 +60,47 @@ contains
 !         tau = 1.d0
 
         if (using_gp) then
-            !call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-            !if (i==0) then
-            !    write(fmt,'(a,i2,a)')  '(',nest_nPar,'f13.4)'
-            !    write(*, fmt) Cube(:)
-            !    write(*, fmt) Cube(:gp_n_planet_pars)
-            !    write(*, fmt) Cube(gp_n_planet_pars+1:)
-            !end if
-            !call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-            !STOP 1
+!             call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+!             if (i==0) then
+!                write(fmt,'(a,i2,a)')  '(',nest_nPar,'f13.4)'
+!                write(*, fmt) Cube(:)
+!                write(*, fmt) Cube(:gp_n_planet_pars)
+!                write(*, fmt) Cube(gp_n_planet_pars+1)
+!                write(*, fmt) Cube(gp_n_planet_pars+2)
+!                write(*, fmt) Cube(gp_n_planet_pars+3)
+!                write(*, fmt) Cube(gp_n_planet_pars+4:gp_n_planet_pars+5)
+!             end if
+!             call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+!             STOP 1
             
-            !gp1%gp_kernel%pars = (/1.d0, 25.d0/)
-            !gp1%gp_kernel%pars = Cube(gp_n_planet_pars+1:)
+            ! gp1 is an object of type GP (class is defined in gp_utils.f90)
+            ! its hierarchy is quite complex:
+            !   gp1%gp_kernel%pars    holds the parameters of the kernel's sum, i.e,
+            !                         the multiplying constants behind the 2 kernels
+            !    
+            !   gp1%sub_kernel1       is the first sub kernel (a product of kernels)
+            !   gp1%sub_kernel1%pars  holds the parameters of the kernels' product, i.e.,
+            !                         the multiplying constants - do not change these
+            !   parameters of the two kernels being multiplied can be accessed and changed by
+            !   gp1%sub_kernel1%get_kernel_pars(k)
+            !   gp1%sub_kernel1%set_kernel_pars(k, new_pars)
+            !   where k=1 corresponds to the ExpSquared kernel (with 1 parameter)
+            !         k=2 corresponds to the ExpSineSquared kernel (with 2 parameters)
+            !
+            !   gp%sub_kernel2        is the second sub kernel (a simple DiagonalKernel)
+            !   gp1%sub_kernel1%pars  holds the DiagonalKernel parameter (the jitter value)
 
-            !! hyperparameters
-            ! amplitude of GP
+            !! update the hyperparameters
+
+            ! amplitude of the quasi-periodic component
             gp1%gp_kernel%pars(1) = Cube(gp_n_planet_pars+1)
+            ! jitter
+            gp1%sub_kernel1%pars(1) = Cube(gp_n_planet_pars+2)
             ! timescale for growth / decay of active regions (d)
-            call gp1%gp_kernel%set_kernel_pars(1, (/Cube(gp_n_planet_pars+2)/) )
-            !gp1%gp_kernel%kernel1%pars = Cube(gp_n_planet_pars+2)
+            call gp1%sub_kernel1%set_kernel_pars(1, (/Cube(gp_n_planet_pars+3)/) )
             ! periodicity (recurrence) timescale -> rotation period of the star
-            ! smoothing parameter (?)
-            call gp1%gp_kernel%set_kernel_pars(2, Cube(gp_n_planet_pars+3:))
-            !gp1%gp_kernel%kernel2%pars = Cube(gp_n_planet_pars+3:)
+            ! correlation scale
+            call gp1%gp_kernel%set_kernel_pars(2, Cube(gp_n_planet_pars+4:))
 
 
             slhood = gp1%get_lnlikelihood(times, rvs, Cube(:gp_n_planet_pars), yerr=errors)
