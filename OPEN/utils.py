@@ -22,8 +22,14 @@ import matplotlib.cm as cm
 
 
 mjup2mearth  = 317.828
-
-
+msun2mjup = 1047.3486
+msun2mnep = 19412.24
+msun2mearth = 328900.56
+mearth2msun = 1./msun2mearth
+au2m = 149597870700.
+m2au = 1./au2m
+jd2s = 86400.
+mean_sidereal_day = 86164.09054 # in seconds; 23h56m04.09054s
 
 ## this code from 
 ##   http://code.activestate.com/recipes/502263-yet-another-unique-function/

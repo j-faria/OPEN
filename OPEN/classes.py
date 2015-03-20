@@ -79,6 +79,7 @@ class rvSeries:
 
         # verbosity (on by default)
         verbose = kwargs.get('verbose', True)
+
         # read data
         try:
           data, self.provenance = rvIO.read_rv(*filenames, skip=skip, verbose=verbose)
@@ -212,7 +213,7 @@ class rvSeries:
 
             
 
-    def do_plot_obs(self, newFig=True, leg=True, save=None, offsets=None):
+    def do_plot_obs(self, newFig=True, leg=True, save=None, offsets=None, LP=False):
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled.
         """
@@ -251,6 +252,10 @@ class rvSeries:
                          fmt='o'+colors[i], label=fname)
             t, rv, err = t[m:], rv[m:], err[m:]
         
+        if LP:
+            # this is 1 October 2012
+            ax1.axvline(x=56202, ls='--', color='k')
+
         if leg: ax1.legend()
         plt.tight_layout()
         ax2.ticklabel_format(useOffset=False)
@@ -841,7 +846,7 @@ class PeriodogramBase:
         perc01 = 0.001 # 0.1% FAP
         perc1 = 1.  # 1% FAP
         perc10 = 10.  # 10% FAP
-        perm = 100 # int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
+        perm = 1000 # int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
 
         try:
             self.peaks
@@ -876,7 +881,7 @@ class PeriodogramBase:
         # ax.semilogx(1./f, p, 'k-')
         # ax.axhline(self.powerFAP_10, c='g', lw=2, ls='-', label='10%')
         ax.axhline(self.powerFAP_1, c=color, lw=2, ls='--', label='1%')
-        ax.axhline(self.powerFAP_01, c=color, lw=2, ls=':', label='0.1%')
+        # ax.axhline(self.powerFAP_01, c=color, lw=2, ls=':', label='0.1%')
         # plt.show()
         #         if orbit == 'circ':
         #             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
@@ -1162,7 +1167,7 @@ class MCMC_dream:
         ## loop over planets
         print("%3s %12s %10s %10s %10s %15s %9s" % \
             ('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
-        for i, planet in enumerate(list(ascii_lowercase)[:self.nplanets]):
+        for i, planet in enumerate(list(ascii_lowercase)[1:self.nplanets+1]):
             P, K, ecc, omega, T0, gam = [par_best[j::6] for j in range(6)]
             print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % 
                                 (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
@@ -1504,7 +1509,7 @@ class MCMC_nest:
         print '%8s %14s %9s %14s %14s' % ('', 'mean', '+- sigma', 'ML', 'MAP')
         ## loop over planets
         i = -1
-        for i, planet in enumerate(list(ascii_lowercase)[:self.nplanets]):
+        for i, planet in enumerate(list(ascii_lowercase)[1:self.nplanets+1]):
             print yellow(planet)
             print '%8s %14.3f %9.3f %14.3f %14.3f' % ('P',     par_mean[5*i], par_sigma[5*i], par_mle[5*i], par_map[5*i])
             print '%8s %14.3f %9.3f %14.3f %14.3f' % ('K',     par_mean[5*i+1], par_sigma[5*i+1], par_mle[5*i+1], par_map[5*i+1])
@@ -1514,7 +1519,7 @@ class MCMC_nest:
         
             print 
 
-            from .utils import mjup2mearth
+            from .utils import mjup2mearth, mearth2msun, mean_sidereal_day, au2m
             P, K, ecc = par_map[5*i], par_map[5*i+1], par_map[5*i+2]
             P_error, K_error, ecc_error = par_sigma[5*i], par_sigma[5*i+1], par_sigma[5*i+2]
 
@@ -1526,14 +1531,18 @@ class MCMC_nest:
                 ecc = ufloat(ecc, ecc_error)
                 m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * sqrt(1-ecc**2)
                 m_me = m_mj * mjup2mearth
+                a = ((system.star_mass + m_me*mearth2msun)/(m_me*mearth2msun)) * sqrt(1.-ecc**2) * K * (P*mean_sidereal_day/(2*np.pi)) / au2m
 
-                print '%8s %11.3f +- %5.3f [MJup]  %11.3f +- %5.3f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
+                print '%8s %11.4f +- %7.4f [MJup]  %11.4f +- %7.4f [MEarth]' % ('m sini', m_mj.n, m_mj.s, m_me.n, m_me.s)
+                print '%8s %11.4f +- %7.4f [AU]' % ('a', a.n, a.s)
 
             except ImportError:
                 m_mj = 4.919e-3 * system.star_mass**(2./3) * P**(1./3) * K * np.sqrt(1-ecc**2)
                 m_me = m_mj * mjup2mearth
+                a = ((system.star_mass + m_me*mearth2msun)/(m_me*mearth2msun)) * np.sqrt(1.-ecc**2) * K * (P*mean_sidereal_day/(2*np.pi)) / au2m
 
                 print '%8s %11.3f [MJup] %11.3f [MEarth]' % ('m sini', m_mj, m_me)
+                print '%8s %11.3f [AU]' % ('a', a)
 
             print 
 
