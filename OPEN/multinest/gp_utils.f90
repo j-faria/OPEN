@@ -37,13 +37,13 @@ module gputils
 		procedure :: evaluate_kernel => evaluate_kernel_ConstantKernel
 	end type ConstantKernel
 
-	! This kernel returns a constant along the diagonal
+	! This kernel returns a constant along the diagonal: "white noise" (homoskedastic)
 	type, extends(Kernel) :: DiagonalKernel
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_DiagonalKernel
 	end type DiagonalKernel
 
-	! This is a "white noise" kernel
+	! This is a "white noise" (heteroskedastic) kernel
 	type, extends(Kernel) :: WhiteKernel
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_WhiteKernel
@@ -123,6 +123,9 @@ module gputils
 		real(kind=8), dimension(:, :), allocatable :: cov
 		! the kernel associated with this GP
 		class(Kernel), pointer :: gp_kernel
+		! possible sub-kernels (we only allow one level down for now)
+		class(Kernel), pointer :: sub_kernel1
+		class(Kernel), pointer :: sub_kernel2
 	contains 
 		procedure :: is_posdef
 		procedure :: get_lnlikelihood
@@ -152,10 +155,11 @@ contains
 	end function new_Kernel
 
 
-	function new_GP(cov_matrix, kernel_ptr)
+	function new_GP(cov_matrix, kernel_ptr, subkernel_ptr1, subkernel_ptr2)
 		! this is the GP derived-type constructor
 		real(kind=8), dimension(:, :) :: cov_matrix
 		class(Kernel), pointer :: kernel_ptr
+		class(Kernel), pointer, optional :: subkernel_ptr1, subkernel_ptr2
 		type(GP) new_GP
 		integer :: shape_cov(2), N
 
@@ -166,6 +170,10 @@ contains
 		allocate(new_GP%cov(N, N))
 		new_GP%cov = cov_matrix
 		new_GP%gp_kernel => kernel_ptr
+
+		if(present(subkernel_ptr1)) new_GP%sub_kernel1 => subkernel_ptr1
+		if(present(subkernel_ptr2)) new_GP%sub_kernel2 => subkernel_ptr2
+
 
 	end function new_GP
 
@@ -468,7 +476,7 @@ contains
 		class(SumKernels), intent(inout) :: self
 		integer, intent(in) :: k
 		if (k==1) print *, self%kernel1%pars
-		if (k==2) print *, self%kernel1%pars
+		if (k==2) print *, self%kernel2%pars
 	end subroutine get_sub_kernel_pars_sum
 
 	subroutine get_sub_kernel_pars_prod(self, k)
@@ -476,7 +484,7 @@ contains
 		class(ProductKernels), intent(inout) :: self
 		integer, intent(in) :: k
 		if (k==1) print *, self%kernel1%pars
-		if (k==2) print *, self%kernel1%pars
+		if (k==2) print *, self%kernel2%pars
 	end subroutine get_sub_kernel_pars_prod
 
 
