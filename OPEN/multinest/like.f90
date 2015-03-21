@@ -24,7 +24,7 @@ contains
         allocate(observ(N))
         allocate(times(N), rvs(N), errors(N))
         allocate(train_var(N))
-        allocate(vel(N), dist(N), sigma(N))
+        allocate(vel(N), r(N), sigma(N))
         allocate(vel_oversampled(5*N), times_oversampled(5*N))
         allocate(last_vel_oversampled(5*N, 3))
         allocate(covmat(N,N), inv_covmat(N,N))
@@ -35,7 +35,7 @@ contains
         deallocate(ss, alpha, tau)
         deallocate(observ)
         deallocate(times, rvs, errors)
-        deallocate(vel, dist, sigma)
+        deallocate(vel, r, sigma)
         deallocate(last_vel_oversampled, vel_oversampled, times_oversampled)
         deallocate(covmat, inv_covmat)
     end subroutine likelihood_finish        
@@ -59,20 +59,60 @@ contains
 !         alpha = 1.d0
 !         tau = 1.d0
 
-        if (using_gp) then
 !             call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
 !             if (i==0) then
 !                write(fmt,'(a,i2,a)')  '(',nest_nPar,'f13.4)'
 !                write(*, fmt) Cube(:)
 !                write(*, fmt) Cube(:gp_n_planet_pars)
-!                write(*, fmt) Cube(gp_n_planet_pars+1)
+!                write(*, fmt) Cube(gp_n_planet_pars)
 !                write(*, fmt) Cube(gp_n_planet_pars+2)
 !                write(*, fmt) Cube(gp_n_planet_pars+3)
 !                write(*, fmt) Cube(gp_n_planet_pars+4:gp_n_planet_pars+5)
 !             end if
 !             call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 !             STOP 1
-            
+
+
+        n = size(times)
+        slhood=-huge(1.d0)*epsilon(1.d0)
+
+!         write(*,'(f10.3, i3)') (rvs(i), observ(i), i=1,n)
+        iendpar = nest_nPar-nextra
+        if (using_jitter) iendpar = iendpar+1
+        do i=1,nobserv
+            where(observ == i) vel = Cube(iendpar+i)
+        end do
+
+        ! get the radial velocity model with these parameters (in vel)
+        if (nplanets > 0) then
+            call get_rvN(times, &
+                         Cube(1:nest_nPar-iendpar-1:5), & ! periods for all planets
+                         Cube(2:nest_nPar-iendpar-1:5), & ! K for all planets
+                         Cube(3:nest_nPar-iendpar-1:5), & ! ecc for all planets
+                         Cube(4:nest_nPar-iendpar-1:5), & ! omega for all planets
+                         Cube(5:nest_nPar-iendpar-1:5), & ! t0 for all planets
+                         0.d0, & ! systematic velocity
+                         vel, n, nplanets)
+
+            ! this works from more than one observatory using OPEN/ext/get_rvN_MultiSite.f90
+            ! well not just yet  
+!             call get_rvN(times, &
+!                          Cube(1:iendpar:5), & ! periods for all planets
+!                          Cube(2:iendpar:5), & ! K for all planets
+!                          Cube(3:iendpar:5), & ! ecc for all planets
+!                          Cube(4:iendpar:5), & ! omega for all planets
+!                          Cube(5:iendpar:5), & ! t0 for all planets
+!                          Cube(iendpar+1:), & ! systematic velocity(ies)
+!                          observ, & ! array with observatory indices
+!                          vel, n, nplanets, nobserv)
+
+        end if
+
+        ! residuals: what is left when the planets (or just vsys) is subtracted from the data
+        r = rvs - vel  
+!         print *, r
+
+        if (using_gp) then
             ! gp1 is an object of type GP (class is defined in gp_utils.f90)
             ! its hierarchy is quite complex:
             !   gp1%gp_kernel%pars    holds the parameters of the kernel's sum, i.e,
@@ -95,88 +135,35 @@ contains
             ! amplitude of the quasi-periodic component
             gp1%gp_kernel%pars(1) = Cube(gp_n_planet_pars+1)
             ! jitter
-            gp1%sub_kernel1%pars(1) = Cube(gp_n_planet_pars+2)
+            gp1%sub_kernel2%pars(1) = Cube(gp_n_planet_pars+2)
             ! timescale for growth / decay of active regions (d)
             call gp1%sub_kernel1%set_kernel_pars(1, (/Cube(gp_n_planet_pars+3)/) )
             ! periodicity (recurrence) timescale -> rotation period of the star
             ! correlation scale
-            call gp1%gp_kernel%set_kernel_pars(2, Cube(gp_n_planet_pars+4:))
+            call gp1%sub_kernel1%set_kernel_pars(2, Cube(gp_n_planet_pars+4:))
 
+            !! log likelihood of the residuals 
+            ! mean_fun is 0. because vsys is already taken care of
+            lhood = gp1%get_lnlikelihood(times, r, (/0.d0/), yerr=errors)
 
-            slhood = gp1%get_lnlikelihood(times, rvs, Cube(:gp_n_planet_pars), yerr=errors)
-            return
-        end if
+!             print *, r(1:5)
 
-        n = size(times)
-        slhood=-huge(1.d0)*epsilon(1.d0)
-
-!         print *, Cube
-!         write(*,'(f10.3, i3)') (rvs(i), observ(i), i=1,n)
-        iendpar = nest_nPar-nobserv
-        do i=1,nobserv
-            where(observ == i) vel = Cube(iendpar+i)
-        end do
-
-!         stop
-
-        ! get the radial velocity model with these parameters (in vel)
-        if (nplanets > 0) then
-            ! this works for one observatory using OPEN/ext/get_rvN.f90
-            call get_rvN(times, &
-                         Cube(1:nest_nPar-1:5), & ! periods for all planets
-                         Cube(2:nest_nPar-1:5), & ! K for all planets
-                         Cube(3:nest_nPar-1:5), & ! ecc for all planets
-                         Cube(4:nest_nPar-1:5), & ! omega for all planets
-                         Cube(5:nest_nPar-1:5), & ! t0 for all planets
-                         0.d0, & ! systematic velocity
-                         vel, n, nplanets)
-
-            ! this works from more than one observatory using OPEN/ext/get_rvN_MultiSite.f90
-            ! well not just yet  
-!             call get_rvN(times, &
-!                          Cube(1:iendpar:5), & ! periods for all planets
-!                          Cube(2:iendpar:5), & ! K for all planets
-!                          Cube(3:iendpar:5), & ! ecc for all planets
-!                          Cube(4:iendpar:5), & ! omega for all planets
-!                          Cube(5:iendpar:5), & ! t0 for all planets
-!                          Cube(iendpar+1:), & ! systematic velocity(ies)
-!                          observ, & ! array with observatory indices
-!                          vel, n, nplanets, nobserv)
-
-            ! this doesn't work...
-            !call get_rvN(times, &
-            !           Cube(1), Cube(2), Cube(3), Cube(4), Cube(5), &
-            !           Cube(6), vel, n, nplanets)
-        else
-            iendpar = nest_nPar-nobserv
-            do i=1,nobserv
-                where(observ == i) vel = Cube(iendpar+i)
-            end do
-        end if
-
-        dist = rvs - vel
-!         print *, dist
-        !call get_covmat(times, errors, observ, ss, alpha, tau, covmat, det, inv_covmat)
-
-        !lhood_test = -0.5d0 * matmul(matmul(reshape(dist, (/1,n/)), covmat), reshape(dist, (/n,1/)))
-        !lhood = lhood_test(1,1) - 0.5d0*log(twopi**n * det)
-
-        if (using_jitter) then
+        else if (using_jitter) then
             jitter = Cube(nest_nPar-nextra+1)
             sigma = errors**2 + jitter**2
 !             print *, jitter
 !             print *, sigma
-            !lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * dist**2 / sigma)
-            lhood = -0.5d0*n*lntwopi - n*sum(log(sqrt(sigma))) -0.5d0*sum(dist**2 / sigma)
+            !lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * r**2 / sigma)
+            lhood = -0.5d0*n*lntwopi - n*sum(log(sqrt(sigma))) -0.5d0*sum(r**2 / sigma)
 !             print *, lhood
-!             lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(dist**2 / sigma)
+!             lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(r**2 / sigma)
 !             print *, lhood
         else
-        	lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(dist**2 / errors**2)
-!             lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(dist**2 / errors**2)
+        	lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(r**2 / errors**2)
+!             lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(r**2 / errors**2)
         end if
 
-!          print *, slhood, lhood, product(sqrt(sigma)), sum(dist**2 / sigma)
+!          print *, slhood, lhood, product(sqrt(sigma)), sum(r**2 / sigma)
         slhood = logSumExp(slhood,lhood)
         !print *, Cube(1:nest_nPar)
 !         print*, slhood

@@ -34,7 +34,7 @@ module params
     ! nuisance parameters and auxiliary variables
     integer, allocatable, dimension(:) :: observ
     real(kind=8), allocatable, dimension(:) :: ss, alpha, tau
-    real(kind=8), allocatable, dimension(:) :: vel, dist, sigma
+    real(kind=8), allocatable, dimension(:) :: vel, r, sigma
     real(kind=8), allocatable, dimension(:) :: times_oversampled, vel_oversampled
     real(kind=8), allocatable, dimension(:, :) :: last_vel_oversampled
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat

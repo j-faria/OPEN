@@ -528,7 +528,7 @@ contains
 		real(kind=8), dimension(size(x)) :: mean
 		integer :: n
 		n = size(x)
-
+		print *, 'here'
 		! ATTENTION: the systematic velocity argument below only allows for one observatory!!!
 		call get_rvN(x, &
 					 args(1:gp_n_planet_pars-1:5), & ! periods for all planets
@@ -609,7 +609,11 @@ contains
 		!cov_cho_factor_copy = cov_cho_factor
 
 		! solve the linear system using the cholesky method
-		yy = y - self%mean_fun(x, args)  ! rh
+		if (size(args) == 1 .and. args(1) == 0.d0) then
+			yy = y ! skip calling the mean function if it's zero
+		else
+			yy = y - self%mean_fun(x, args)  ! rh
+		end if
 		yy_m(:, 1) = yy
 
 		!call cpu_time(time1)

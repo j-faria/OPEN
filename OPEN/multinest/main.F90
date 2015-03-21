@@ -6,7 +6,7 @@ program main
 
     use strings
     use gputils
-    use array_utils, only: linspace
+    use array_utils, only: linspace, variance
 
     implicit none
 
@@ -228,11 +228,11 @@ program main
         subk2 => k3
 
         gp1 = GP(k7%evaluate_kernel(times, times), kernel_to_pass, subk1, subk2)
-        if (nest_context / 100 == 2) then
-            gp1%mean_fun => mean_fun_keplerian
-        else
+!         if (nest_context / 100 == 2) then
+!             gp1%mean_fun => mean_fun_keplerian
+!         else
             gp1%mean_fun => mean_fun_constant
-        endif
+!         endif
         gp_n_planets = nplanets
         gp_n_planet_pars = 5*nplanets + nobserv
     end if
@@ -317,8 +317,8 @@ program main
             spriorran(i,1)= 0.d0
             spriorran(i,2)= maxval(rvs) - minval(rvs)
             ! jitter 
-            spriorran(i+1,1)= trained_parameters(2)
-            spriorran(i+1,2)= trained_parameters(2)
+            spriorran(i+1,1)= 0.d0
+            spriorran(i+1,2)= 0.d0 !variance(errors)
             ! timescale for growth / decay of active regions (d)
             spriorran(i+2,1)= trained_parameters(3)
             spriorran(i+2,2)= trained_parameters(3)
@@ -354,7 +354,6 @@ program main
 
     end if    
 
-!    call MPI_INIT(ierr)
 !     call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
 !     if (i==0) then
 !         print *, 'Prior limits:'
@@ -364,16 +363,15 @@ program main
 !        !write(*,*) observ
 !     end if
 !     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
 !    print *, training, trained_parameters
 !     stop "we have to stop here"
 
-       call nest_Sample
+    call nest_Sample
 
-       ! deallocate memory
-       !call nullify(kernel_to_pass)
-       deallocate(n_each_observ)
-       call likelihood_finish
+    ! deallocate memory
+    !call nullify(kernel_to_pass)
+    deallocate(n_each_observ)
+    call likelihood_finish
 
 #ifdef PLOT 
     if (nest_liveplot) then

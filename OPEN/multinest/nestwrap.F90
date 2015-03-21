@@ -138,7 +138,7 @@ contains
 
 		! For e=0, where pericentre is undefined, ω=0 can be chosen
 		! such that t0 gives the time of nodal passage
-		do i=3,nPar-1,5
+		do i=3,nPar-nextra,5
 			if (Cube(i) == 0) Cube(i+1) = 0.d0
 		end do
 
@@ -178,25 +178,27 @@ contains
 		integer context ! any additional information user wants to pass
 		logical ending ! is this the final call?
 		! local variables
-		double precision, dimension(size(times) + 1000) :: t, mu, std
+		integer, dimension(nobserv) :: t_limits
+		double precision, dimension(size(times) + 1000) :: t, velt, mu, std
 		double precision, dimension(size(times) + 1000, size(times) + 1000) :: cov
 		character(len=100) gppredictfile
-		integer i, map_index
+		integer i, ipar, map_index, n
 		character(len=100) :: fmt
 
+		n = size(times)
 		!write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
 		!write(*,fmt) paramConstr(nPar*3+1:nPar*4)
 		print *, maxLogLike
 
 		write(*,*) ' '
-		if (nplanets == 1 .and. using_gp) then  ! 1 planet + 4 hyper
+		if (nplanets == 1 .and. using_gp) then  ! 1 planet + 5 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
-			write(fmt,'(a,i2,a)')  '(',nPar - 4,'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+1:nPar*4 - 4)
+			write(fmt,'(a,i2,a)')  '(',nPar - 5,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*4 - 5)
 			
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*4 - 3:)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.7)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 1 .and. using_jitter) then  ! 1 planet + jitter
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
@@ -209,16 +211,16 @@ contains
 			write(*,fmt) paramConstr(nPar*3+1:nPar*4)
 
 		
-		else if (nplanets == 2 .and. using_gp) then  ! 2 planets + 4 hyper
+		else if (nplanets == 2 .and. using_gp) then  ! 2 planets + 5 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+5)
 			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+6:nPar*4 - 4)
+			write(*,fmt) paramConstr(nPar*3+6:nPar*4 - 5)
 
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*4 - 3:)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 2 .and. using_jitter) then  ! 2 planets + jitter
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
@@ -234,16 +236,16 @@ contains
 			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+6:nPar*4)
 
-		else if (nplanets == 3 .and. using_gp) then  ! 3 planets + 4 hyper
+		else if (nplanets == 3 .and. using_gp) then  ! 3 planets + 5 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+10)
 			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+11:nPar*4 - 4)
+			write(*,fmt) paramConstr(nPar*3+11:nPar*4 - 5)
 
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*4 - 3:)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 3 .and. using_jitter) then  ! 3 planets + jitter
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
@@ -259,13 +261,13 @@ contains
 			write(fmt,'(a,i2,a)')  '(',nPar-10,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+11:nPar*4)
 
-		else if (nplanets == 0 .and. using_gp) then  ! 4 hyper (plus one systematic velocity)
+		else if (nplanets == 0 .and. using_gp) then  ! 5 hyper (plus systematic velocity)
 			write(*,'(a13)') (/" vsys" /)
-			write(fmt,'(a,i2,a)')  '(', 1, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+1)
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+2:)
+			write(fmt,'(a,i2,a)')  '(', nobserv, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*3+nobserv)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 0 .and. using_jitter) then  ! jitter + vsys
 			write(*,'(2a13)') (/"    s", " vsys" /)
@@ -283,28 +285,66 @@ contains
 		if (ending .and. using_gp) then
 			gppredictfile = TRIM(nest_root)//'gp.dat'
 
+			map_index = nPar*3 ! this is where the MAP parameters start in the paramConstr array
+
 			! prediction times are lineary spaced
 			t(1:1000) = linspace(minval(times), maxval(times), 1000)
 			! and put together with observed times
 			t(1001:) = times
 			call sort(t, size(t))  ! sort it
 
+			! fill vel with systematic velocities
+			ipar = nPar-nextra
+			if (using_jitter) ipar = ipar+1
+	        do i=1,nobserv
+	            where(observ == i) vel = paramConstr(ipar+i)
+	        end do
+	        velt = 0d0
+
+
+	        ! get the radial velocity model with these parameters (in vel and velt)
+	        if (gp_n_planets > 0) then
+	            call get_rvN(times, &
+	                         paramConstr(map_index+1:nPar*4-nextra:5), & ! periods for all planets
+	                         paramConstr(map_index+2:nPar*4-nextra:5), & ! K for all planets
+	                         paramConstr(map_index+3:nPar*4-nextra:5), & ! ecc for all planets
+	                         paramConstr(map_index+4:nPar*4-nextra:5), & ! omega for all planets
+	                         paramConstr(map_index+5:nPar*4-nextra:5), & ! t0 for all planets
+	                         0.d0, & ! systematic velocity
+	                         vel, n, gp_n_planets)
+	            call get_rvN(t, &
+	                         paramConstr(map_index+1:nPar*4-nextra:5), & ! periods for all planets
+	                         paramConstr(map_index+2:nPar*4-nextra:5), & ! K for all planets
+	                         paramConstr(map_index+3:nPar*4-nextra:5), & ! ecc for all planets
+	                         paramConstr(map_index+4:nPar*4-nextra:5), & ! omega for all planets
+	                         paramConstr(map_index+5:nPar*4-nextra:5), & ! t0 for all planets
+	                         0.d0, & ! systematic velocity
+	                         velt, size(t), gp_n_planets)
+
+
+        	end if
+
+	        ! residuals: what is left when the planets (or just vsys) is subtracted from the data
+	        r = rvs - vel  
+
+
 			!! set hyperparameters to their MAP values
-			map_index = nPar*3 ! this is where the MAP parameters start in the array
 			gp1%gp_kernel%pars(1) = paramConstr(map_index+gp_n_planet_pars+1)
-			call gp1%gp_kernel%set_kernel_pars(1, (/paramConstr(map_index+gp_n_planet_pars+2)/) )
-			call gp1%gp_kernel%set_kernel_pars(2, paramConstr(map_index+gp_n_planet_pars+3:))
+			gp1%sub_kernel2%pars(1) = paramConstr(map_index+gp_n_planet_pars+2)
+			call gp1%sub_kernel1%set_kernel_pars(1, (/paramConstr(map_index+gp_n_planet_pars+3)/) )
+			call gp1%sub_kernel1%set_kernel_pars(2, paramConstr(map_index+gp_n_planet_pars+4:))
 
-			!print *, paramConstr(map_index+gp_n_planet_pars+1)
-			!print *, paramConstr(map_index+gp_n_planet_pars+2)
-			!print *, paramConstr(map_index+gp_n_planet_pars+3:)
-			!print *, paramConstr(nPar*3+1:nPar*4-4)
-			!print *, ''
-			!write(*, '(10f13.6)') gp1%gp_kernel%evaluate_kernel(times, times)
-			!print *, ''
+! 			print *, gp1%gp_kernel%pars
+! 			print *, gp1%sub_kernel2%pars
+! 			call gp1%sub_kernel1%get_kernel_pars(1)
+! 			call gp1%sub_kernel1%get_kernel_pars(2)
 
+
+			! planet parameters paramConstr(nPar*3+1:nPar*4-5)
+! 			print *, vel(1:5)
 			write(*,*) 'Calculating predictions...'
-			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-4), t, mu, cov, yerr=errors)
+			call gp1%predict(times, r, (/0.d0/), t, mu, cov, yerr=errors)
+			mu = mu+velt
 			std = sqrt(get_diagonal(cov))
 
 			write(*,*) 'Writing file ', gppredictfile
