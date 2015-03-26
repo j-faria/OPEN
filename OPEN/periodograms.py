@@ -8,9 +8,10 @@ from classes import PeriodogramBase
 from numpy import *
 import numpy as np
 from numpy.fft import *  
-import cmath
+from scipy.stats import rankdata
 import matplotlib.pyplot as plt
 from sys import float_info
+from multiprocessing import cpu_count
 
 from .logger import clogger, logging
 from .utils import ask_yes_no
@@ -520,6 +521,7 @@ class gls(PeriodogramBase):
   def __calcPeriodogramFast(self):
     """ Compute the GLS using the Fortran extension 
     which allows speedups of ~6x."""
+    ncpu = cpu_count()
 
     # Build frequency array if not present
     if self.freq is None:
@@ -530,7 +532,7 @@ class gls(PeriodogramBase):
     omegas = 2.*pi * self.freq
 
     # unnormalized power and an estimate of the number of independent frequencies 
-    self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas)
+    self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas, ncpu)
 
     self.N = len(self.y)
     # Normalization:
@@ -569,7 +571,7 @@ class gls(PeriodogramBase):
     # print xdif
     # nout = self.ofac * self.hifac * len(self.th)/2
     nout = int(xdif * self.ofac / plow)
-    # print nout
+    # print self.ofac, nout
     # sys.exit(0)
     self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
@@ -1096,6 +1098,197 @@ class bgls(PeriodogramBase):
     if self.norm=="HorneBaliunas": return (self.N-1.)/2.*(1.-Prob**(2./(self.N-3.)))
     if self.norm=="Cumming": return (self.N-3.)/2.*(Prob**(-2./(self.N-3.))-1.)
 
+
+
+# This is the Hoeffding-test periodicity metric based upon 
+# Hoeffding 1948, Ann. Math. Stat. 19, 293
+#####################################################################
+class hoeffding(PeriodogramBase):
+  """
+  Calculate The Hoeffding-test "periodogram".
+
+  This class implements the Hoeffding-test periodicity metric based
+  upon Hoeffding 1948, Ann. Math. Stat. 19, 293 and as developed by
+  Shay Zucker 2015, arXiv:1503.01734
+
+  The constructor takes a RVSeries instance (i.e. a rv curve) as 
+  first argument.
+  There is an optional `freq` array, that can contain the 
+  frequencies on which to calculate the periodogram. If not provided
+  (....)
+    
+  Parameters
+    rv : RVSeries
+        The radial velocity curve or any object providing the attributes
+        time, vrad and error which define the data.
+    ofac : int
+        Oversampling factor (default=6).
+    hifac : float
+        hifac * "average" Nyquist frequency is highest frequency for 
+        which the periodogram will be calculated (default=1).
+    freq : array, optional
+        Contains the frequencies at which to calculate the periodogram.
+        If not given, a frequency array will be automatically generated.
+    quantity : string, optional
+        For which quantity to calculate the periodogram. Possibilities are
+        'bis', 'rhk', 'contrast' or 'fwhm' other than the default 'vrad'.
+    ext : boolean, optional
+        Use Fortran extension in the calculation (default is False)
+  
+  Attributes
+    power : array
+        The normalized power of the GLS.
+    freq : array
+        The frequency array.
+    ofac : int
+        The oversampling factor.
+    hifac : float
+        The maximum frequency.
+    norm : string
+        The normalization used.
+  """
+
+  def __init__(self, rv, ofac=4, hifac=1, freq=None, quantity='vrad', ext=False):
+    self.name = 'Hoeffding'
+
+    self.power = None
+    self.freq = freq
+    self.ofac, self.hifac = ofac, hifac
+    self.t = rv.time
+    self.th = rv.time - min(rv.time)
+    if quantity == 'vrad':
+      self.y = rv.vrad
+      self.error = rv.error
+    elif quantity == 'bis':
+      self.y = rv.extras.bis_span
+      self.error = 2. * rv.error #ones_like(self.y)
+    elif quantity == 'fwhm':
+      # if not force_notrend and ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+      #   m, b = polyfit(self.t, rv.extras.fwhm, 1)
+      #   yp = polyval([m, b], self.t)
+      #   self.y = rv.extras.fwhm - yp
+      # else:
+      self.y = rv.extras.fwhm
+      self.error = 2.35 * rv.error #ones_like(self.y)
+    elif quantity == 'rhk':
+      self.y = rv.extras.rhk
+      self.error = rv.extras.sig_rhk
+    elif quantity == 'contrast':
+      self.y = rv.extras.contrast
+      self.error = ones_like(self.y)
+    elif quantity == 'resid':
+      try:
+        self.y = rv.fit['residuals']
+      except TypeError:
+        clogger.fatal('error!')
+        return 
+      self.error = rv.error
+
+    self.label = {'title': self.name + ' Periodogram'}
+    
+    if ext: 
+      self.__calcPeriodogramFast()
+    else: 
+      self.__calcPeriodogram()
+    
+  def __calcPeriodogram(self):
+    """ Compute the Hoeffding-test """
+    # Build frequency array if not present
+    if self.freq is None:
+      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      self.__buildFreq(plow=plow)
+
+    N = self.t.size
+    Nfreqs = self.freq.size
+
+    # Temporaries
+    t = self.t
+    y = self.y
+
+
+    # Allocate the output vector (to save memory handling time)
+    D = zeros_like(self.freq)
+
+    # Allocate area for auxiliary vectors in advance
+    a = zeros_like(t) #zeros(N,1);
+    b = zeros_like(t) #zeros(N,1);
+    c = zeros_like(t) #zeros(N,1);
+
+    periods = 1./self.freq
+
+    # Convert the original values to ranks, using Scipy's rankdata
+    rankx = rankdata(y)  #tiedrank(x);
+
+    # Serially enumerate the periods (frequencies)
+    for ifreq in range(Nfreqs):
+      # Phase folding
+      phases = np.mod(t, periods[ifreq])
+
+      iphases = np.argsort(phases)
+      sortedphases = phases[iphases]
+
+      # A special treatment for the wrap-around.
+      iphases = np.append(iphases, iphases[0])
+
+      # Calculate Hoeffding test statistic (D)
+      # --------------------------------------
+      # a = 'current' sample rank
+      # b = 'next' sample rank (in terms of the phase ordering)
+      a = rankx[iphases[:-1]] - 1 # rankx(iphases(1:(end-1)))-1;
+      b = rankx[iphases[1:]] - 1 # rankx(iphases(2:end))-1;
+      
+      # Calculate the bivariate rank
+      for ii in range(N):
+        c[ii] = sum((y[iphases[:-1]] < y[iphases[ii]]) & (y[iphases[1:]] < y[iphases[ii+1]]))
+
+      # Calculate the A, B and C statistics in Hoeffding's formulae
+      A = sum(a*(a-1)*b*(b-1)) # sum(a.*(a-1).*b.*(b-1));
+      B = sum((a-1)*(b-1)*c) # sum((a-1).*(b-1).*c);
+      C = sum(c*(c-1)) # sum(c.*(c-1));
+      
+      D[ifreq] = A-2*(N-2)*B+(N-2)*(N-3)*C
+
+      # Save the current phase ordering, assuming next period's ordering 
+      # will not be too much different, thus saving some time.
+      t = t[iphases[:-1]] # t(iphases(1:end-1));
+      y = y[iphases[:-1]] # x(iphases(1:end-1));
+      rankx = rankx[iphases[:-1]] # rankx(iphases(1:end-1));
+    
+    # Apply Hoeffding's normalization
+    D = D/(N*(N-1)*(N-2)*(N-3)*(N-4))
+
+    self._a = a
+    self._b = b
+    self._c = c
+
+    self.power = D
+
+
+  def __calcPeriodogramFast(self):
+    """ """
+    pass
+
+  def _normalize(self):
+    pass
+
+  def _normalize_value(self, a):
+    pass
+
+  def __buildFreq(self, plow=0.5):
+    """ Build frequency array (`freq` attribute) """
+    xdif = max(self.th)-min(self.th)
+    # print xdif
+    # nout = self.ofac * self.hifac * len(self.th)/2
+    nout = int(xdif * self.ofac / plow)
+    # print nout
+    # sys.exit(0)
+    self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
+
+  def prob(self, Pn):
+    pass
+
+  def probInv(self, Prob):
+    pass
 
 
 # This is the ...... periodogram etc etc etc

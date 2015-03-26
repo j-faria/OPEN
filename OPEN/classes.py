@@ -829,15 +829,19 @@ class PeriodogramBase:
 
     def FAP_by_bootstrap(self, axes, color='g'):
         from tqdm import tqdm
+        from time import time
+        from multiprocessing import cpu_count
+
+        ncpu = cpu_count()
         name = '_' + self.__class__.__name__
 
         if name == '_gls':
             from OPEN.ext.glombscargle import glombscargle
+        else:
+            return
 
         # temporaries
         temp_per = copy(self)
-        # access the instance's __calcPeriodogramFast function
-        exec 'calc = temp_per.' + name + '__calcPeriodogramFast'
 
         f = temp_per.freq
         omegas = 2.*np.pi*temp_per.freq
@@ -861,7 +865,7 @@ class PeriodogramBase:
                 # temp_per.error = permutted[:,1]
                 err = permutted[:,1]
 
-                power = glombscargle(t, y, err, omegas)[0]
+                power = glombscargle(t, y, err, omegas, ncpu)[0]
                 # calc()
                 # temp_per._plot_pg()
                 # powermaxP = temp_per.power.max()
