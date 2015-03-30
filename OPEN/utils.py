@@ -59,7 +59,27 @@ def wrms(array, weights):
     w = weights #/ sum(weights)
     # return sqrt(sum(x*x for x in array*w))
     return sqrt(sum(w*(array - np.average(array, weights=w))**2) / sum(w))
-    
+
+def var(array, weights=None, biased=False):
+    """ 
+    Calculate the (possibly weighted) sample variance, 
+    and correct for small samples (if biased=False). 
+    """
+    x = np.atleast_1d(array)
+    if weights is None:
+        if biased: 
+            return x.var()
+        else: 
+            return x.var(ddof=1)
+    else:
+        if biased:
+            return np.sum(weights*(x-np.average(x, weights=weights))**2) / np.sum(weights)
+        else:
+            V1 = np.sum(weights)
+            V2 = np.sum(weights**2)
+            return np.sum(weights*(x-np.average(x, weights=weights))**2) / (V1 - (V2/V1))
+
+
 
 def get_tp(P, ecc, omega, tt):
     """ 
@@ -91,6 +111,16 @@ def stdout_write(msg):
 	stdout.write(msg)
 	stdout.flush()
 
+
+def get_star_name(system):
+    """ Return the name of the star (works for standard HARPS filenames) """
+    full_path = system.provenance.keys()[0]
+    bn = os.path.basename(full_path)
+    i = bn.rfind('_harps_mean_corr.rdb')
+    if i == -1:
+        i = bn.rfind('_harps_mean.rdb')
+    star = bn[:i]
+    return star
 
 
 ### Matplotlib advanced plot interaction stuff
