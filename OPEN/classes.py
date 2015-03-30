@@ -44,6 +44,24 @@ from ext.julian import caldat
 # rc( rc_params_from_file( p+'/../matplotlibrc' ) )
 # plt.ion()
 
+
+# matplotlib parameters for publication plots
+import matplotlib.ticker as ticker
+import re
+# plt.rcParams['text.latex.preamble'].append(r'\usepackage{lmodern}')
+# plt.rcParams["text.latex.preamble"].append(r'\mathchardef\mhyphen="2D')
+params = {'text.latex.preamble': [r'\usepackage{lmodern}', 
+                                  r'\usepackage{amsfonts,amsmath,amssymb}',
+                                  r'\mathchardef\mhyphen="2D',
+                                  r'\DeclareMathOperator{\ms}{m\,s^{-1}}'],
+          'text.usetex' : True,
+          'font.size'   : 8,
+          'font.family' : 'lmodern',
+          'text.latex.unicode': True,
+          'axes.unicode_minus': True,
+          }
+
+
 class rvSeries:
     """
     A container class that holds the observed radial velocity data. 
@@ -272,18 +290,6 @@ class rvSeries:
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled. Pretty plot, ready for publication.
         """
-        import matplotlib.ticker as ticker
-        import re
-        # plt.rcParams['text.latex.preamble'].append(r'\usepackage{lmodern}')
-        # plt.rcParams["text.latex.preamble"].append(r'\mathchardef\mhyphen="2D')
-        params = {'text.latex.preamble': [r'\usepackage{lmodern}', r'\mathchardef\mhyphen="2D'],
-                  'text.usetex' : True,
-                  'font.size'   : 8,
-                  'font.family' : 'lmodern',
-                  'text.latex.unicode': True,
-                  'axes.unicode_minus': True,
-                  }
-
         full_path = self.provenance.keys()[0]
         bn = os.path.basename(full_path)
         i = bn.rfind('_harps_mean_corr.rdb')
@@ -320,7 +326,7 @@ class rvSeries:
             ax2.set_title(star, loc='right', fontsize=params['font.size'])
             lpad = 20 if show_years else 8
             ax2.set_xlabel('BJD - 2450000 [days]', labelpad=lpad)
-            ax2.set_ylabel('RV [%s]'%self.units)
+            ax2.set_ylabel(r'RV [$\ms$]')
             ax1 = ax2
             
             if show_years:
@@ -347,11 +353,16 @@ class rvSeries:
             plt.tight_layout()
             ax2.ticklabel_format(useOffset=False)
             ax1.yaxis.set_major_formatter(MyFormatter())
+            print ax1.margins()
+            ax1.margins(0.05)
 
             if save:
                 msg = yellow('INFO: ') + 'Saving figure to %s' % save
                 clogger.info(msg)
                 plt.savefig(save, bbox_inches='tight')
+
+        ax2.set_ylabel('RV [%s]' % self.units) # otherwise, matplotlib complains...
+        plt.show()
 
         return fig
         # plt.show()
@@ -702,6 +713,10 @@ class BasicTimeSeries():
     error = None
 
 
+perc01 = 0.001 # 0.1% FAP
+perc1 = 1.  # 1% FAP
+perc10 = 10.  # 10% FAP
+
 class PeriodogramBase:
     """
     Base class for all periodograms.
@@ -718,6 +733,7 @@ class PeriodogramBase:
     """
     
     name = None # which periodogram
+    star_name = None # name of the star
 
 
     def get_peaks(self, n=1, output_period=False):
@@ -827,7 +843,7 @@ class PeriodogramBase:
       Prob = 1.-(1.-FAPlevel)**(1./self.M)
       return self.probInv(Prob)  
 
-    def FAP_by_bootstrap(self, axes, color='g'):
+    def FAP_by_bootstrap(self):
         from tqdm import tqdm
         from time import time
         from multiprocessing import cpu_count
@@ -847,15 +863,13 @@ class PeriodogramBase:
         omegas = 2.*np.pi*temp_per.freq
         p = temp_per._upow
 
-        perc01 = 0.001 # 0.1% FAP
-        perc1 = 1.  # 1% FAP
-        perc10 = 10.  # 10% FAP
         perm = 1000 # int(1000/perc1) # (use 1000 for 1% fap or 10000 for 0.1% fap)
 
         try:
-            self.peaks
+            peaks = self.peaks
             if len(self.peaks) != perm: raise AttributeError
         except AttributeError:
+            t1 = time()
             maxPowers = []
             t = temp_per.t
             for k in tqdm(xrange(perm)):
@@ -871,31 +885,13 @@ class PeriodogramBase:
                 # powermaxP = temp_per.power.max()
                 powermaxP = power.max()
                 maxPowers.append(powermaxP)
-            self.peaks = np.sort(maxPowers)
+        
+            peaks = np.sort(maxPowers)
 
-        index01 = int( ((1-perc01/100.0) * len(self.peaks)) )
-        index1 = int( ((1-perc1/100.0) * len(self.peaks)) )
-        index10 = int( ((1-perc10/100.0) * len(self.peaks)) )
-        self.powerFAP_01 = self._normalize_value(self.peaks[index01])
-        self.powerFAP_1 = self._normalize_value(self.peaks[index1])
-        self.powerFAP_10 = self._normalize_value(self.peaks[index10])
+        return peaks
 
-        # plt.figure()
-        ax = axes
-        # ax.semilogx(1./f, p, 'k-')
-        # ax.axhline(self.powerFAP_10, c='g', lw=2, ls='-', label='10%')
-        ax.axhline(self.powerFAP_1, c=color, lw=2, ls='--', label='1%')
-        # ax.axhline(self.powerFAP_01, c=color, lw=2, ls=':', label='0.1%')
-        # plt.show()
-        #         if orbit == 'circ':
-        #             powermaxP = (periodogram.periodogram(bjd,data_perm,sigma_perm,ofac,plow))[3]
-        #         if orbit == 'kep':
-        #             powermaxP = (periodogram_kep.periodogram_kep(bjd,data_perm,sigma_perm,ofac,plow))[3]
-        # #       print k
-        #         maxPowers.append(powermaxP)
 
-    def _plot(self, doFAP=False, dobFAP=False, faps=None, verts=None, 
-              newFig=True, axes=None, save=None, **kwargs):
+    def _plot(self, doFAP=False, dobFAP=False, faps=None, verts=None, newFig=True, axes=None, save=None, **kwargs):
         """
         Plot this periodogram.
         """
@@ -940,14 +936,28 @@ class PeriodogramBase:
             plvl1 = self.powerLevel(0.1) # 10% FAP
             plvl2 = self.powerLevel(0.01) # 1% FAP
             plvl3 = self.powerLevel(0.001) # 0.1% FAP
-            self.ax.axhline(y=plvl1, color='k', ls='-', label='10%')
-            self.ax.axhline(y=plvl2, color='k', ls='--', label='1%')
-            self.ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
+            self.ax.axhline(y=plvl1, color=FAPcolor, ls='-', label='10%')
+            self.ax.axhline(y=plvl2, color=FAPcolor, ls='--', label='1%')
+            self.ax.axhline(y=plvl3, color=FAPcolor, ls=':', label='0.1%')
             if do_legend: 
                 self.ax.legend(frameon=True)
         if dobFAP:
             # calculate FAP by bootstrap
-            self.FAP_by_bootstrap(self.ax, FAPcolor)
+            self.peaks = self.FAP_by_bootstrap()
+
+            index01 = int( ((1-perc01/100.0) * len(self.peaks)) )
+            index1 = int( ((1-perc1/100.0) * len(self.peaks)) )
+            index10 = int( ((1-perc10/100.0) * len(self.peaks)) )
+            self.powerFAP_01 = self._normalize_value(self.peaks[index01])
+            self.powerFAP_1 = self._normalize_value(self.peaks[index1])
+            self.powerFAP_10 = self._normalize_value(self.peaks[index10])
+
+            clogger.info(blue('INFO: ')+'Plotting bootstrap FAPs')
+    
+            self.ax.axhline(self.powerFAP_10, c=FAPcolor, lw=2, ls='-', label='10%')
+            self.ax.axhline(self.powerFAP_1, c=FAPcolor, lw=2, ls='--', label='1%')
+            self.ax.axhline(self.powerFAP_01, c=FAPcolor, lw=2, ls=':', label='0.1%')
+
             if do_legend: 
                 self.ax.legend(frameon=True)
 
@@ -955,8 +965,6 @@ class PeriodogramBase:
         if verts is not None:
             for v in verts:
                 self.ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5, label="_nolegend_") 
-                # if v==18:
-                #   self.ax.axvline(x=v, color='r', ls='--', lw=2) 
 
         # plt.tight_layout()
 
@@ -964,6 +972,90 @@ class PeriodogramBase:
             msg = yellow('INFO: ') + 'Saving figure to %s' % save
             clogger.info(msg)
             plt.savefig(save)
+
+
+    def _plot_pretty(self, doFAP=False, dobFAP=False, faps=None, verts=None, save=None, **kwargs):
+        """ Plot this periodogram. Ready for publication. """
+
+        # this is Seaborn's "colorblind" pallete
+        colors = ['#0072b2', '#009e73', '#d55e00', '#cc79a7', '#f0e442', '#56b4e9']
+        # this is Seaborn's "muted" pallete
+        # colors = ['#4878cf', '#6acc65', '#d65f5f', '#b47cc7', '#c4ad66', '#77bedb']
+
+        xlabel = 'Period [days]'
+        ylabel = 'Power'
+        do_title = kwargs.pop('title', True)
+        do_labels = kwargs.pop('labels', True)
+        color = kwargs.pop('color', colors[0])
+        FAPcolor = kwargs.pop('FAPcolor', 'k')
+
+        with plt.rc_context(params):
+            figwidth = 3.543311946  # in inches = \hsize = 256.0748pt
+            figheight = 0.5 * figwidth
+
+
+            fig = plt.figure(figsize=(figwidth, figheight))
+            ax = fig.add_subplot(111)
+            ax.set_title(self.star_name, loc='right', fontsize=params['font.size'])
+
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            if self.power.max() < 1e-300:  # apparently, Metplotlib can't plot these small values
+                clogger.warning(yellow('Warning:')+' Max value < 1e-300, plotting normalized periodogram')
+                ax.semilogx(1./self.freq, self.power/self.power.max(), color=color, ls='-', **kwargs)
+            else:
+                ax.semilogx(1./self.freq, self.power, color=color, ls='-', lw=0.5, **kwargs)
+            # plot FAPs
+            if doFAP:
+                # do default FAPs of 10%, 1% and 0.1%
+                if faps is None: clogger.warning(yellow('Warning: ')+'Plotting default FAPs')
+
+                pmin = 1./self.freq.min()
+                pmax = 1./self.freq.max()
+                plvl1 = self.powerLevel(0.1) # 10% FAP
+                plvl2 = self.powerLevel(0.01) # 1% FAP
+                plvl3 = self.powerLevel(0.001) # 0.1% FAP
+                ax.axhline(y=plvl1, color='k', ls='-', label='10%')
+                ax.axhline(y=plvl2, color='k', ls='--', label='1%')
+                ax.axhline(y=plvl3, color='k', ls=':', label='0.1%')
+                if do_legend: 
+                    ax.legend(frameon=True)
+            if dobFAP:
+                # calculate FAP by bootstrap
+                self.peaks = self.FAP_by_bootstrap()
+
+                index01 = int( ((1-perc01/100.0) * len(self.peaks)) )
+                index1 = int( ((1-perc1/100.0) * len(self.peaks)) )
+                index10 = int( ((1-perc10/100.0) * len(self.peaks)) )
+                self.powerFAP_01 = self._normalize_value(self.peaks[index01])
+                self.powerFAP_1 = self._normalize_value(self.peaks[index1])
+                self.powerFAP_10 = self._normalize_value(self.peaks[index10])
+
+                clogger.info(blue('INFO: ')+'Plotting bootstrap FAPs')
+        
+                # ax.axhline(self.powerFAP_10, xmin=0.05, xmax=0.95, c=FAPcolor, lw=0.5, ls='-', label='10%')
+                ax.axhline(self.powerFAP_1, xmin=0.04, xmax=0.96, c=FAPcolor, lw=0.5, ls='--', dashes=(4,4),  label='1%')
+                ax.axhline(self.powerFAP_01, xmin=0.04, xmax=0.96, c=FAPcolor, lw=0.5, ls=':', label='0.1%')
+
+
+            # plot vertical lines
+            if verts is not None:
+                for v in verts:
+                    ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5, label="_nolegend_") 
+
+            if ax.get_ylim()[1] > self.powerFAP_01+2:
+                pass
+            else:
+                ax.set_ylim([0, self.powerFAP_01+2])
+            fig.tight_layout()
+
+            if save:
+                msg = yellow('INFO: ') + 'Saving figure to %s' % save
+                clogger.info(msg)
+                plt.savefig(save)
+            plt.show()
+
+
 
     def _plot_pg(self, doFAP=False, verts=None, newFig=True, axes=None):
 

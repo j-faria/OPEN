@@ -14,7 +14,7 @@ from sys import float_info
 from multiprocessing import cpu_count
 
 from .logger import clogger, logging
-from .utils import ask_yes_no
+from .utils import ask_yes_no, get_star_name
 
 from ext.blombscargle import blombscargle
 from ext.glombscargle import glombscargle
@@ -396,6 +396,7 @@ class gls(PeriodogramBase):
   def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
                norm="HorneBaliunas", stats=False, ext=True, force_notrend=False):
     self.name = 'Generalized Lomb-Scargle'
+    self.star_name = get_star_name(rv)
 
     self.power = None
     self.freq = freq
