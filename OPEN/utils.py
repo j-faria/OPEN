@@ -126,6 +126,7 @@ def selectable_plot(system, **kwargs):
         # fig.show()
 
     fig, ax = plt.subplots()
+    e = ax.errorbar(system.time, system.vrad, system.error, fmt='o')
     col = ax.scatter(system.time, system.vrad, picker=True)
     ax.set_xlabel('Time [days]')
     ax.set_ylabel('RV [%s]'%system.units)
