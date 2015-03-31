@@ -593,13 +593,16 @@ contains
 		real(kind=8), dimension(size(y)) :: yy, xsol
 		real(kind=8), dimension(size(y), 1) :: yy_m  ! 2-dimensional array to go into DPOTRF, DPOTRS
 		integer :: N, rc
-		!real(kind=8) :: time1, time2
+		real(kind=8) :: time1, time2
 
 		if (size(x) /= size(y)) STOP 'Dimension mismatch in get_lnlikelihood'
 		if (.not. associated(self%mean_fun)) STOP 'GP%mean_fun is not associated'
 
 		N = size(y)
-		cov_cho_factor = self%cov
+! 		call cpu_time(time1)
+		cov_cho_factor = self%gp_kernel%evaluate_kernel(x, x)
+! 		call cpu_time(time2)
+! 		print *, 'Took ', time2-time1
 
 		! optionally add data uncertainties in quadrature to covariance matrix
 		if (present(yerr)) then
@@ -616,11 +619,11 @@ contains
 		end if
 		yy_m(:, 1) = yy
 
-		!call cpu_time(time1)
+! 		call cpu_time(time1)
 		call DPOTRF( 'L', N, cov_cho_factor, N, rc )
 		call DPOTRS( 'L', N, 1, cov_cho_factor, N, yy_m, N, rc )
-		!call cpu_time(time2)
-		!print '("Time for cholesky = ",f6.3," seconds.")',time2-time1
+! 		call cpu_time(time2)
+! 		print '("Time for cholesky = ",f6.3," seconds.")',time2-time1
 
 		!call choly(0, N, cov_cho_factor, yy, xsol, rc)
 			
