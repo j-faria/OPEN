@@ -59,18 +59,6 @@ contains
 !         alpha = 1.d0
 !         tau = 1.d0
 
-!             call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-!             if (i==0) then
-!                write(fmt,'(a,i2,a)')  '(',nest_nPar,'f13.4)'
-!                write(*, fmt) Cube(:)
-!                write(*, fmt) Cube(:gp_n_planet_pars)
-!                write(*, fmt) Cube(gp_n_planet_pars)
-!                write(*, fmt) Cube(gp_n_planet_pars+2)
-!                write(*, fmt) Cube(gp_n_planet_pars+3)
-!                write(*, fmt) Cube(gp_n_planet_pars+4:gp_n_planet_pars+5)
-!             end if
-!             call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-!             STOP 1
 
 
         n = size(times)
@@ -110,7 +98,21 @@ contains
 
         ! residuals: what is left when the planets (or just vsys) is subtracted from the data
         r = rvs - vel  
-!         print *, r
+        
+!             call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+!             if (i==0) then
+!                 print *, 'r = ', r
+!                write(fmt,'(a,i2,a)')  '(',nest_nPar,'f13.4)'
+!                write(*, fmt) Cube(:)
+! !                write(*, fmt) Cube(:gp_n_planet_pars)
+! !                write(*, fmt) Cube(gp_n_planet_pars)
+! !                write(*, fmt) Cube(gp_n_planet_pars+2)
+! !                write(*, fmt) Cube(gp_n_planet_pars+3)
+! !                write(*, fmt) Cube(gp_n_planet_pars+4:gp_n_planet_pars+5)
+!             end if
+!             call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+!             STOP 1
+
 
         if (using_gp) then
             ! gp1 is an object of type GP (class is defined in gp_utils.f90)
@@ -146,27 +148,19 @@ contains
             ! mean_fun is 0. because vsys is already taken care of
             lhood = gp1%get_lnlikelihood(times, r, (/0.d0/), yerr=errors)
 
-!             print *, r(1:5)
 
         else if (using_jitter) then
             jitter = Cube(nest_nPar-nextra+1)
             sigma = errors**2 + jitter**2
-!             print *, jitter
-!             print *, sigma
             !lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * r**2 / sigma)
             lhood = -0.5d0*n*lntwopi - n*sum(log(sqrt(sigma))) -0.5d0*sum(r**2 / sigma)
-!             print *, lhood
-!             lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(r**2 / sigma)
-!             print *, lhood
+            ! lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(r**2 / sigma)
         else
-        	lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(r**2 / errors**2)
-!             lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(r**2 / errors**2)
+            lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(r**2 / errors**2)
+            ! lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(r**2 / errors**2)
         end if
 
-!          print *, slhood, lhood, product(sqrt(sigma)), sum(r**2 / sigma)
         slhood = logSumExp(slhood,lhood)
-        !print *, Cube(1:nest_nPar)
-!         print*, slhood
 !         stop
         if (doing_debug) write(*,'(f8.3)', advance='no') slhood
 

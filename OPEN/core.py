@@ -744,7 +744,10 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
+def do_multinest(system, user, gp, jitter, maxp=3, 
+	             resume=False, verbose=False, ncpu=None, 
+	             training=None, skip_train_mcmc=False, lin=None, 
+	             doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -964,14 +967,20 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				if 'training' in line: print replacer1,
 				else: print line,
 
+			# complicated logic but the idea is simple: we only redo the MCMC on
+			# the training variable if *none* of "-r" or "--skip-mcmc" is used
 			# we assume the user did not change the trained_parameters in 
 			# the namelist if resuming from a previous job
-			if not resume:
+			if (not skip_train_mcmc and not resume):
 				# do the actual training
 				GP_parameters = train_gp.do_it(system, training, ncpu)
 
+				# convert the parameters from george to OPEN's GP
+				GP_parameters[2] = np.sqrt(GP_parameters[2])
+				GP_parameters[3] = np.sqrt(2./GP_parameters[3])
+				GP_parameters[3], GP_parameters[4] = GP_parameters[4], GP_parameters[3]
 				# write the trained parameters to the namelist
-				replacer1 = '    trained_parameters = %fd0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters)
+				replacer1 = '    trained_parameters = %fd0, %fd0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters)
 				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
 					if 'trained_parameters' in line: print replacer1,
 					else: print line,
@@ -1080,7 +1089,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 
 
 		# this is hardcoded, for now
-		nlive_dict = {0:300, 1:500, 2:700}
+		nlive_dict = {0:300, 1:500, 2:800, 3:1000}
 
 		for npl in range(0, maxp+1):
 
@@ -1599,6 +1608,12 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
 			yp = np.polyval([m, b], v1)
 
 			system.vrad = system.vrad - yp
+
+		# force recalculation of periodogram
+		try:
+			del system.per
+		except AttributeError:
+			pass
 
 
 

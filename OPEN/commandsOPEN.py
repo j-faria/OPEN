@@ -206,6 +206,7 @@ Options:
     --gp          Perform model selection within Gaussian Process framework
     --jitter      Include a jitter parameter (incompatible with --gp)
     --train=None  Train the GP on quantity before using it in the RVs
+    --skip-mcmc   Skip the training MCMC: the user sets the appropriate namelist options
     --lin=None    Include linear dependence on quantity in the model
     --ncpu=<cpu>  Number of threads to use; by default use all available
     --noplot      Do not produce result plots
@@ -991,6 +992,7 @@ class EmbeddedMagics(Magics):
             ncpu = None
 
         train_quantity = args['--train'] if bool(args['--train']) else None
+        skip_train_mcmc = args['--skip-mcmc']
         lin_quantity = args['--lin'] if bool(args['--lin']) else None
 
         if bool(args['--train']) and not system.is_in_extras(train_quantity):
@@ -1000,7 +1002,7 @@ class EmbeddedMagics(Magics):
 
         core.do_multinest(system, user, gp, jitter, maxp=maxp,
                           resume=resume, ncpu=ncpu, verbose=verbose,
-                          training=train_quantity, lin=lin_quantity, 
+                          training=train_quantity, skip_train_mcmc=skip_train_mcmc, lin=lin_quantity, 
                           doplot=doplot, saveplot=saveplot, feed=dofeedback, MAPfeed=doMAPfeedback,
                           restart=restart)
 
@@ -1117,7 +1119,13 @@ class EmbeddedMagics(Magics):
                     replacer = {field_name:delete(arr, ind_to_remove)}
                     system.extras = system.extras._replace(**replacer)
                 msg = blue('    : ') + 'Done'
-                clogger.info(msg)                
+                clogger.info(msg)
+
+                # delete system.per to force re-calculation
+                try:
+                    del system.per
+                except AttributeError:
+                    pass
             else:
                 msg = blue('    : ') + 'Not removing any observations.'
                 clogger.info(msg)                

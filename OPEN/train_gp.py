@@ -26,6 +26,8 @@ from time import time
 # intra-package imports
 from logger import clogger
 from shell_colors import yellow, red, blue
+from classes import BasicTimeSeries
+from periodograms import gls
 
 
 def rel(array, percentage):
@@ -91,10 +93,10 @@ def fit_gp(model, initial, data, ncpu, nwalkers=10):
     msg = blue('    :: ') + 'Running burn-in...'
     clogger.info(msg)
 
-    p0, lnp, _ = sampler.run_mcmc(p0, 250)
+    p0, lnp, _ = sampler.run_mcmc(p0, 100)
     sampler.reset()
 
-    niter = 300
+    niter = 250
     
     msg = blue('    :: ') + 'Running %d MCMC chains for %d iterations...' % (nwalkers, niter)
     clogger.info(msg)
@@ -135,7 +137,7 @@ def do_it(system, training_variable, ncpu=1):
     data = (t, y, 1.0 / yerr ** 2)
 
     model = GPfuncs['QuasiPeriodicJitter']
-    initial = np.array([0.001, 1e-5, 70, 1, 30])
+    initial = np.array([0.001, 1e-5, 80, 1, 30])
     sampler, best_p = fit_gp(model, initial, data, ncpu)
 
     msg = yellow('    :: ') + 'Best GP hyperparameters: ' + initial.size*' %f ' % tuple(best_p)
@@ -146,7 +148,7 @@ def do_it(system, training_variable, ncpu=1):
 
 
     # # The positions where the prediction should be computed.
-    x = np.linspace(min(t), max(t), 2000)
+    x = np.linspace(min(t), max(t), 1000)
     x = np.hstack((x, t))
     x.sort()
 
@@ -164,6 +166,7 @@ def do_it(system, training_variable, ncpu=1):
     # #     plt.plot(x, m, color="#4682b4", alpha=0.3)
 
     # plot lnp solution
+    best_p[1] = 0.
     kernel = model[0](*best_p)
     gp = george.GP(kernel, solver=george.HODLRSolver)
     gp.compute(t, yerr)
@@ -176,20 +179,28 @@ def do_it(system, training_variable, ncpu=1):
     plt.subplot(211)
     plt.plot(x, m, color='r', alpha=0.8)
     # plt.plot(t, m1, color='r', alpha=0.8)
-
     # Plot the data
     plt.errorbar(t, y, yerr=yerr, fmt=".k", capsize=0)
+    # plt.plot(t, system.extras.rhk_activity - system.extras.rhk_activity.mean(), "og")
     plt.ylabel(training_variable)
-
     # Plot the residuals
     plt.subplot(212)
     plt.errorbar(t, y - m1, yerr=yerr, fmt=".k", capsize=0)
 
-
     plt.xlabel('Time [days]')
 
-    plt.show()
+    ts = BasicTimeSeries()
+    ts.time = t
+    ts.vrad = y-m1
+    ts.error = yerr
+    per = gls(ts)
+    per._plot()
 
-    sys.exit(0)
+    # plt.show()
+    # sys.exit(0)
+    enter = raw_input('Press Enter to continue: ')
+    if enter == 'n':
+        sys.exit(0)
+
     return best_p
     # fig = triangle.corner(samples)

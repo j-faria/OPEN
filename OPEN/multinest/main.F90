@@ -251,7 +251,7 @@ program main
         !! Period, Jeffreys, 0.2d - 365000d
         spriorran(i,1)= 0.2d0
         !spriorran(i,2)= 365000d0
-        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
+        spriorran(i,2)= 365d0 !1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
 
 !         spriorran(i,1)= 1500.d0
 !         spriorran(i,2)= 1900.d0
@@ -318,16 +318,16 @@ program main
             spriorran(i,2)= maxval(rvs) - minval(rvs)
             ! jitter 
             spriorran(i+1,1)= 0.d0
-            spriorran(i+1,2)= 0.d0 !variance(errors)
+            spriorran(i+1,2)= maxval(errors)
             ! timescale for growth / decay of active regions (d)
-            spriorran(i+2,1)= trained_parameters(3)
-            spriorran(i+2,2)= trained_parameters(3)
+            spriorran(i+2,1)= 0.95d0*trained_parameters(3)
+            spriorran(i+2,2)= 1.05d0*trained_parameters(3)
             ! periodicity (recurrence) timescale -> rotation period of the star
-            spriorran(i+3,1)= trained_parameters(4)
-            spriorran(i+3,2)= trained_parameters(4)
+            spriorran(i+3,1)= 0.95d0*trained_parameters(4)
+            spriorran(i+3,2)= 1.05d0*trained_parameters(4)
             ! smoothing parameter (?)
-            spriorran(i+4,1)= trained_parameters(5)
-            spriorran(i+4,2)= trained_parameters(5)
+            spriorran(i+4,1)= 0.95d0*trained_parameters(5)
+            spriorran(i+4,2)= 1.05d0*trained_parameters(5)
         else
             ! amplitude of GP
             i = sdim-nextra+nobserv+1
