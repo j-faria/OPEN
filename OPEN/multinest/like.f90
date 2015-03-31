@@ -74,11 +74,11 @@ contains
         ! get the radial velocity model with these parameters (in vel)
         if (nplanets > 0) then
             call get_rvN(times, &
-                         Cube(1:nest_nPar-iendpar-1:5), & ! periods for all planets
-                         Cube(2:nest_nPar-iendpar-1:5), & ! K for all planets
-                         Cube(3:nest_nPar-iendpar-1:5), & ! ecc for all planets
-                         Cube(4:nest_nPar-iendpar-1:5), & ! omega for all planets
-                         Cube(5:nest_nPar-iendpar-1:5), & ! t0 for all planets
+                         Cube(1:5*nplanets:5), & ! periods for all planets
+                         Cube(2:5*nplanets:5), & ! K for all planets
+                         Cube(3:5*nplanets:5), & ! ecc for all planets
+                         Cube(4:5*nplanets:5), & ! omega for all planets
+                         Cube(5:5*nplanets:5), & ! t0 for all planets
                          0.d0, & ! systematic velocity
                          vel, n, nplanets)
 
