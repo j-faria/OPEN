@@ -20,9 +20,7 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, meanf, np
 
 
     !! Gaussian process variables
-!     type(WhiteKernel), target :: k2
     type(DiagonalKernel), target :: k3
-    !type(ExpKernel), target :: k4
     type(ExpSquaredKernel), target :: k5
     type(ExpSineSquaredKernel), target :: k6
     type(SumKernels), target :: k7
@@ -31,13 +29,14 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, meanf, np
     class(Kernel), pointer :: kernel_to_pass, subk1, subk2
 
     !! local variables
+    integer :: nPar
     real(kind=8), dimension(nt, nt) :: cov
+    real(kind=8), dimension(nt) :: vel, r
 
-    !WhiteKernel(3e-7) + 10. * ExpSquaredKernel(10) * ExpSine2Kernel(1, 30)
-    !write(*,*) 'Using Gaussian Process model'
+    nPar = size(planetpar)
+
     k3 = DiagonalKernel((/3d-7/))
     k5 = ExpSquaredKernel((/ sqrt(10.d0) /))
-    !kernel_to_pass => k5
     k6 = ExpSineSquaredKernel((/ 30.d0, sqrt(2.d0) /))
 
     k8 = ProductKernels((/1.d0, 1.d0 /))
@@ -53,13 +52,7 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, meanf, np
     subk2 => k3
 
     gp1 = GP(k7%evaluate_kernel(times, times), kernel_to_pass, subk1, subk2)
-!     if (meanf == 'constant') then
-!         print *, 'constant'
-        gp1%mean_fun => mean_fun_constant
-!     else
-!         print *, planetpar
-!         gp1%mean_fun => mean_fun_keplerian
-!     endif
+    gp1%mean_fun => mean_fun_constant
 
     gp_n_planets = nplanets
     gp_n_planet_pars = 5*nplanets + 1
@@ -74,8 +67,31 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, meanf, np
 !     call gp1%sub_kernel1%get_kernel_pars(1)
 !     call gp1%sub_kernel1%get_kernel_pars(2)
 
-    pred = 0.d0
-    call gp1%predict(times, rvs, (/0.d0/), times, pred, cov, yerr=errors)
+    ! fill pred with systematic velocities
+!     do i=1,nobserv
+!         where(observ == i) pred = planetpar(size(planetpar)-)
+!     end do
+    vel = planetpar(nPar)
+
+    ! get the radial velocity model with these parameters (in vel)
+    if (gp_n_planets > 0) then
+        call get_rvN(times, &
+                     planetpar(1:nPar-1:5), & ! periods for all planets
+                     planetpar(2:nPar-1:5), & ! K for all planets
+                     planetpar(3:nPar-1:5), & ! ecc for all planets
+                     planetpar(4:nPar-1:5), & ! omega for all planets
+                     planetpar(5:nPar-1:5), & ! t0 for all planets
+                     0.d0, & ! systematic velocity
+                     vel, nt, gp_n_planets)
+    end if
+
+    ! residuals: what is left when the planets (or just vsys) is subtracted from the data
+    r = rvs - vel
+
+    ! calculate predictions at observed times
+    call gp1%predict(times, r, (/0.d0/), times, pred, cov, yerr=errors)
+    pred = pred + vel
+
 
     return
 
