@@ -1203,7 +1203,7 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 					if verbose:
 						results_constant.do_hist_plots(save=hist_plot_file_constant)
 
-				constant_lnE = results_constant.NS_lnE
+				constant_lnE = results_constant.INS_lnE
 
 			elif nplanets == 1:
 				results_one_planet = MCMC_nest(root, context=str(context))
@@ -1221,7 +1221,7 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 						results_one_planet.do_plot_map_phased(system, save=map_phased_plot_file_one_planet)
 						results_one_planet.do_hist_plots(save=hist_plot_file_one_planet)
 
-				one_planet_lnE = results_one_planet.NS_lnE
+				one_planet_lnE = results_one_planet.INS_lnE
 
 			elif nplanets == 2:
 				results_two_planet = MCMC_nest(root, context=str(context))
@@ -1240,7 +1240,7 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 						results_two_planet.do_plot_map_phased(system, save=map_phased_plot_file_two_planet)
 						results_two_planet.do_hist_plots(save=hist_plot_file_two_planet)
 
-				two_planet_lnE = results_two_planet.NS_lnE
+				two_planet_lnE = results_two_planet.INS_lnE
 
 			elif nplanets == 3:
 				results_three_planet = MCMC_nest(root, context=str(context))
@@ -1259,7 +1259,7 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 						results_three_planet.do_plot_map_phased(system, save=map_phased_plot_file_three_planet)
 						results_three_planet.do_hist_plots(save=hist_plot_file_three_planet)
 
-				three_planet_lnE = results_three_planet.NS_lnE
+				three_planet_lnE = results_three_planet.INS_lnE
 
 
 		##############################################################################
