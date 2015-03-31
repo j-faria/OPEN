@@ -396,7 +396,10 @@ class gls(PeriodogramBase):
   def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
                norm="HorneBaliunas", stats=False, ext=True, force_notrend=False):
     self.name = 'Generalized Lomb-Scargle'
-    self.star_name = get_star_name(rv)
+    try:
+      self.star_name = get_star_name(rv)
+    except AttributeError:
+      self.star_name = ''
 
     self.power = None
     self.freq = freq
