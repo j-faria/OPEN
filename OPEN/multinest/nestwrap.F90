@@ -154,6 +154,7 @@ contains
 ! 		print *, Cube
 		!call loglike function here 
 		call slikelihood(Cube,lnew,context)
+! 		print *, lnew
 ! 		stop
 
 	end subroutine getLogLike
@@ -179,8 +180,9 @@ contains
 		logical ending ! is this the final call?
 		! local variables
 		integer, dimension(nobserv) :: t_limits
-		double precision, dimension(size(times) + 1000) :: t, velt, mu, std
-		double precision, dimension(size(times) + 1000, size(times) + 1000) :: cov
+		integer, parameter :: Npredict = 500
+		double precision, dimension(size(times) + Npredict) :: t, velt, mu, std
+		double precision, dimension(size(times) + Npredict, size(times) + Npredict) :: cov
 		character(len=100) gppredictfile
 		integer i, ipar, map_index, n
 		character(len=100) :: fmt
@@ -288,9 +290,9 @@ contains
 			map_index = nPar*3 ! this is where the MAP parameters start in the paramConstr array
 
 			! prediction times are lineary spaced
-			t(1:1000) = linspace(minval(times), maxval(times), 1000)
+			t(1:Npredict) = linspace(minval(times), maxval(times), Npredict)
 			! and put together with observed times
-			t(1001:) = times
+			t(Npredict+1:) = times
 			call sort(t, size(t))  ! sort it
 
 			! fill vel with systematic velocities
@@ -327,10 +329,9 @@ contains
 	        ! residuals: what is left when the planets (or just vsys) is subtracted from the data
 	        r = rvs - vel
 
-
 			!! set hyperparameters to their MAP values
 			gp1%gp_kernel%pars(1) = paramConstr(map_index+gp_n_planet_pars+1)
-			gp1%sub_kernel2%pars(1) = paramConstr(map_index+gp_n_planet_pars+2)
+			gp1%sub_kernel2%pars(1) = 0d0 !paramConstr(map_index+gp_n_planet_pars+2)
 			call gp1%sub_kernel1%set_kernel_pars(1, (/paramConstr(map_index+gp_n_planet_pars+3)/) )
 			call gp1%sub_kernel1%set_kernel_pars(2, paramConstr(map_index+gp_n_planet_pars+4:))
 
@@ -341,7 +342,6 @@ contains
 
 
 			! planet parameters paramConstr(nPar*3+1:nPar*4-5)
-! 			print *, vel(1:5)
 			write(*,*) 'Calculating predictions...'
 			call gp1%predict(times, r, (/0.d0/), t, mu, cov, yerr=errors)
 			mu = mu+velt
@@ -349,7 +349,7 @@ contains
 
 			write(*,*) 'Writing file ', gppredictfile
 			open(unit=59, file=gppredictfile, form='formatted', status='replace')
-			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1, size(times) + 1000)
+			write(59, '(3f16.4)') (t(i), mu(i), std(i), i=1, size(times) + Npredict)
 			close(59)
 
 		end if

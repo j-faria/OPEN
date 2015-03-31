@@ -58,7 +58,7 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, meanf, np
     gp_n_planet_pars = 5*nplanets + 1
 
     gp1%gp_kernel%pars(1) = hyperpar(1)
-    gp1%sub_kernel2%pars(1) = hyperpar(2)
+    gp1%sub_kernel2%pars(1) = 0d0 !hyperpar(2)
     call gp1%sub_kernel1%set_kernel_pars(1, (/ hyperpar(3) /) )
     call gp1%sub_kernel1%set_kernel_pars(2, hyperpar(4:))
 
@@ -89,6 +89,7 @@ subroutine gp_predictor(times, rvs, errors, pred, planetpar, hyperpar, meanf, np
     r = rvs - vel
 
     ! calculate predictions at observed times
+    pred = 0d0
     call gp1%predict(times, r, (/0.d0/), times, pred, cov, yerr=errors)
     pred = pred + vel
 
