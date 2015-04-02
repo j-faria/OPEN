@@ -84,7 +84,7 @@ contains
 
 			! prior for hyperparameters
 			i = nPar-nextra+nobserv+1
-			do j = i, i+3
+			do j = i, i+4
 				Cube(j) = UniformPrior(Cube(j), spriorran(j,1), spriorran(j,2))
 			end do
 
@@ -98,10 +98,10 @@ contains
 		! prior for period(s)
 		do i = 1, nPar-nextra, 5
 			! uncomment the following line for Jeffreys prior
-! 			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 			! uncomment the following two lines for individual prior (2 planets case)
-			if (i==1) Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
-			if (i==6) Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+! 			if (i==1) Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
+! 			if (i==6) Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 
 ! 			if (i==1) Cube(i) = GaussianPrior(Cube(i), 2.2185733d0, 1.9d-6)
 		end do
@@ -126,19 +126,19 @@ contains
 			!Cube(i+1) is this planet's eccentricity
 			!Cube(i-1) is this planet's period
 			! set kmax here
-! 			kmax = spriorran(i,2)
+			kmax = spriorran(i,2)
 ! 			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
 			! uncomment the following line for Modified Jeffreys prior
-! 			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
+			Cube(i) = ModJeffreysPrior(Cube(i), 1.d0, kmax)
 			! uncomment the following line for Jeffreys prior
 			!Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), kmax)
 			! uncomment the following line for a uniform prior
-			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+! 			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 		end do
 
 		! For e=0, where pericentre is undefined, ω=0 can be chosen
 		! such that t0 gives the time of nodal passage
-		do i=3,nPar-1,5
+		do i=3,nPar-nextra,5
 			if (Cube(i) == 0) Cube(i+1) = 0.d0
 		end do
 
@@ -178,25 +178,27 @@ contains
 		integer context ! any additional information user wants to pass
 		logical ending ! is this the final call?
 		! local variables
-		double precision, dimension(size(times) + 1000) :: t, mu, std
+		integer, dimension(nobserv) :: t_limits
+		double precision, dimension(size(times) + 1000) :: t, velt, mu, std
 		double precision, dimension(size(times) + 1000, size(times) + 1000) :: cov
 		character(len=100) gppredictfile
-		integer i, map_index
+		integer i, ipar, map_index, n
 		character(len=100) :: fmt
 
+		n = size(times)
 		!write(fmt,'(a,i2,a)')  '(',nPar,'f13.4)'
 		!write(*,fmt) paramConstr(nPar*3+1:nPar*4)
 		print *, maxLogLike
 
 		write(*,*) ' '
-		if (nplanets == 1 .and. using_gp) then  ! 1 planet + 4 hyper
+		if (nplanets == 1 .and. using_gp) then  ! 1 planet + 5 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
-			write(fmt,'(a,i2,a)')  '(',nPar - 4,'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+1:nPar*4 - 4)
+			write(fmt,'(a,i2,a)')  '(',nPar - 5,'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*4 - 5)
 			
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*4 - 3:)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.7)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 1 .and. using_jitter) then  ! 1 planet + jitter
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
@@ -209,16 +211,16 @@ contains
 			write(*,fmt) paramConstr(nPar*3+1:nPar*4)
 
 		
-		else if (nplanets == 2 .and. using_gp) then  ! 2 planets + 4 hyper
+		else if (nplanets == 2 .and. using_gp) then  ! 2 planets + 5 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+5)
 			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+6:nPar*4 - 4)
+			write(*,fmt) paramConstr(nPar*3+6:nPar*4 - 5)
 
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*4 - 3:)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 2 .and. using_jitter) then  ! 2 planets + jitter
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
@@ -234,16 +236,16 @@ contains
 			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+6:nPar*4)
 
-		else if (nplanets == 3 .and. using_gp) then  ! 3 planets + 4 hyper
+		else if (nplanets == 3 .and. using_gp) then  ! 3 planets + 5 hyper
 			write(*,'(6a13)') (/"    P", "    K", "  ecc", "omega", "   t0", " vsys" /)
 			write(fmt,'(a,i2,a)')  '(',5,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+1:nPar*3+10)
 			write(fmt,'(a,i2,a)')  '(',6,'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+11:nPar*4 - 4)
+			write(*,fmt) paramConstr(nPar*3+11:nPar*4 - 5)
 
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*4 - 3:)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 3 .and. using_jitter) then  ! 3 planets + jitter
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
@@ -259,13 +261,13 @@ contains
 			write(fmt,'(a,i2,a)')  '(',nPar-10,'f13.4)'
 			write(*,fmt) paramConstr(nPar*3+11:nPar*4)
 
-		else if (nplanets == 0 .and. using_gp) then  ! 4 hyper (plus one systematic velocity)
+		else if (nplanets == 0 .and. using_gp) then  ! 5 hyper (plus systematic velocity)
 			write(*,'(a13)') (/" vsys" /)
-			write(fmt,'(a,i2,a)')  '(', 1, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+1)
-			write(*,'(4a13)') (/"t1", "t2", "t3", "t4" /)
-			write(fmt,'(a,i2,a)')  '(', 4, 'f13.4)'
-			write(*,fmt) paramConstr(nPar*3+2:)
+			write(fmt,'(a,i2,a)')  '(', nobserv, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*3+1:nPar*3+nobserv)
+			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
+			write(fmt,'(a,i2,a)')  '(', 5, 'f13.4)'
+			write(*,fmt) paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 0 .and. using_jitter) then  ! jitter + vsys
 			write(*,'(2a13)') (/"    s", " vsys" /)
@@ -283,28 +285,66 @@ contains
 		if (ending .and. using_gp) then
 			gppredictfile = TRIM(nest_root)//'gp.dat'
 
+			map_index = nPar*3 ! this is where the MAP parameters start in the paramConstr array
+
 			! prediction times are lineary spaced
 			t(1:1000) = linspace(minval(times), maxval(times), 1000)
 			! and put together with observed times
 			t(1001:) = times
 			call sort(t, size(t))  ! sort it
 
+			! fill vel with systematic velocities
+			ipar = nPar-nextra
+			if (using_jitter) ipar = ipar+1
+	        do i=1,nobserv
+	            where(observ == i) vel = paramConstr(ipar+i)
+	        end do
+	        velt = 0d0
+
+
+	        ! get the radial velocity model with these parameters (in vel and velt)
+	        if (gp_n_planets > 0) then
+	            call get_rvN(times, &
+	                         paramConstr(map_index+1:nPar*4-nextra:5), & ! periods for all planets
+	                         paramConstr(map_index+2:nPar*4-nextra:5), & ! K for all planets
+	                         paramConstr(map_index+3:nPar*4-nextra:5), & ! ecc for all planets
+	                         paramConstr(map_index+4:nPar*4-nextra:5), & ! omega for all planets
+	                         paramConstr(map_index+5:nPar*4-nextra:5), & ! t0 for all planets
+	                         0.d0, & ! systematic velocity
+	                         vel, n, gp_n_planets)
+	            call get_rvN(t, &
+	                         paramConstr(map_index+1:nPar*4-nextra:5), & ! periods for all planets
+	                         paramConstr(map_index+2:nPar*4-nextra:5), & ! K for all planets
+	                         paramConstr(map_index+3:nPar*4-nextra:5), & ! ecc for all planets
+	                         paramConstr(map_index+4:nPar*4-nextra:5), & ! omega for all planets
+	                         paramConstr(map_index+5:nPar*4-nextra:5), & ! t0 for all planets
+	                         0.d0, & ! systematic velocity
+	                         velt, size(t), gp_n_planets)
+
+
+        	end if
+
+	        ! residuals: what is left when the planets (or just vsys) is subtracted from the data
+	        r = rvs - vel
+
+
 			!! set hyperparameters to their MAP values
-			map_index = nPar*3 ! this is where the MAP parameters start in the array
 			gp1%gp_kernel%pars(1) = paramConstr(map_index+gp_n_planet_pars+1)
-			call gp1%gp_kernel%set_kernel_pars(1, (/paramConstr(map_index+gp_n_planet_pars+2)/) )
-			call gp1%gp_kernel%set_kernel_pars(2, paramConstr(map_index+gp_n_planet_pars+3:))
+			gp1%sub_kernel2%pars(1) = paramConstr(map_index+gp_n_planet_pars+2)
+			call gp1%sub_kernel1%set_kernel_pars(1, (/paramConstr(map_index+gp_n_planet_pars+3)/) )
+			call gp1%sub_kernel1%set_kernel_pars(2, paramConstr(map_index+gp_n_planet_pars+4:))
 
-			!print *, paramConstr(map_index+gp_n_planet_pars+1)
-			!print *, paramConstr(map_index+gp_n_planet_pars+2)
-			!print *, paramConstr(map_index+gp_n_planet_pars+3:)
-			!print *, paramConstr(nPar*3+1:nPar*4-4)
-			!print *, ''
-			!write(*, '(10f13.6)') gp1%gp_kernel%evaluate_kernel(times, times)
-			!print *, ''
+! 			print *, gp1%gp_kernel%pars
+! 			print *, gp1%sub_kernel2%pars
+! 			call gp1%sub_kernel1%get_kernel_pars(1)
+! 			call gp1%sub_kernel1%get_kernel_pars(2)
 
+
+			! planet parameters paramConstr(nPar*3+1:nPar*4-5)
+! 			print *, vel(1:5)
 			write(*,*) 'Calculating predictions...'
-			call gp1%predict(times, rvs, paramConstr(nPar*3+1:nPar*4-4), t, mu, cov, yerr=errors)
+			call gp1%predict(times, r, (/0.d0/), t, mu, cov, yerr=errors)
+			mu = mu+velt
 			std = sqrt(get_diagonal(cov))
 
 			write(*,*) 'Writing file ', gppredictfile
@@ -327,71 +367,72 @@ contains
 		double precision u(nsamples)
 		integer j(nsamples), jmaxlike(1), min_index, max_index, nt, i
 
-		call random_number(u)
-		!print *, u
-		min_index=1
-		max_index=nLpt
-		j = min_index + FLOOR((max_index+1-min_index)*u)
-		jmaxlike = maxloc(l)
-		!print *, j
-		!print *, phyP(:,j)
-		nt = size(times)
+			call random_number(u)
+			!print *, u
+			min_index=1
+			max_index=nLpt
+			j = min_index + FLOOR((max_index+1-min_index)*u)
+			jmaxlike = maxloc(l)
+			!print *, j
+			!print *, phyP(:,j)
+			nt = size(times)
 
-		!**********************      PLOT      ******************
-		CALL PGERAS
-		! Define the Viewport
-	    CALL PGSVP(0.01, 0.99, 0.01, 0.99)
-		! Define the Window
-		CALL PGSWIN(REAL(minval(times)-10), REAL(maxval(times)+10), REAL(minval(rvs)-2), REAL(maxval(rvs)+2))
-		!CALL PGSWIN(2449464.5956, 2452856.4222, -150.0, 150.0)
-		!CALL PGSWIN(13000., 16000., -150.0, 150.0)
-		! Draw a box
-	    CALL PGSCI(4) ! blue
-	    CALL PGBOX ('BCTS', 0., 0, 'BCTSV', 0.0, 0)
+			!**********************      PLOT      ******************
+			CALL PGERAS
+			! Define the Viewport
+		    CALL PGSVP(0.01, 0.99, 0.01, 0.99)
+			! Define the Window
+			CALL PGSWIN(REAL(minval(times)-10), REAL(maxval(times)+10), REAL(minval(rvs)-2), REAL(maxval(rvs)+2))
+			!CALL PGSWIN(2449464.5956, 2452856.4222, -150.0, 150.0)
+			!CALL PGSWIN(13000., 16000., -150.0, 150.0)
+			! Draw a box
+		    CALL PGSCI(4) ! blue
+		    CALL PGBOX ('BCTS', 0., 0, 'BCTSV', 0.0, 0)
 
-	    CALL PGSCI (6) ! magenta
-	    CALL PGPT (nt, REAL(times), REAL(rvs), 17)
+		    CALL PGSCI (6) ! magenta
+		    CALL PGPT (nt, REAL(times), REAL(rvs), 17)
 
-		do i=2,nsamples
+			do i=2,nsamples
+				call get_rvN(times_oversampled, &
+							 phyP(1:nPar-1:5, j(i)), & ! periods for all planets
+							 phyP(2:nPar-1:5, j(i)), & ! K for all planets
+							 phyP(3:nPar-1:5, j(i)), & ! ecc for all planets
+							 phyP(4:nPar-1:5, j(i)), & ! omega for all planets
+							 phyP(5:nPar-1:5, j(i)), & ! t0 for all planets
+							 phyP(nPar, j(i)), & ! systematic velocity
+							 vel_oversampled, 5*nt, nplanets)
+
+				!CALL PGSCI (0) ! white
+			    !CALL PGLINE(5*nt, REAL(times_oversampled), REAL(last_vel_oversampled(:,i)))
+			    !CALL PGPT (nt, REAL(times), REAL(last_vel), 18)
+			    CALL PGSCI (1) ! black
+			    !CALL PGPT (nt, REAL(times), REAL(vel), 18)
+			    CALL PGLINE(5*nt, REAL(times_oversampled), REAL(vel_oversampled))
+			    last_vel_oversampled(:, i) = vel_oversampled
+			end do
+
 			call get_rvN(times_oversampled, &
-						 phyP(1:nPar-1:5, j(i)), & ! periods for all planets
-						 phyP(2:nPar-1:5, j(i)), & ! K for all planets
-						 phyP(3:nPar-1:5, j(i)), & ! ecc for all planets
-						 phyP(4:nPar-1:5, j(i)), & ! omega for all planets
-						 phyP(5:nPar-1:5, j(i)), & ! t0 for all planets
-						 phyP(nPar, j(i)), & ! systematic velocity
+						 phyP(1:nPar-1:5, jmaxlike), & ! periods for all planets
+						 phyP(2:nPar-1:5, jmaxlike), & ! K for all planets
+						 phyP(3:nPar-1:5, jmaxlike), & ! ecc for all planets
+						 phyP(4:nPar-1:5, jmaxlike), & ! omega for all planets
+						 phyP(5:nPar-1:5, jmaxlike), & ! t0 for all planets
+						 phyP(nPar, jmaxlike), & ! systematic velocity
 						 vel_oversampled, 5*nt, nplanets)
 
-			!CALL PGSCI (0) ! white
-		    !CALL PGLINE(5*nt, REAL(times_oversampled), REAL(last_vel_oversampled(:,i)))
+			CALL PGSCI (3)
+			CALL PGSLW (3)  ! line width
+		    CALL PGLINE(5*nt, REAL(times_oversampled), REAL(last_vel_oversampled(:,1)))
 		    !CALL PGPT (nt, REAL(times), REAL(last_vel), 18)
-		    CALL PGSCI (1) ! black
+		    !CALL PGSCI (1) ! black
 		    !CALL PGPT (nt, REAL(times), REAL(vel), 18)
-		    CALL PGLINE(5*nt, REAL(times_oversampled), REAL(vel_oversampled))
-		    last_vel_oversampled(:, i) = vel_oversampled
-		end do
+		    !CALL PGLINE(5*nt, REAL(times_oversampled), REAL(vel_oversampled))
+		    last_vel_oversampled(:, 1) = vel_oversampled
+		
 
-		call get_rvN(times_oversampled, &
-					 phyP(1:nPar-1:5, jmaxlike), & ! periods for all planets
-					 phyP(2:nPar-1:5, jmaxlike), & ! K for all planets
-					 phyP(3:nPar-1:5, jmaxlike), & ! ecc for all planets
-					 phyP(4:nPar-1:5, jmaxlike), & ! omega for all planets
-					 phyP(5:nPar-1:5, jmaxlike), & ! t0 for all planets
-					 phyP(nPar, jmaxlike), & ! systematic velocity
-					 vel_oversampled, 5*nt, nplanets)
+		    CALL PGUPDT
+			CALL PGEBUF
 
-		CALL PGSCI (3)
-		CALL PGSLW (3)  ! line width
-	    CALL PGLINE(5*nt, REAL(times_oversampled), REAL(last_vel_oversampled(:,1)))
-	    !CALL PGPT (nt, REAL(times), REAL(last_vel), 18)
-	    !CALL PGSCI (1) ! black
-	    !CALL PGPT (nt, REAL(times), REAL(vel), 18)
-	    !CALL PGLINE(5*nt, REAL(times_oversampled), REAL(vel_oversampled))
-	    last_vel_oversampled(:, 1) = vel_oversampled
-	
-
-	    CALL PGUPDT
-		CALL PGEBUF
 #endif
 
 	end subroutine live_plot

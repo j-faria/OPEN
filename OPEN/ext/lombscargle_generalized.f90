@@ -1,18 +1,21 @@
-SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
+SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, NCPU, P, M, NT, NW)
 !f2py threadsafe
 !f2py intent(in) T(NT)
 !f2py intent(in) Y(NT)
 !f2py intent(in) SIG(NT)
 !f2py intent(in) W(NW)
+!f2py integer intent(in), optional :: NCPU = -1
 !f2py intent(out) P(NW)
 !f2py intent(out) M
 !f2py intent(hide) NT
 !f2py intent(hide) NW
+    use omp_lib
     IMPLICIT NONE
 !* 
 !*  Input arguments
 !* 
     INTEGER NT, NW, M
+    INTEGER,optional :: NCPU
     REAL (KIND=8) T(NT), Y(NT), SIG(NT)
     REAL (KIND=8) W(NW), P(NW)
 
@@ -38,6 +41,9 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
 !*  W   (input) REAL (KIND=8) array, dimension (NW)
 !*      Angular frequencies for output periodogram
 !* 
+!* NCPU (input) INTEGER, OPTIONAL
+!*      Number of CPUs to distribute calculation
+!*
 !*  P   (output) REAL (KIND=8) array, dimension (NW)
 !*      Lomb-Scargle periodogram
 !* 
@@ -76,8 +82,15 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
     b = 0.d0
     off = 0.d0
 
-    !$OMP PARALLEL PRIVATE(x,cosx,sinx,wcosx,wsinx,C,S,YC,YS,CCh,CSh,SSh,CC,SS,CS,D)
-    !$OMP DO
+    ! If NCPU is present, distribute the calculation using OpenMP
+    if (present(NCPU).and.(.not.(NCPU.eq.-1))) then
+      call OMP_SET_NUM_THREADS(NCPU)
+    else
+      call OMP_SET_NUM_THREADS(1)
+    endif
+
+    !$OMP PARALLEL DO &
+    !$OMP PRIVATE(x,cosx,sinx,wcosx,wsinx,C,S,YC,YS,CCh,CSh,SSh,CC,SS,CS,D)
     do I=1,NW
 
       x = W(I) * th
@@ -106,8 +119,7 @@ SUBROUTINE GLOMBSCARGLE(T, Y, SIG, W, P, M, NT, NW)
       upow(I) = (SS*YC*YC + CC*YS*YS - 2.d0*CS*YC*YS) / (YY*D) ! Eq. (5)
 
     end do
-    !$OMP END DO
-    !$OMP END PARALLEL
+    !$OMP END PARALLEL DO
 
     ! An ad-hoc estimate of the number of independent frequencies 
     ! see discussion following Eq. (24)

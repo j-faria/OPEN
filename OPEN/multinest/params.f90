@@ -22,7 +22,7 @@ module params
     logical using_jitter, using_gp
     !train the gaussian process beforehand
     logical training
-    real(kind=8), dimension(4) :: trained_parameters
+    real(kind=8), dimension(5) :: trained_parameters
     !extra linear dependence in the model
     !how many variables
     logical lin_dep
@@ -34,7 +34,7 @@ module params
     ! nuisance parameters and auxiliary variables
     integer, allocatable, dimension(:) :: observ
     real(kind=8), allocatable, dimension(:) :: ss, alpha, tau
-    real(kind=8), allocatable, dimension(:) :: vel, dist, sigma
+    real(kind=8), allocatable, dimension(:) :: vel, r, sigma
     real(kind=8), allocatable, dimension(:) :: times_oversampled, vel_oversampled
     real(kind=8), allocatable, dimension(:, :) :: last_vel_oversampled
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
@@ -50,7 +50,7 @@ module params
     type(SumKernels), target :: k7
     type(ProductKernels), target :: k8
     type(GP) gp1
-    class(Kernel), pointer :: kernel_to_pass
+    class(Kernel), pointer :: kernel_to_pass, subk1, subk2
 
 
 ! Parameters for MultiNest
@@ -83,7 +83,8 @@ module params
       
     !seed for MultiNest, negative value means take it from sys clock
 	integer nest_rseed 
-	parameter(nest_rseed=-1)
+! 	parameter(nest_rseed=1548)
+    parameter(nest_rseed=-1)
       
     !evidence tolerance factor
     double precision nest_tol 

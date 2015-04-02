@@ -39,7 +39,7 @@ GCC_VERSION = commands.getoutput(env['F90'] + ' -dumpversion')
 
 
 f2py_flags = ' --quiet '
-f2py_flags += '--f90flags="-ffree-line-length-none" '
+f2py_flags += '--f90flags="-ffree-line-length-none -fopenmp" '
 f2py_flags += '--opt="-O3" -lgomp --fcompiler=gnu95 '
 
 ## allow use to pass path to fortran compiler

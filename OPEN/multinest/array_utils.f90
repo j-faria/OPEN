@@ -210,4 +210,13 @@ subroutine swap(a, b)
 	temp = a ; a = b ; b = temp
 end subroutine swap
 
+function variance(arr)
+	implicit none
+	real(kind=8), intent(in), dimension(:) :: arr
+	real(kind=8) :: variance, x
+	x = sum(arr) / size(arr)
+	variance = sum((arr-x)**2)/size(arr)
+end function variance
+
+
 end module array_utils

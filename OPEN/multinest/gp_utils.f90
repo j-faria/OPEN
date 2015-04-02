@@ -37,13 +37,13 @@ module gputils
 		procedure :: evaluate_kernel => evaluate_kernel_ConstantKernel
 	end type ConstantKernel
 
-	! This kernel returns a constant along the diagonal
+	! This kernel returns a constant along the diagonal: "white noise" (homoskedastic)
 	type, extends(Kernel) :: DiagonalKernel
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_DiagonalKernel
 	end type DiagonalKernel
 
-	! This is a "white noise" kernel
+	! This is a "white noise" (heteroskedastic) kernel
 	type, extends(Kernel) :: WhiteKernel
 	contains
 		procedure :: evaluate_kernel => evaluate_kernel_WhiteKernel
@@ -123,6 +123,9 @@ module gputils
 		real(kind=8), dimension(:, :), allocatable :: cov
 		! the kernel associated with this GP
 		class(Kernel), pointer :: gp_kernel
+		! possible sub-kernels (we only allow one level down for now)
+		class(Kernel), pointer :: sub_kernel1
+		class(Kernel), pointer :: sub_kernel2
 	contains 
 		procedure :: is_posdef
 		procedure :: get_lnlikelihood
@@ -152,10 +155,11 @@ contains
 	end function new_Kernel
 
 
-	function new_GP(cov_matrix, kernel_ptr)
+	function new_GP(cov_matrix, kernel_ptr, subkernel_ptr1, subkernel_ptr2)
 		! this is the GP derived-type constructor
 		real(kind=8), dimension(:, :) :: cov_matrix
 		class(Kernel), pointer :: kernel_ptr
+		class(Kernel), pointer, optional :: subkernel_ptr1, subkernel_ptr2
 		type(GP) new_GP
 		integer :: shape_cov(2), N
 
@@ -166,6 +170,10 @@ contains
 		allocate(new_GP%cov(N, N))
 		new_GP%cov = cov_matrix
 		new_GP%gp_kernel => kernel_ptr
+
+		if(present(subkernel_ptr1)) new_GP%sub_kernel1 => subkernel_ptr1
+		if(present(subkernel_ptr2)) new_GP%sub_kernel2 => subkernel_ptr2
+
 
 	end function new_GP
 
@@ -468,7 +476,7 @@ contains
 		class(SumKernels), intent(inout) :: self
 		integer, intent(in) :: k
 		if (k==1) print *, self%kernel1%pars
-		if (k==2) print *, self%kernel1%pars
+		if (k==2) print *, self%kernel2%pars
 	end subroutine get_sub_kernel_pars_sum
 
 	subroutine get_sub_kernel_pars_prod(self, k)
@@ -476,7 +484,7 @@ contains
 		class(ProductKernels), intent(inout) :: self
 		integer, intent(in) :: k
 		if (k==1) print *, self%kernel1%pars
-		if (k==2) print *, self%kernel1%pars
+		if (k==2) print *, self%kernel2%pars
 	end subroutine get_sub_kernel_pars_prod
 
 
@@ -520,7 +528,7 @@ contains
 		real(kind=8), dimension(size(x)) :: mean
 		integer :: n
 		n = size(x)
-
+		print *, 'here'
 		! ATTENTION: the systematic velocity argument below only allows for one observatory!!!
 		call get_rvN(x, &
 					 args(1:gp_n_planet_pars-1:5), & ! periods for all planets
@@ -585,13 +593,16 @@ contains
 		real(kind=8), dimension(size(y)) :: yy, xsol
 		real(kind=8), dimension(size(y), 1) :: yy_m  ! 2-dimensional array to go into DPOTRF, DPOTRS
 		integer :: N, rc
-		!real(kind=8) :: time1, time2
+		real(kind=8) :: time1, time2
 
 		if (size(x) /= size(y)) STOP 'Dimension mismatch in get_lnlikelihood'
 		if (.not. associated(self%mean_fun)) STOP 'GP%mean_fun is not associated'
 
 		N = size(y)
-		cov_cho_factor = self%cov
+! 		call cpu_time(time1)
+		cov_cho_factor = self%gp_kernel%evaluate_kernel(x, x)
+! 		call cpu_time(time2)
+! 		print *, 'Took ', time2-time1
 
 		! optionally add data uncertainties in quadrature to covariance matrix
 		if (present(yerr)) then
@@ -601,14 +612,18 @@ contains
 		!cov_cho_factor_copy = cov_cho_factor
 
 		! solve the linear system using the cholesky method
-		yy = y - self%mean_fun(x, args)  ! rh
+		if (size(args) == 1 .and. args(1) == 0.d0) then
+			yy = y ! skip calling the mean function if it's zero
+		else
+			yy = y - self%mean_fun(x, args)  ! rh
+		end if
 		yy_m(:, 1) = yy
 
-		!call cpu_time(time1)
+! 		call cpu_time(time1)
 		call DPOTRF( 'L', N, cov_cho_factor, N, rc )
 		call DPOTRS( 'L', N, 1, cov_cho_factor, N, yy_m, N, rc )
-		!call cpu_time(time2)
-		!print '("Time for cholesky = ",f6.3," seconds.")',time2-time1
+! 		call cpu_time(time2)
+! 		print '("Time for cholesky = ",f6.3," seconds.")',time2-time1
 
 		!call choly(0, N, cov_cho_factor, yy, xsol, rc)
 			

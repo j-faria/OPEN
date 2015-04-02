@@ -22,8 +22,14 @@ import matplotlib.cm as cm
 
 
 mjup2mearth  = 317.828
-
-
+msun2mjup = 1047.3486
+msun2mnep = 19412.24
+msun2mearth = 328900.56
+mearth2msun = 1./msun2mearth
+au2m = 149597870700.
+m2au = 1./au2m
+jd2s = 86400.
+mean_sidereal_day = 86164.09054 # in seconds; 23h56m04.09054s
 
 ## this code from 
 ##   http://code.activestate.com/recipes/502263-yet-another-unique-function/
@@ -53,7 +59,27 @@ def wrms(array, weights):
     w = weights #/ sum(weights)
     # return sqrt(sum(x*x for x in array*w))
     return sqrt(sum(w*(array - np.average(array, weights=w))**2) / sum(w))
-    
+
+def var(array, weights=None, biased=False):
+    """ 
+    Calculate the (possibly weighted) sample variance, 
+    and correct for small samples (if biased=False). 
+    """
+    x = np.atleast_1d(array)
+    if weights is None:
+        if biased: 
+            return x.var()
+        else: 
+            return x.var(ddof=1)
+    else:
+        if biased:
+            return np.sum(weights*(x-np.average(x, weights=weights))**2) / np.sum(weights)
+        else:
+            V1 = np.sum(weights)
+            V2 = np.sum(weights**2)
+            return np.sum(weights*(x-np.average(x, weights=weights))**2) / (V1 - (V2/V1))
+
+
 
 def get_tp(P, ecc, omega, tt):
     """ 
@@ -85,6 +111,16 @@ def stdout_write(msg):
 	stdout.write(msg)
 	stdout.flush()
 
+
+def get_star_name(system):
+    """ Return the name of the star (works for standard HARPS filenames) """
+    full_path = system.provenance.keys()[0]
+    bn = os.path.basename(full_path)
+    i = bn.rfind('_harps_mean_corr.rdb')
+    if i == -1:
+        i = bn.rfind('_harps_mean.rdb')
+    star = bn[:i]
+    return star
 
 
 ### Matplotlib advanced plot interaction stuff
@@ -120,6 +156,7 @@ def selectable_plot(system, **kwargs):
         # fig.show()
 
     fig, ax = plt.subplots()
+    e = ax.errorbar(system.time, system.vrad, system.error, fmt='o')
     col = ax.scatter(system.time, system.vrad, picker=True)
     ax.set_xlabel('Time [days]')
     ax.set_ylabel('RV [%s]'%system.units)
