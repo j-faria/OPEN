@@ -72,7 +72,7 @@ per_usage = \
 """
 Usage:
     per 
-    per [-n SYSTEM] (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
+    per [-n SYSTEM] (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l|-z] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
     per -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
@@ -80,6 +80,7 @@ Options:
     -m --bgls        Calculate the Bayesian Generalized Lomb-Scargle periodogram
     -b --bayes       Calculate the Bayesian LS periodogram
     -l --ls          Calculate the Lomb-Scargle periodogram with fast algorithm
+    -z --hoef        Calculate the Hoeffding-test "periodogram" with Zucker's algorithm
     -f --force       Force recalculation
     --hifac=<hf>     hifac * Nyquist is lowest frequency used [default: 40]
     --ofac=<of>      Oversampling factor [default: 6]
@@ -466,6 +467,9 @@ class EmbeddedMagics(Magics):
 
         # which periodogram should be calculated?
         per_fcn = None
+        if args['--hoef']:
+            per_fcn = periodograms.hoeffding
+            name = 'Hoeffding'
         if args['--bgls']:
             per_fcn = periodograms.bgls
             name = 'Bayesian Generalized Lomb-Scargle'
