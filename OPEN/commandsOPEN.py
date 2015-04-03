@@ -311,7 +311,13 @@ class EmbeddedMagics(Magics):
             return
 
         # take care of glob (and tilde) expansions
-        globs = [glob.glob(expanduser(f)) for f in args['<file>']]
+        files = args['<file>']
+
+        # hack for metal-poor files
+        if len(files) == 1 and files[0].startswith('HD'):
+            files = ['/home/joao/phd/data/'+files[0]+'_harps_mean_corr.rdb']
+        ##
+        globs = [glob.glob(expanduser(f)) for f in files]
         filenames = list(chain.from_iterable(globs)) # some magic...
 
         # if 'default' system is already set, return the rvSeries class
@@ -900,7 +906,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return 
 
-        print args
+        # print args
         noise = float(args['<number>'])
         kms = system.error.mean() < 0.01
         if kms:
