@@ -225,10 +225,11 @@ Usage:
     restrict [(year <yr>)]
     restrict [(years <yr1> <yr2>)]
     restrict --gui
-    restrict --index=None
+    restrict --index=None [--noask]
 Options:
     --gui         Restrict data using a graphical interface (experimental)
     --index=None  Remove specific data points, providing their indices [default:None]
+    --noask       Do not confirm if removing observations
 """
 
 
@@ -1111,7 +1112,7 @@ class EmbeddedMagics(Magics):
                 clogger.info(msg)
                 return
 
-            if ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
+            if args['--noask'] or ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
                 system.provenance.values()[0][1] += n
                 # remove observations with indices ind_to_remove from
                 # system.(time,vrad,error); leave *_full arrays intact
