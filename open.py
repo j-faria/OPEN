@@ -44,8 +44,10 @@ if __name__ == "__main__":
     banner += 'Type "listcommands" for a list of the available commands\n'
     banner += 'For help on a specific command, type "command -h" or see http://j-faria.github.io/OPEN'
     ipyshell = EmbedShell(config=cfg, user_global_ns=globals(), user_ns={'np':np, 'sp':sp, 'keplerian':keplerian},
-                          banner1=banner if (not args['--nobanner']) else '',
-                          #banner2 = 'This is in banner 2',
+                          banner1=banner,
+                          banner2 = '',
+                          display_banner = not args['--nobanner'],
+                          usage='',
                           exit_msg='Goodbye.')
     ipyshell.enable_pylab(import_all=False)
     ipyshell()

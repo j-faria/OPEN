@@ -51,7 +51,7 @@ class EmbedShell(TerminalInteractiveShell):
     def __init__(self, config=None, ipython_dir=None, user_ns=None,
                  user_module=None, custom_exceptions=((),None),
                  usage=None, banner1=None, banner2=None,
-                 display_banner=None, exit_msg=u'', user_global_ns=None):
+                 display_banner=True, exit_msg=u'', user_global_ns=None):
     
         if user_global_ns is not None:
             warnings.warn("user_global_ns has been replaced by user_module. The\
