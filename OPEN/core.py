@@ -24,7 +24,7 @@ import pylab
 import matplotlib.pyplot as plt
 
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
-from scipy.optimize import leastsq
+from scipy.optimize import leastsq, curve_fit
 from scipy.stats.stats import spearmanr, pearsonr
 from scipy.stats import nanmean, nanstd
 from scipy.odr import odrpack
@@ -33,6 +33,7 @@ from scipy.odr import odrpack
 from .classes import MCMC_dream, MCMC_nest
 from logger import clogger
 from ext.get_rvN import get_rvn
+from .ext.lopast import lopast
 from .periodograms import ls_PressRybicki, gls
 try:
 	from ext.periodogram_DF import periodogram_DF
@@ -1614,6 +1615,36 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
 			del system.per
 		except AttributeError:
 			pass
+
+
+def do_lowpass_filter(system):
+	f = 1./95
+	temp = lopast(system.extras.rhk, system.time, f)
+
+	plt.figure()
+	plt.subplot(211)
+	plt.plot(system.time, system.extras.rhk, 'o')
+	plt.plot(system.time, temp, '--o', alpha=0.5)
+	plt.subplot(212)
+	plt.plot(system.time, system.extras.rhk - temp, 'o')
+	plt.show()
+
+	# assuming linear relation between RV and (activity-related) rhk
+	# use the lowpass filter shape to fit the RV variation
+	m, b = np.polyfit(temp, system.vrad, 1)
+	result = np.polyval([m, b], temp)
+
+	# def func(x, a):
+	# 	return a*(temp-temp.mean())
+
+	# popt, pcov = curve_fit(func, system.time, system.vrad, p0=100)
+	# result = func(system.time, 100)
+	# print popt
+	plt.figure()
+	plt.plot(system.time, system.vrad, 'o')
+	plt.plot(system.time, result, '--o', alpha=0.5)
+
+	system.vrad -= result
 
 
 

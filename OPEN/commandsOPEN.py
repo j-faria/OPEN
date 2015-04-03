@@ -27,7 +27,6 @@ from .utils import stdout_write, ask_yes_no, selectable_plot, write_yorbit_macro
 from .logger import clogger, logging
 import core
 import periodograms
-from .ext.lopast import lopast
 
 ################################################################################
 ################################################################################
@@ -923,11 +922,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default'):
-                system = local_ns['default']
-            # else:
-            #     system_name = args['-n']
-            #     system = local_ns[system_name]
+            system = local_ns['default']
         except KeyError:
             from shell_colors import red
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -935,13 +930,14 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return 
 
-        f = 1./60
+        core.do_lowpass_filter(system) 
+        # f = 1./60
 
-        msg = blue('INFO: ') + 'Converting to m/s'
-        clogger.info(msg)
+        # temp = lopast(system.extras.rhk, system.time, f)
 
-        temp = lopast(system.extras.rhk, system.time, f)
-        system.vrad = system.vrad - temp
+        # print plt
+
+        # system.vrad = system.vrad - temp
 
 
     @needs_local_scope
