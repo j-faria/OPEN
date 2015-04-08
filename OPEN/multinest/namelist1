@@ -26,7 +26,7 @@
     nest_IS = .true.
 
     !root for saving output files; character*100
-    nest_root='chains/nest-'
+    nest_root='chains/nest-1planet-'
 
 
     !after how many iterations feedback is required and the output
@@ -41,7 +41,7 @@
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
     !iterations or convergence criterion has been satisfied
-    nest_maxIter=10000
+    nest_maxIter=1000
     
     !feedback on the sampling progress?
     nest_fb=.true.
@@ -56,7 +56,9 @@
     !train the gaussian process beforehand (only effective if nest_context = 2yz)
     training = .true.
     !values of the trained parameters
-    trained_parameters = 0.000794d0, 0.000000d0, 9.391656d0, 25.680170d0, 1.043243d0
+    trained_parameters = 0.d0, 0.d0, 8.750494d0, 13.300407d0, 0.768633d0
+    !values of the "errros" in the trained parameters, to be considered for the priors
+    trained_std = 0.d0, 0.d0, 3.419370d0, 7.232614d0, 1.207830d0
 
 
     !extra linear dependences in the model

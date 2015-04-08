@@ -27,7 +27,7 @@ program main
     namelist /NEST_parameters/ sdim, nest_nlive, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &
                                nest_root, nest_context, &
-                               training, trained_parameters, &
+                               training, trained_parameters, trained_std, &
                                lin_dep, n_lin_dep
     ! read configuration values from namelist
     iou = 8
@@ -251,10 +251,7 @@ program main
         !! Period, Jeffreys, 0.2d - 365000d
         spriorran(i,1)= 0.2d0
         !spriorran(i,2)= 365000d0
-        spriorran(i,2)= 365d0 !1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
-
-!         spriorran(i,1)= 1500.d0
-!         spriorran(i,2)= 1900.d0
+        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
 
         !! semi amplitude K, Mod. Jeffreys (or Uniform)
 !         spriorran(i+1,1)=0.d0
@@ -320,14 +317,14 @@ program main
             spriorran(i+1,1)= 0.d0
             spriorran(i+1,2)= maxval(errors)
             ! timescale for growth / decay of active regions (d)
-            spriorran(i+2,1)= 0.95d0*trained_parameters(3)
-            spriorran(i+2,2)= 1.05d0*trained_parameters(3)
+            spriorran(i+2,1)= trained_parameters(3)
+            spriorran(i+2,2)= trained_std(3)
             ! periodicity (recurrence) timescale -> rotation period of the star
-            spriorran(i+3,1)= 0.95d0*trained_parameters(4)
-            spriorran(i+3,2)= 1.05d0*trained_parameters(4)
+            spriorran(i+3,1)= trained_parameters(4)
+            spriorran(i+3,2)= trained_std(4)
             ! smoothing parameter (?)
-            spriorran(i+4,1)= 0.95d0*trained_parameters(5)
-            spriorran(i+4,2)= 1.05d0*trained_parameters(5)
+            spriorran(i+4,1)= trained_parameters(5)
+            spriorran(i+4,2)= trained_std(5)
         else
             ! amplitude of GP
             i = sdim-nextra+nobserv+1

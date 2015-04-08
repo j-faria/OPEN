@@ -73,7 +73,7 @@ def lnlike2(p, t, y, yerr):
 
 def lnprior2(p):
     a, jit, tau, gamma, period = p
-    if (0.0005 < a < 0.005 and 1e-6<jit<1e-4 and 50<tau<90 and 0.2<gamma<5 and 25<period<35):
+    if (0.0005 < a < 0.005 and 1e-6<jit<1e-4 and 50<tau<90 and 0.2<gamma<5 and 10<period<35):
         return 0.0
     return -np.inf
 
@@ -88,7 +88,7 @@ def fit_gp(model, initial, data, ncpu, nwalkers=10):
     k, lnlike, lnprior, lnprob = model
     ndim = len(initial)
     p0 = [np.array(initial) + rel(initial, 1) * np.random.randn(ndim) for i in xrange(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=data, threads=1)
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=data, threads=4)
 
     msg = blue('    :: ') + 'Running burn-in...'
     clogger.info(msg)
@@ -96,7 +96,10 @@ def fit_gp(model, initial, data, ncpu, nwalkers=10):
     p0, lnp, _ = sampler.run_mcmc(p0, 100)
     sampler.reset()
 
-    niter = 250
+    p0, lnp, _ = sampler.run_mcmc(p0, 200)
+    sampler.reset()
+
+    niter = 5000
     
     msg = blue('    :: ') + 'Running %d MCMC chains for %d iterations...' % (nwalkers, niter)
     clogger.info(msg)
@@ -137,11 +140,18 @@ def do_it(system, training_variable, ncpu=1):
     data = (t, y, 1.0 / yerr ** 2)
 
     model = GPfuncs['QuasiPeriodicJitter']
-    initial = np.array([0.001, 1e-5, 80, 1, 30])
+    initial = np.array([0.001, 1e-5, 80, 1, 18])
     sampler, best_p = fit_gp(model, initial, data, ncpu)
+    samples = sampler.flatchain
+
+    std = samples.std(axis=0)
 
     msg = yellow('    :: ') + 'Best GP hyperparameters: ' + initial.size*' %f ' % tuple(best_p)
     clogger.info(msg)
+    msg = yellow('    :: ') + 'std of the chains:       ' + initial.size*' %f ' % tuple(std)
+    clogger.info(msg)
+
+
 
 
     
@@ -153,7 +163,7 @@ def do_it(system, training_variable, ncpu=1):
     x.sort()
 
     # # Plot 24 posterior samples.
-    # # samples = sampler.flatchain
+
     # # for s in samples[np.random.randint(len(samples), size=4)]:
     # #     # Set up the GP for this sample.
     # #     z1, z2, z3, z4 = s
@@ -196,11 +206,13 @@ def do_it(system, training_variable, ncpu=1):
     per = gls(ts)
     per._plot()
 
-    # plt.show()
+    plt.show()
     # sys.exit(0)
+
+    # fig = triangle.corner(samples, plot_contours=False)
+
     enter = raw_input('Press Enter to continue: ')
     if enter == 'n':
         sys.exit(0)
 
-    return best_p
-    # fig = triangle.corner(samples)
+    return best_p, std

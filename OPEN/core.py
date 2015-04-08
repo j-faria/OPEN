@@ -745,10 +745,7 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, maxp=3, 
-	             resume=False, verbose=False, ncpu=None, 
-	             training=None, skip_train_mcmc=False, lin=None, 
-	             doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
+def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, skip_train_mcmc=False, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -916,6 +913,7 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 	except AttributeError:
 		pass
 
+
 	if user:
 		# user is controlling and editing the namelist, we just start 
 		# multinest once with whatever is in there and read the output
@@ -974,24 +972,46 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 			# the namelist if resuming from a previous job
 			if (not skip_train_mcmc and not resume):
 				# do the actual training
-				GP_parameters = train_gp.do_it(system, training, ncpu)
+				GP_parameters, GP_parameters_std = train_gp.do_it(system, training, ncpu)
 
 				# convert the parameters from george to OPEN's GP
-				GP_parameters[2] = np.sqrt(GP_parameters[2])
-				GP_parameters[3] = np.sqrt(2./GP_parameters[3])
+				GP_parameters[2], GP_parameters_std[2] = np.sqrt(GP_parameters[2]), np.sqrt(GP_parameters_std[2])
+				GP_parameters[3], GP_parameters_std[3] = np.sqrt(2./GP_parameters[3]), np.sqrt(2./GP_parameters_std[3])
 				GP_parameters[3], GP_parameters[4] = GP_parameters[4], GP_parameters[3]
+				GP_parameters_std[3], GP_parameters_std[4] = GP_parameters_std[4], GP_parameters_std[3]
+
 				# write the trained parameters to the namelist
-				replacer1 = '    trained_parameters = %fd0, %fd0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters)
+				replacer1 = '    trained_parameters = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters[2:])
+				replacer2 = '    trained_std = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters_std[2:])
 				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
 					if 'trained_parameters' in line: print replacer1,
+					elif 'trained_std' in line: print replacer2,
 					else: print line,
 
 		else:
 			replacer1 = '    training = .false.\n'
 			replacer2 = '    trained_parameters = 0.d0, 0.d0, 0.d0, 0.d0\n'
+			replacer3 = '    trained_std = 0.d0, 0.d0, 0.d0, 0.d0\n'
 			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
 				if 'training' in line: print replacer1,
 				elif 'trained_parameters' in line: print replacer2,
+				elif 'trained_std' in line: print replacer3,
+				else: print line,
+
+		# if model has linear dependences on indicators, set the appropriate namelist flags
+		if lin:
+			replacer1 = '    lin_dep = .true.\n'
+			replacer2 = '    n_lin_dep = %d\n' % len(lvars)
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if ('lin_dep' in line and '.' in line): print replacer1,
+				elif 'n_lin_dep' in line: print replacer2,
+				else: print line,
+		else:
+			replacer1 = '    lin_dep = .false.\n'
+			replacer2 = '    n_lin_dep = 0\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if ' lin_dep' in line: print replacer1,
+				elif 'n_lin_dep' in line: print replacer2,
 				else: print line,
 
 
@@ -1038,7 +1058,11 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 	else:
 		# OPEN is in control and will try to run a full model selection
 		# analysis, editing the namelist accordingly.
-		
+
+		if maxp == 0:
+			clogger.info(red('ERROR: ') + 'maxp should be > 0')
+			return
+
 		# try to find name of star automatically
 		# this will be used for reading and writing in restarts
 		import re
@@ -1070,7 +1094,7 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 			for zf in zipfilenames:  # cycle all zip files in restart folder
 				ZF = zipfile.ZipFile(zf, "r")  # create the ZipFile object
 				for name in ZF.namelist():  # cycle every path in the zip file
-					# we don't actually need th namelist files here, as they would cause 
+					# we don't actually need the namelist files here, as they would cause 
 					# rewritting issues. They are just there for reproducibility
 					if 'namelist1' in name:
 						continue
@@ -1088,6 +1112,44 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 			# print restart_root
 			# return
 
+		# if training the GP before, set the appropriate namelist flags
+		if training:
+			replacer1 = '    training = .true.\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'training' in line: print replacer1,
+				else: print line,
+
+			# complicated logic but the idea is simple: we only redo the MCMC on
+			# the training variable if *none* of "-r" or "--skip-mcmc" is used
+			# we assume the user did not change the trained_parameters in 
+			# the namelist if resuming from a previous job
+			if (not skip_train_mcmc and not resume):
+				# do the actual training
+				GP_parameters, GP_parameters_std = train_gp.do_it(system, training, ncpu)
+
+				# convert the parameters from george to OPEN's GP
+				GP_parameters[2], GP_parameters_std[2] = np.sqrt(GP_parameters[2]), np.sqrt(GP_parameters_std[2])
+				GP_parameters[3], GP_parameters_std[3] = np.sqrt(2./GP_parameters[3]), np.sqrt(2./GP_parameters_std[3])
+				GP_parameters[3], GP_parameters[4] = GP_parameters[4], GP_parameters[3]
+				GP_parameters_std[3], GP_parameters_std[4] = GP_parameters_std[4], GP_parameters_std[3]
+
+				# write the trained parameters to the namelist
+				replacer1 = '    trained_parameters = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters[2:])
+				replacer2 = '    trained_std = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters_std[2:])
+				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+					if 'trained_parameters' in line: print replacer1,
+					elif 'trained_std' in line: print replacer2,
+					else: print line,
+
+		else:
+			replacer1 = '    training = .false.\n'
+			replacer2 = '    trained_parameters = 0.d0, 0.d0, 0.d0, 0.d0\n'
+			replacer3 = '    trained_std = 0.d0, 0.d0, 0.d0, 0.d0\n'
+			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				if 'training' in line: print replacer1,
+				elif 'trained_parameters' in line: print replacer2,
+				elif 'trained_std' in line: print replacer3,
+				else: print line,
 
 		# this is hardcoded, for now
 		nlive_dict = {0:300, 1:500, 2:800, 3:1000}
@@ -1161,6 +1223,7 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 					if 'nest_MAPfb' in line: print replacer,
 					else: print line,
 
+
 			# set nlive
 			nlive = nlive_dict[npl]
 			replacer = '    nest_nlive = %d\n' % nlive
@@ -1204,7 +1267,10 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 					if verbose:
 						results_constant.do_hist_plots(save=hist_plot_file_constant)
 
-				constant_lnE = results_constant.INS_lnE
+				if results_constant.INS_lnE != 0.:
+					constant_lnE = max([results_constant.INS_lnE, results_constant.NS_lnE])
+				else:
+					constant_lnE = results_constant.NS_lnE
 
 			elif nplanets == 1:
 				results_one_planet = MCMC_nest(root, context=str(context))
@@ -1222,7 +1288,10 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 						results_one_planet.do_plot_map_phased(system, save=map_phased_plot_file_one_planet)
 						results_one_planet.do_hist_plots(save=hist_plot_file_one_planet)
 
-				one_planet_lnE = results_one_planet.INS_lnE
+				if results_one_planet.INS_lnE != 0.:
+					one_planet_lnE = max([results_one_planet.INS_lnE, results_one_planet.NS_lnE])
+				else:
+					one_planet_lnE = results_one_planet.NS_lnE
 
 			elif nplanets == 2:
 				results_two_planet = MCMC_nest(root, context=str(context))
@@ -1241,7 +1310,10 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 						results_two_planet.do_plot_map_phased(system, save=map_phased_plot_file_two_planet)
 						results_two_planet.do_hist_plots(save=hist_plot_file_two_planet)
 
-				two_planet_lnE = results_two_planet.INS_lnE
+				if results_two_planet.INS_lnE != 0.:
+					two_planet_lnE = max([results_two_planet.INS_lnE, results_two_planet.NS_lnE])
+				else:
+					two_planet_lnE = results_two_planet.NS_lnE
 
 			elif nplanets == 3:
 				results_three_planet = MCMC_nest(root, context=str(context))
@@ -1260,7 +1332,10 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 						results_three_planet.do_plot_map_phased(system, save=map_phased_plot_file_three_planet)
 						results_three_planet.do_hist_plots(save=hist_plot_file_three_planet)
 
-				three_planet_lnE = results_three_planet.INS_lnE
+				if results_three_planet.INS_lnE != 0.:
+					three_planet_lnE = max([results_three_planet.INS_lnE, results_three_planet.NS_lnE])
+				else:
+					three_planet_lnE = results_three_planet.NS_lnE
 
 
 		##############################################################################
@@ -1368,9 +1443,6 @@ def do_multinest(system, user, gp, jitter, maxp=3,
 			        one_planet_lnE: results_one_planet,
 			        two_planet_lnE: results_two_planet,
 			        three_planet_lnE: results_three_planet}
-		else:
-			clogger.info(red('ERROR: ') + 'maxp should be > 0')
-			return
 
 
 		## save all fits to the system
@@ -1556,6 +1628,8 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
 		print blue('[Pearson correlation]') + ' r=%f, p-value=%f' % pr
 		print blue('[Spearman correlation]') + ' r=%f, p-value=%f' % sr
 
+	print pr[0] * (v2.std() / v1.std())
+
 	plt.figure()
 	plt.errorbar(v1, v2, xerr=e1, yerr=e2, fmt='o')
 	if verbose:
@@ -1563,6 +1637,7 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
 		m, b = np.polyfit(v1, v2, 1)
 		yp = np.polyval([m, b], v1)
 		plt.plot(v1, yp, '-k')
+		print yellow('Non-weighted linear fit') + ' m=%f, b=%f' % (m, b)
 
 		# weghted fit, ODR (only do if errors on variables)
 		if not (np.count_nonzero(e1) == 0 or np.count_nonzero(e2) == 0):
@@ -1573,6 +1648,7 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
 			output = odr.run()
 			yp = np.polyval(output.beta, v1)
 			plt.plot(v1, yp, '--k')
+			print yellow('Weighted linear fit') + ' m=%f, b=%f' % tuple(output.beta)
 
 	plt.ylabel(var2)
 	plt.xlabel(var1)
@@ -1873,7 +1949,7 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=F
 
 def get_rotation_period(system):
 	"""
-	Calculate rotation period from the Noyes (1984) relation
+	Calculate rotation period from the activity-rotation calibration
 	"""
 	# try to find name of star automatically
 	import re

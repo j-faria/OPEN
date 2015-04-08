@@ -84,9 +84,13 @@ contains
 
 			! prior for hyperparameters
 			i = nPar-nextra+nobserv+1
-			do j = i, i+4
-				Cube(j) = UniformPrior(Cube(j), spriorran(j,1), spriorran(j,2))
-			end do
+
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2))
+
+			Cube(i+2) = GaussianPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2))
+			Cube(i+3) = GaussianPrior(Cube(i+3), spriorran(i+3,1), spriorran(i+3,2))
+			Cube(i+4) = GaussianPrior(Cube(i+4), spriorran(i+4,1), spriorran(i+4,2))
 
 		else
 			! prior for systematic velocity
@@ -180,7 +184,7 @@ contains
 		logical ending ! is this the final call?
 		! local variables
 		integer, dimension(nobserv) :: t_limits
-		integer, parameter :: Npredict = 500
+		integer, parameter :: Npredict = 1000
 		double precision, dimension(size(times) + Npredict) :: t, velt, mu, std
 		double precision, dimension(size(times) + Npredict, size(times) + Npredict) :: cov
 		character(len=100) gppredictfile
