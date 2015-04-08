@@ -119,6 +119,8 @@ def get_star_name(system):
     i = bn.rfind('_harps_mean_corr.rdb')
     if i == -1:
         i = bn.rfind('_harps_mean.rdb')
+    if i == -1:
+        i = bn.rfind('_harps.rdb')
     star = bn[:i]
     return star
 
