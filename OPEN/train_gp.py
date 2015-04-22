@@ -50,8 +50,8 @@ def lnlike1(p, t, y, yerr):
     return gp.lnlikelihood(y)
 
 def lnprior1(p):
-    z1, z2, z3, z4 = p
-    if (0.<z1<1. and 5.<z2<50. and 20.<z3<40. and 5.<z4<50.): 
+    a, tau, gamma, period = p
+    if (0.<a<1. and 5.<tau<50. and 20.<gamma<40. and 5.<period<50.): 
         return 0.0
     return -np.inf
 
@@ -73,7 +73,7 @@ def lnlike2(p, t, y, yerr):
 
 def lnprior2(p):
     a, jit, tau, gamma, period = p
-    if (0.0005 < a < 0.005 and 1e-6<jit<1e-4 and 50<tau<90 and 0.2<gamma<5 and 10<period<35):
+    if (0.0005 < a < 0.5 and 1e-7<jit<1e-4 and 40<tau<100000 and 0.2<gamma<5 and 15<period<21):
         return 0.0
     return -np.inf
 
@@ -84,11 +84,11 @@ def lnprob2(p, x, y, yerr):
 GPfuncs['QuasiPeriodicJitter'] = (k2, lnlike2, lnprior2, lnprob2)
 
 
-def fit_gp(model, initial, data, ncpu, nwalkers=10):
+def fit_gp(model, initial, data, ncpu, nwalkers=20):
     k, lnlike, lnprior, lnprob = model
     ndim = len(initial)
     p0 = [np.array(initial) + rel(initial, 1) * np.random.randn(ndim) for i in xrange(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=data, threads=4)
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=data, threads=1)
 
     msg = blue('    :: ') + 'Running burn-in...'
     clogger.info(msg)
@@ -96,10 +96,10 @@ def fit_gp(model, initial, data, ncpu, nwalkers=10):
     p0, lnp, _ = sampler.run_mcmc(p0, 100)
     sampler.reset()
 
-    p0, lnp, _ = sampler.run_mcmc(p0, 200)
+    p0, lnp, _ = sampler.run_mcmc(p0, 100)
     sampler.reset()
 
-    niter = 5000
+    niter = 200
     
     msg = blue('    :: ') + 'Running %d MCMC chains for %d iterations...' % (nwalkers, niter)
     clogger.info(msg)
@@ -134,15 +134,22 @@ def do_it(system, training_variable, ncpu=1):
         else:
             f = 2.35
         yerr = f * system.error
+    if training_variable == 'bis_span':
+        yerr = 2.e-3*system.error
+
     
     # subtract mean
     y = y - np.mean(y)
     data = (t, y, 1.0 / yerr ** 2)
 
     model = GPfuncs['QuasiPeriodicJitter']
-    initial = np.array([0.001, 1e-5, 80, 1, 18])
+
+    # print y.ptp()
+    initial = np.array([y.ptp(), 1e-5, 1000, 1, 18.3])
+    # best_p = initial
     sampler, best_p = fit_gp(model, initial, data, ncpu)
     samples = sampler.flatchain
+    print samples.shape
 
     std = samples.std(axis=0)
 
@@ -154,11 +161,17 @@ def do_it(system, training_variable, ncpu=1):
 
 
 
+    # plt.figure()
+    # for i in range(samples.shape[1]):
+    #     plt.subplot(5,1,i+1)
+    #     plt.plot(samples[:,i])
+    # plt.show()
+
     
 
 
     # # The positions where the prediction should be computed.
-    x = np.linspace(min(t), max(t), 1000)
+    x = np.linspace(min(t), max(t), 5000)
     x = np.hstack((x, t))
     x.sort()
 
@@ -180,13 +193,18 @@ def do_it(system, training_variable, ncpu=1):
     kernel = model[0](*best_p)
     gp = george.GP(kernel, solver=george.HODLRSolver)
     gp.compute(t, yerr)
+    print gp.lnlikelihood(y)
     # Compute the prediction conditioned on the observations and plot it.
     # t1 = time()
-    m = gp.sample_conditional(y, x)
-    m1 = gp.sample_conditional(y, t)
+    m, cov = gp.predict(y, x)
+    m1, cov = gp.predict(y, t)
     # print time() - t1
     plt.figure()
     plt.subplot(211)
+
+    phase, fwhm_sim = np.loadtxt('/home/joao/phd/data/simulated/HD41248/HD41248_simul_oversampled.rdb', unpack=True, usecols=(0, 4), skiprows=2)
+    plt.plot(phase*18.3+t[0], fwhm_sim - fwhm_sim.mean(), 'g-')
+
     plt.plot(x, m, color='r', alpha=0.8)
     # plt.plot(t, m1, color='r', alpha=0.8)
     # Plot the data
@@ -199,12 +217,18 @@ def do_it(system, training_variable, ncpu=1):
 
     plt.xlabel('Time [days]')
 
+    plt.figure()
+    ax = plt.subplot(211)
     ts = BasicTimeSeries()
     ts.time = t
-    ts.vrad = y-m1
+    ts.vrad = y
     ts.error = yerr
     per = gls(ts)
-    per._plot()
+    per._plot(axes=ax)
+    ax = plt.subplot(212)
+    ts.vrad = y-m1
+    per = gls(ts)
+    per._plot(axes=ax, newFig=False)
 
     plt.show()
     # sys.exit(0)
