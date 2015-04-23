@@ -1268,7 +1268,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 						results_constant.do_hist_plots(save=hist_plot_file_constant)
 
 				if results_constant.INS_lnE != 0.:
-					constant_lnE = max([results_constant.INS_lnE, results_constant.NS_lnE])
+					constant_lnE = results_constant.INS_lnE # max([results_constant.INS_lnE, results_constant.NS_lnE])
 				else:
 					constant_lnE = results_constant.NS_lnE
 
@@ -1289,7 +1289,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 						results_one_planet.do_hist_plots(save=hist_plot_file_one_planet)
 
 				if results_one_planet.INS_lnE != 0.:
-					one_planet_lnE = max([results_one_planet.INS_lnE, results_one_planet.NS_lnE])
+					one_planet_lnE = results_one_planet.INS_lnE # max([results_one_planet.INS_lnE, results_one_planet.NS_lnE])
 				else:
 					one_planet_lnE = results_one_planet.NS_lnE
 
@@ -1311,7 +1311,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 						results_two_planet.do_hist_plots(save=hist_plot_file_two_planet)
 
 				if results_two_planet.INS_lnE != 0.:
-					two_planet_lnE = max([results_two_planet.INS_lnE, results_two_planet.NS_lnE])
+					two_planet_lnE = results_two_planet.INS_lnE # max([results_two_planet.INS_lnE, results_two_planet.NS_lnE])
 				else:
 					two_planet_lnE = results_two_planet.NS_lnE
 
@@ -1333,7 +1333,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 						results_three_planet.do_hist_plots(save=hist_plot_file_three_planet)
 
 				if results_three_planet.INS_lnE != 0.:
-					three_planet_lnE = max([results_three_planet.INS_lnE, results_three_planet.NS_lnE])
+					three_planet_lnE = results_three_planet.INS_lnE # max([results_three_planet.INS_lnE, results_three_planet.NS_lnE])
 				else:
 					three_planet_lnE = results_three_planet.NS_lnE
 
