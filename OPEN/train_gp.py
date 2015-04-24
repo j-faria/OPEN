@@ -69,11 +69,12 @@ def lnlike2(p, t, y, yerr):
     kernel = k2(*p)
     gp = george.GP(kernel, solver=george.HODLRSolver)
     gp.compute(t, yerr)
+    # print gp.lnlikelihood(y)
     return gp.lnlikelihood(y)
 
 def lnprior2(p):
     a, jit, tau, gamma, period = p
-    if (0.0005 < a < 0.5 and 1e-7<jit<1e-4 and 40<tau<100000 and 0.2<gamma<5 and 15<period<21):
+    if (0.0005 < a < 0.5 and 1e-7<jit<1e-4 and 40<tau<100000 and 0.2<gamma<5 and 10<period<40):
         return 0.0
     return -np.inf
 
@@ -96,24 +97,29 @@ def fit_gp(model, initial, data, ncpu, nwalkers=20):
     p0, lnp, _ = sampler.run_mcmc(p0, 100)
     sampler.reset()
 
-    p0, lnp, _ = sampler.run_mcmc(p0, 100)
+    p0, lnp, _ = sampler.run_mcmc(p0, 200)
     sampler.reset()
 
-    niter = 200
+    niter = 1000
     
     msg = blue('    :: ') + 'Running %d MCMC chains for %d iterations...' % (nwalkers, niter)
     clogger.info(msg)
 
+    logl = []
     t1 = time()
-    p0, lnp, _ = sampler.run_mcmc(p0, niter)
+    for p0, lnp, _ in sampler.sample(p0, None, None, iterations=niter):
+    #     pass
+        logl.append(max(lnp))
+    # p0, lnp, _ = sampler.run_mcmc(p0, niter)
     t2 = time()
+    logl = np.array(logl)
 
     p = p0[np.argmax(lnp)]
 
 
     msg = blue('    :: ') + 'MCMC took %f seconds' % (t2-t1)
     clogger.info(msg)
-    return sampler, p
+    return sampler, p, logl
 
 
 def do_it(system, training_variable, ncpu=1):
@@ -140,17 +146,15 @@ def do_it(system, training_variable, ncpu=1):
     
     # subtract mean
     y = y - np.mean(y)
-    data = (t, y, 1.0 / yerr ** 2)
+    data = (t, y, yerr)
 
     model = GPfuncs['QuasiPeriodicJitter']
 
     # print y.ptp()
-    initial = np.array([y.ptp(), 1e-5, 1000, 1, 18.3])
+    initial = np.array([0.01, 1e-5, 5000, 1, 25])
     # best_p = initial
-    sampler, best_p = fit_gp(model, initial, data, ncpu)
-    samples = sampler.flatchain
-    print samples.shape
-
+    sampler, best_p, logl = fit_gp(model, initial, data, ncpu)
+    samples = sampler.flatchain 
     std = samples.std(axis=0)
 
     msg = yellow('    :: ') + 'Best GP hyperparameters: ' + initial.size*' %f ' % tuple(best_p)
@@ -161,11 +165,14 @@ def do_it(system, training_variable, ncpu=1):
 
 
 
-    # plt.figure()
-    # for i in range(samples.shape[1]):
-    #     plt.subplot(5,1,i+1)
-    #     plt.plot(samples[:,i])
-    # plt.show()
+    plt.figure()
+    for i in range(samples.shape[1]+1):
+        plt.subplot(6,1,i+1)
+        if i == samples.shape[1]:
+            plt.plot(logl)
+        else:
+            plt.plot(samples[:,i])
+    plt.show()
 
     
 
@@ -202,8 +209,8 @@ def do_it(system, training_variable, ncpu=1):
     plt.figure()
     plt.subplot(211)
 
-    phase, fwhm_sim = np.loadtxt('/home/joao/phd/data/simulated/HD41248/HD41248_simul_oversampled.rdb', unpack=True, usecols=(0, 4), skiprows=2)
-    plt.plot(phase*18.3+t[0], fwhm_sim - fwhm_sim.mean(), 'g-')
+    # phase, fwhm_sim = np.loadtxt('/home/joao/phd/data/simulated/HD41248/HD41248_simul_oversampled.rdb', unpack=True, usecols=(0, 4), skiprows=2)
+    # plt.plot(phase*18.3+t[0], fwhm_sim - fwhm_sim.mean(), 'g-')
 
     plt.plot(x, m, color='r', alpha=0.8)
     # plt.plot(t, m1, color='r', alpha=0.8)
@@ -224,7 +231,7 @@ def do_it(system, training_variable, ncpu=1):
     ts.vrad = y
     ts.error = yerr
     per = gls(ts)
-    per._plot(axes=ax)
+    per._plot(axes=ax, newFig=False)
     ax = plt.subplot(212)
     ts.vrad = y-m1
     per = gls(ts)
