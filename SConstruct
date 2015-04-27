@@ -56,5 +56,5 @@ else:
 	Exit(1)
 
 
-SConscript(['RJDNest3/SConscript'])
+#SConscript(['RJDNest3/SConscript'])
 
