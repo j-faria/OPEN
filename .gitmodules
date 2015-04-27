@@ -5,5 +5,5 @@
 
 [submodule "RJDNest3"]
 	path = RJDNest3
-	url = git@github.com:j-faria/OPEN-RJDNest3.git
+	url = https://github.com/j-faria/OPEN-RJDNest3.git
 	ignore = untracked
