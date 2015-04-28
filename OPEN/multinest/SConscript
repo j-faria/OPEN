@@ -50,8 +50,8 @@ env = env.Clone(F90=mpif90_exec if MPI else 'gfortran',
 	            LINKFLAGS='',
 	            # F90COMSTR='Compiling $SOURCE',
 	            F90FLAGS=FFLAGS,
-	            LIBS=['nest3', 'lapack', 'blas'] #+ ['pgplot', 'X11', 'z'], 
-	            LIBPATH=[MultiNest_dir] #+ ['-L/home/joao/Software/mesasdk/pgplot'],
+	            LIBS=['nest3', 'lapack', 'blas'], #+ ['pgplot', 'X11', 'z'], 
+	            LIBPATH=[MultiNest_dir], #+ ['-L/home/joao/Software/mesasdk/pgplot'],
 	            FORTRANMODDIRPREFIX = '-J',  # option used by gfortran to specify where to put .mod files for compiled modules
 	            FORTRANMODDIR='.'
 	            )
