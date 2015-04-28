@@ -47,7 +47,7 @@ except ImportError:
 	periodogram_CLEAN_available = False
 
 from shell_colors import yellow, red, blue
-from .utils import julian_day_to_date, ask_yes_no, get_number_cores
+from .utils import julian_day_to_date, ask_yes_no, get_number_cores, var
 from .prior_funcs import random_from_jeffreys, random_from_modjeffreys
 import train_gp
 
@@ -1159,7 +1159,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				else: print line,
 
 		# this is hardcoded, for now
-		nlive_dict = {0:300, 1:500, 2:800, 3:1000}
+		nlive_dict = {0:1000, 1:1000, 2:1000, 3:1000}
 
 		for npl in range(0, maxp+1):
 
@@ -1389,16 +1389,25 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			finally:
 				clogger.info(msg) # print the previous message
 
-				msg1 += ' '*5 + 'p = %-13.8f\n' % (odds[0]/sum(odds), )
+				msg1 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[0]/sum(odds), odds[0])
 				msg = msg1
 				if maxp >= 1: 
-					msg2 += ' '*5 + 'p = %-13.8f\n' % (odds[1]/sum(odds), )
+					if odds[1] < 1.: # evidence supports constant model, 1/O_21 is to be compared with scales
+						msg2 += ' '*5 + 'p = %-13.8f   odds = %-13.8f (%-13.8f)\n' % (odds[1]/sum(odds), odds[1], 1./odds[1])
+					else:
+						msg2 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[1]/sum(odds), odds[1])
 					msg += msg2
 				if maxp >= 2: 
-					msg3 += ' '*5 + 'p = %-13.8f\n' % (odds[2]/sum(odds), )
+					if odds[2] < 1.: # evidence supports constant model, 1/O_31 is to be compared with scales
+						msg3 += ' '*5 + 'p = %-13.8f   odds = %-13.8f (%-13.8f)\n' % (odds[2]/sum(odds), odds[2], 1./odds[2])
+					else:
+						msg3 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[2]/sum(odds), odds[2])
 					msg += msg3
-				if maxp == 3: 
-					msg4 += ' '*5 + 'p = %-13.8f\n' % (odds[3]/sum(odds), )
+				if maxp == 3:
+					if odds[2] < 1.: # evidence supports constant model, 1/O_41 is to be compared with scales
+						msg4 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n (%-13.8f)' % (odds[3]/sum(odds), odds[3], 1./odds[3])
+					else:
+						msg4 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[3]/sum(odds), odds[3])
 					msg += msg4
 
 				clogger.info(msg)
@@ -1965,6 +1974,8 @@ def get_rotation_period(system):
 	"""
 	Calculate rotation period from the activity-rotation calibration
 	"""
+	from uncertainties import ufloat
+
 	# try to find name of star automatically
 	import re
 	filename = system.provenance.keys()[0]
@@ -2023,15 +2034,20 @@ def get_rotation_period(system):
 	log_tau = (1.362 - 0.166*x + 0.025*x**2 - 5.323*x**3) if x > 0 else (1.362 - 0.14*x)
 
 	lrhk = np.average(system.extras.rhk, weights=1/(system.extras.sig_rhk**2))
-	
-	msg = blue('INFO: ') + "Using weighted average of R'hk: %6.3f" % (lrhk,)
+	std_lrhk = np.sqrt(var(system.extras.rhk, weights=1./system.extras.sig_rhk**2))
+	lrhk = ufloat(lrhk, std_lrhk)
+
+
+	msg = blue('INFO: ') + "Using weighted average of R'hk: %6.3f (+- %4.3f)" % (lrhk.n, lrhk.s)
 	clogger.info(msg)
-	
+	print 
+
+
 	y = 5. + lrhk
 	## Noyes (1984), Eq 3
 	log_P = (0.324 - 0.4*y - 0.283*y**2 - 1.325*y**3) + log_tau
 
-	msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f d' % (10**log_P)
+	msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f (+- %f) d' % (10**log_P.n, 10**log_P.s)
 	clogger.info(msg)
 
 
@@ -2042,7 +2058,7 @@ def get_rotation_period(system):
 	Ro = (0.808 - 2.966*(lrhk+4.52))
 	P = Ro * tau
 
-	msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f d' % (P)
+	msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f (+- %f) d' % (P.n, 10**P.s)
 	clogger.info(msg)
 
 
