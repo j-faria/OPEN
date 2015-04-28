@@ -1589,7 +1589,8 @@ class MCMC_nest:
             for f in nest_output_files:
                 zf.write(f)
             # include the namelist used to run MultiNest
-            zf.write('OPEN/multinest/namelist1')
+            namelist_file = os.path.join(os.path.dirname(__file__), 'multinest/namelist1')
+            zf.write(namelist_file)
 
         msg = blue('INFO: ') + 'Saved output files to %s' % zfilename
         clogger.info(msg)
