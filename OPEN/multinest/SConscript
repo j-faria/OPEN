@@ -107,7 +107,7 @@ f2py_flags += '--opt="-O3" --fcompiler=gnu95 '
 if GetOption('gp_lapack_link') is None:
 	f2py_flags += '-lblas '
 else:
-	f2py_flags += '-L/usr/lib/lapack -llapack -lblas '
+	f2py_flags += '-L/usr/lib64/atlas -llapack -lblas '
 
 ## allow use to pass path to fortran compiler
 if GetOption('gfortran') is None:
