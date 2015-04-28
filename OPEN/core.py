@@ -47,12 +47,13 @@ except ImportError:
 	periodogram_CLEAN_available = False
 
 from shell_colors import yellow, red, blue
-from .utils import julian_day_to_date, ask_yes_no, get_number_cores
+from .utils import julian_day_to_date, ask_yes_no, get_number_cores, var
 from .prior_funcs import random_from_jeffreys, random_from_modjeffreys
 import train_gp
 
 timestamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 pi = np.pi
+this_file_abs_path = os.path.dirname(__file__)
 
 def updated_timestamp():
 	return datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
@@ -853,6 +854,9 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# in this case, the vsys is before the hyperparameters
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
 
+	namelist_file = os.path.join(this_file_abs_path, 'multinest/namelist1')
+	nest_exec = os.path.join(this_file_abs_path, 'multinest/nest')
+
 	# determine available number of cpu cores
 	available_cpu = get_number_cores()
 	if (ncpu is None) or (ncpu > available_cpu): 
@@ -913,13 +917,16 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 	except AttributeError:
 		pass
 
+	# create a 'chains' directory if it does not exist to store all MN output
+	if not os.path.isdir('chains'):
+		os.makedirs('chains')
 
 	if user:
 		# user is controlling and editing the namelist, we just start 
 		# multinest once with whatever is in there and read the output
 
 		# but first we need some info from the namelist
-		with open('OPEN/multinest/namelist1') as f:
+		with open(namelist_file) as f:
 			namelist_lines = f.readlines()
 
 		# the root of output files which may have changed
@@ -941,7 +948,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		# if resuming from a previous run, set the appropriate namelist flag
 		if resume:
 			replacer = '    nest_resume=.true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if 'nest_resume' in line: print replacer,
 				else: print line,
 
@@ -955,14 +962,14 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				os.system('head -n -50 ' + root_path + 'ev.dat.2 > ' + root_path + 'ev.dat')
 		else:
 			replacer = '    nest_resume=.false.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if 'nest_resume' in line: print replacer,
 				else: print line,
 
 		# if training the GP before, set the appropriate namelist flags
 		if training:
 			replacer1 = '    training = .true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if 'training' in line: print replacer1,
 				else: print line,
 
@@ -983,7 +990,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				# write the trained parameters to the namelist
 				replacer1 = '    trained_parameters = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters[2:])
 				replacer2 = '    trained_std = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters_std[2:])
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'trained_parameters' in line: print replacer1,
 					elif 'trained_std' in line: print replacer2,
 					else: print line,
@@ -992,7 +999,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			replacer1 = '    training = .false.\n'
 			replacer2 = '    trained_parameters = 0.d0, 0.d0, 0.d0, 0.d0\n'
 			replacer3 = '    trained_std = 0.d0, 0.d0, 0.d0, 0.d0\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if 'training' in line: print replacer1,
 				elif 'trained_parameters' in line: print replacer2,
 				elif 'trained_std' in line: print replacer3,
@@ -1002,14 +1009,14 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		if lin:
 			replacer1 = '    lin_dep = .true.\n'
 			replacer2 = '    n_lin_dep = %d\n' % len(lvars)
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if ('lin_dep' in line and '.' in line): print replacer1,
 				elif 'n_lin_dep' in line: print replacer2,
 				else: print line,
 		else:
 			replacer1 = '    lin_dep = .false.\n'
 			replacer2 = '    n_lin_dep = 0\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if ' lin_dep' in line: print replacer1,
 				elif 'n_lin_dep' in line: print replacer2,
 				else: print line,
@@ -1019,7 +1026,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		clogger.info(msg)
 
 		start = time()
-		cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
+		cmd = 'mpirun -np %d %s' % (ncpu, nest_exec)
 		rc = subprocess.call(cmd, shell=True)
 
 		if (rc == 1): 
@@ -1054,10 +1061,10 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				system.results.do_hist_plots()
 				
 
-
 	else:
 		# OPEN is in control and will try to run a full model selection
 		# analysis, editing the namelist accordingly.
+		total_time1 = time()
 
 		if maxp == 0:
 			clogger.info(red('ERROR: ') + 'maxp should be > 0')
@@ -1115,7 +1122,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		# if training the GP before, set the appropriate namelist flags
 		if training:
 			replacer1 = '    training = .true.\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if 'training' in line: print replacer1,
 				else: print line,
 
@@ -1136,7 +1143,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				# write the trained parameters to the namelist
 				replacer1 = '    trained_parameters = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters[2:])
 				replacer2 = '    trained_std = 0.d0, 0.d0, %fd0, %fd0, %fd0\n' % tuple(GP_parameters_std[2:])
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'trained_parameters' in line: print replacer1,
 					elif 'trained_std' in line: print replacer2,
 					else: print line,
@@ -1145,14 +1152,14 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			replacer1 = '    training = .false.\n'
 			replacer2 = '    trained_parameters = 0.d0, 0.d0, 0.d0, 0.d0\n'
 			replacer3 = '    trained_std = 0.d0, 0.d0, 0.d0, 0.d0\n'
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if 'training' in line: print replacer1,
 				elif 'trained_parameters' in line: print replacer2,
 				elif 'trained_std' in line: print replacer3,
 				else: print line,
 
 		# this is hardcoded, for now
-		nlive_dict = {0:300, 1:500, 2:800, 3:1000}
+		nlive_dict = {0:1000, 1:1000, 2:1000, 3:1000}
 
 		for npl in range(0, maxp+1):
 
@@ -1179,7 +1186,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			## automatically fill the necessary parameters in the inlist
 			replacer1 = '    nest_context = %d\n' % context
 			replacer2 = '    nest_root=\'%s\'\n' % root
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if ('nest_context' in line) and not line.strip().startswith('!'): print replacer1,
 				elif 'nest_root' in line: print replacer2,
 				elif (resume and 'nest_resume' in line): print '    nest_resume=.true.\n',
@@ -1188,12 +1195,12 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# if resuming from a previous run, set the appropriate namelist flag
 			if resume:
 				replacer = '    nest_resume=.true.\n'
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'nest_resume' in line: print replacer,
 					else: print line,
 			else:
 				replacer = '    nest_resume=.false.\n'
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'nest_resume' in line: print replacer,
 					else: print line,
 
@@ -1201,12 +1208,12 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# the user can still request it
 			if feed:
 				replacer = '    nest_fb=.true.\n'
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'nest_fb' in line: print replacer,
 					else: print line,
 			else:
 				replacer = '    nest_fb=.false.\n'
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'nest_fb' in line: print replacer,
 					else: print line,
 
@@ -1214,12 +1221,12 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# the user can still request it
 			if MAPfeed:
 				replacer = '    nest_MAPfb=.true.\n'
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'nest_MAPfb' in line: print replacer,
 					else: print line,
 			else:
 				replacer = '    nest_MAPfb=.false.\n'
-				for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+				for line in fileinput.input(namelist_file, inplace=True):
 					if 'nest_MAPfb' in line: print replacer,
 					else: print line,
 
@@ -1227,14 +1234,14 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# set nlive
 			nlive = nlive_dict[npl]
 			replacer = '    nest_nlive = %d\n' % nlive
-			for line in fileinput.input('OPEN/multinest/namelist1', inplace=True):
+			for line in fileinput.input(namelist_file, inplace=True):
 				if 'nest_nlive' in line: print replacer,
 				else: print line,
 
 
 			sleep(1)
 			start = time()
-			cmd = 'mpirun -np %d ./OPEN/multinest/nest' % (ncpu,)
+			cmd = 'mpirun -np %d %s' % (ncpu, nest_exec)
 			rc = subprocess.call(cmd, shell=True)
 
 			if (rc == 1): 
@@ -1382,16 +1389,25 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			finally:
 				clogger.info(msg) # print the previous message
 
-				msg1 += ' '*5 + 'p = %-13.8f\n' % (odds[0]/sum(odds), )
+				msg1 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[0]/sum(odds), odds[0])
 				msg = msg1
 				if maxp >= 1: 
-					msg2 += ' '*5 + 'p = %-13.8f\n' % (odds[1]/sum(odds), )
+					if odds[1] < 1.: # evidence supports constant model, 1/O_21 is to be compared with scales
+						msg2 += ' '*5 + 'p = %-13.8f   odds = %-13.8f (%-13.8f)\n' % (odds[1]/sum(odds), odds[1], 1./odds[1])
+					else:
+						msg2 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[1]/sum(odds), odds[1])
 					msg += msg2
 				if maxp >= 2: 
-					msg3 += ' '*5 + 'p = %-13.8f\n' % (odds[2]/sum(odds), )
+					if odds[2] < 1.: # evidence supports constant model, 1/O_31 is to be compared with scales
+						msg3 += ' '*5 + 'p = %-13.8f   odds = %-13.8f (%-13.8f)\n' % (odds[2]/sum(odds), odds[2], 1./odds[2])
+					else:
+						msg3 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[2]/sum(odds), odds[2])
 					msg += msg3
-				if maxp == 3: 
-					msg4 += ' '*5 + 'p = %-13.8f\n' % (odds[3]/sum(odds), )
+				if maxp == 3:
+					if odds[2] < 1.: # evidence supports constant model, 1/O_41 is to be compared with scales
+						msg4 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n (%-13.8f)' % (odds[3]/sum(odds), odds[3], 1./odds[3])
+					else:
+						msg4 += ' '*5 + 'p = %-13.8f   odds = %-13.8f\n' % (odds[3]/sum(odds), odds[3])
 					msg += msg4
 
 				clogger.info(msg)
@@ -1515,6 +1531,13 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				if maxp == 3:
 					shutil.move(map_phased_plot_file_three_planet, save_folder)
 					shutil.move(hist_plot_file_three_planet, save_folder)				
+
+		total_time2 = time()
+		took_min = int(total_time2 - total_time1) / 60
+		took_sec = (total_time2 - total_time1) - (took_min*60)
+
+		msg = blue('INFO: ') + 'The full analysis took %2dm%2.0fs' % (took_min, took_sec)
+		clogger.info(msg)
 
 		os.system("notify-send 'OPEN has finished an automatic MN run'")
 
@@ -1951,6 +1974,8 @@ def get_rotation_period(system):
 	"""
 	Calculate rotation period from the activity-rotation calibration
 	"""
+	from uncertainties import ufloat
+
 	# try to find name of star automatically
 	import re
 	filename = system.provenance.keys()[0]
@@ -2009,15 +2034,20 @@ def get_rotation_period(system):
 	log_tau = (1.362 - 0.166*x + 0.025*x**2 - 5.323*x**3) if x > 0 else (1.362 - 0.14*x)
 
 	lrhk = np.average(system.extras.rhk, weights=1/(system.extras.sig_rhk**2))
-	
-	msg = blue('INFO: ') + "Using weighted average of R'hk: %6.3f" % (lrhk,)
+	std_lrhk = np.sqrt(var(system.extras.rhk, weights=1./system.extras.sig_rhk**2))
+	lrhk = ufloat(lrhk, std_lrhk)
+
+
+	msg = blue('INFO: ') + "Using weighted average of R'hk: %6.3f (+- %4.3f)" % (lrhk.n, lrhk.s)
 	clogger.info(msg)
-	
+	print 
+
+
 	y = 5. + lrhk
 	## Noyes (1984), Eq 3
 	log_P = (0.324 - 0.4*y - 0.283*y**2 - 1.325*y**3) + log_tau
 
-	msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f d' % (10**log_P)
+	msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f (+- %f) d' % (10**log_P.n, 10**log_P.s)
 	clogger.info(msg)
 
 
@@ -2028,7 +2058,7 @@ def get_rotation_period(system):
 	Ro = (0.808 - 2.966*(lrhk+4.52))
 	P = Ro * tau
 
-	msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f d' % (P)
+	msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f (+- %f) d' % (P.n, 10**P.s)
 	clogger.info(msg)
 
 

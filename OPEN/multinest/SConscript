@@ -42,7 +42,12 @@ rvN = env.Command("get_rvN.f90", "../ext/get_rvN.f90", Copy("$TARGET", "$SOURCE"
 ## Configure the f90 compiler
 FFLAGS = '-O3 -fPIC -w -Wno-unused-parameter -ffree-line-length-none'
 if MPI: FFLAGS += ' -DMPI -lmpi'
+<<<<<<< HEAD
 # FFLAGS += ' -DPLOT' # -lpgplot -lX11 -lz -L/home/joao/Software/mesasdk/lib'
+=======
+FFLAGS += r' -DCWD=\'%s\'' % (os.getcwd(),)
+FFLAGS += ' -DPLOT' # -lpgplot -lX11 -lz -L/home/joao/Software/mesasdk/lib'
+>>>>>>> develop
 FFLAGS += ' -I' + MultiNest_dir
 
 env = env.Clone(F90=mpif90_exec if MPI else 'gfortran',

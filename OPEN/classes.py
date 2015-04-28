@@ -30,7 +30,7 @@ import rvIO
 from .utils import unique, get_tt
 from .logger import clogger, logging
 from shell_colors import yellow, blue
-from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde
+from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde, get_star_name
 from ext.get_rvN import get_rvn
 # from ext.get_rvN_MultiSite import get_rvn as get_rvn_ms
 from ext.gp import gp_predictor
@@ -60,7 +60,6 @@ params = {'text.latex.preamble': [r'\usepackage{lmodern}',
           'text.latex.unicode': True,
           'axes.unicode_minus': True,
           }
-
 
 class rvSeries:
     """
@@ -295,6 +294,8 @@ class rvSeries:
         i = bn.rfind('_harps_mean_corr.rdb')
         if i == -1:
             i = bn.rfind('_harps_mean.rdb')
+        if i == -1:
+            i = bn.rfind('_harps.rdb')
         star = bn[:i]
 
         with plt.rc_context(params):
@@ -1031,7 +1032,7 @@ class PeriodogramBase:
                 self.powerFAP_1 = self._normalize_value(self.peaks[index1])
                 self.powerFAP_10 = self._normalize_value(self.peaks[index10])
 
-                clogger.info(blue('INFO: ')+'Plotting bootstrap FAPs')
+                clogger.info(blue('INFO: ')+'Plotting bootstrap FAPs (1% and 0.1%)')
         
                 # ax.axhline(self.powerFAP_10, xmin=0.05, xmax=0.95, c=FAPcolor, lw=0.5, ls='-', label='10%')
                 ax.axhline(self.powerFAP_1, xmin=0.04, xmax=0.96, c=FAPcolor, lw=0.5, ls='--', dashes=(4,4),  label='1%')
@@ -1043,10 +1044,13 @@ class PeriodogramBase:
                 for v in verts:
                     ax.axvline(x=v, color='k', ls='--', lw=2, alpha=0.5, label="_nolegend_") 
 
-            if ax.get_ylim()[1] > self.powerFAP_01+2:
+            try:
+                if ax.get_ylim()[1] > self.powerFAP_01+2:
+                    pass
+                else:
+                    ax.set_ylim([0, self.powerFAP_01+2])
+            except:
                 pass
-            else:
-                ax.set_ylim([0, self.powerFAP_01+2])
             fig.tight_layout()
 
             if save:
@@ -1589,7 +1593,8 @@ class MCMC_nest:
             for f in nest_output_files:
                 zf.write(f)
             # include the namelist used to run MultiNest
-            zf.write('OPEN/multinest/namelist1')
+            namelist_file = os.path.join(os.path.dirname(__file__), 'multinest/namelist1')
+            zf.write(namelist_file)
 
         msg = blue('INFO: ') + 'Saved output files to %s' % zfilename
         clogger.info(msg)
@@ -2117,19 +2122,11 @@ class MCMC_nest:
         # if systematic velocity only, there is nothing to do here
         if self.only_vsys: return
 
-        import matplotlib.ticker as ticker
-        import re
-
-        params = {'text.latex.preamble': [r'\usepackage{lmodern}', r'\mathchardef\mhyphen="2D'],
-                  'text.usetex' : True,
-                  'font.size'   : 8,
-                  'font.family' : 'lmodern',
-                  'text.latex.unicode': True,
-                  'axes.unicode_minus': True,
-                  }
+        from math import floor, ceil
+        star = get_star_name(system)
 
         figwidth = 3.543311946  # in inches = \hsize = 256.0748pt
-        figheight = 0.9 * figwidth
+        figheight = 0.75 * figwidth
         # this is Seaborn's "colorblind" pallete
         # colors = ['#0072b2', '#009e73', '#d55e00', '#cc79a7', '#f0e442', '#56b4e9']
         # this is Seaborn's "muted" pallete
@@ -2230,7 +2227,16 @@ class MCMC_nest:
                     m = n-nout # how many values are there after restriction
 
                     phase = ((t[:m] - t0[planeti]) / P[planeti]) % 1.0
-                    ax.errorbar(np.sort(phase), rv[np.argsort(phase)] - vsys[i] - vel_other[np.argsort(phase)],
+                    points = rv[np.argsort(phase)] - vsys[i] - vel_other[np.argsort(phase)]
+                    e = err[np.argsort(phase)]
+
+                    # limits for plot
+                    max_value, min_value = max(points+e), min(points-e)
+                    max_y = ceil(max(abs(max_value), abs(min_value)))
+                    print max_y
+                    min_y = -max_y
+
+                    ax.errorbar(np.sort(phase), points,
                                  yerr=err[np.argsort(phase)],
                                  fmt='o', color=colors[i], 
                                  mec='none', ms=2, capsize=0, elinewidth=0.5,
@@ -2246,11 +2252,13 @@ class MCMC_nest:
                     t, rv, err = t[m:], rv[m:], err[m:]
 
                 # plot systematic velocity
-                for i, v in enumerate(vsys):
-                    ax.axhline(y=v, ls='--', color=colors[i], alpha=0.3)
+                # for i, v in enumerate(vsys):
+                #     ax.axhline(y=v, ls='--', color=colors[i], alpha=0.3)
 
                 ax.set_xlim([-0.2, 1.2])
-                ax.set_xlabel('phase (P=%3.2f)' % P[planeti])
+                ax.set_ylim([min_y, max_y])
+                ax.margins(ymargin=0.05)
+                ax.set_xlabel(r'$\phi$ (P=%3.2f)' % P[planeti])
                 ax.set_ylabel('RV [%s]'%system.units)
                 ax.minorticks_on()
                 ax.xaxis.set_major_formatter(MyFormatter())

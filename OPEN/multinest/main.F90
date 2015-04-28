@@ -29,9 +29,11 @@ program main
                                nest_root, nest_context, &
                                training, trained_parameters, trained_std, &
                                lin_dep, n_lin_dep
+
     ! read configuration values from namelist
+    ! CWD is set by the preprocessor to the directory where this file main.F90 lives
     iou = 8
-    open(unit=iou, file="./OPEN/multinest/namelist1", status='old', action='read', delim='quote', iostat=ierr)
+    open(unit=iou, file=CWD//"/namelist1", status='old', action='read', delim='quote', iostat=ierr)
     if (ierr /= 0) then
       stop 'Failed to open namelist file'
     else
