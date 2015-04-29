@@ -5,7 +5,7 @@
 # You should have received a copy of the license along with OPEN. See LICENSE.
 #
 import logging
-
+import sys
 
 # The following code extends Python's logging module with a custom log level
 # called VERBOSE. 
@@ -44,6 +44,6 @@ class VerboseLogger(logging.Logger):
 # instantiate our custom logger at the default level of INFO
 # every module should use this logger
 clogger = VerboseLogger(__name__)
-clogger.addHandler(logging.StreamHandler())
+clogger.addHandler(logging.StreamHandler(sys.stdout))
 clogger.setLevel(logging.INFO)
 
