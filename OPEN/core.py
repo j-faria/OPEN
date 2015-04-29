@@ -861,6 +861,9 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 	available_cpu = get_number_cores()
 	if (ncpu is None) or (ncpu > available_cpu): 
 		ncpu = available_cpu
+	## if running on a cluster, the NCORES env var should overwrite this
+	if os.environ.get('NCORES') is not None:
+		ncpu = int(os.environ.get('NCORES'))
 
 	msg = blue('INFO: ') + 'Transfering data to MultiNest...'
 	clogger.info(msg)
@@ -1022,11 +1025,18 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				else: print line,
 
 
+		## if running on cluster, mpirun needs one more option
+		nodefile = os.environ.get('PBS_NODEFILE')
+		if nodefile is not None:
+			mpirun_option = '-machinefile ' + nodefile
+		else:
+			mpirun_option = ''
+
 		msg = blue('    : ') + 'Starting MultiNest (%d threads) ...' % (ncpu,)
 		clogger.info(msg)
 
 		start = time()
-		cmd = 'mpirun -np %d %s' % (ncpu, nest_exec)
+		cmd = 'mpirun %s -np %d %s' % (mpirun_option, ncpu, nest_exec)
 		rc = subprocess.call(cmd, shell=True)
 
 		if (rc == 1): 
@@ -1238,10 +1248,16 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				if 'nest_nlive' in line: print replacer,
 				else: print line,
 
+			## if running on cluster, mpirun needs one more option
+			nodefile = os.environ.get('PBS_NODEFILE')
+			if nodefile is not None:
+				mpirun_option = '-machinefile ' + nodefile
+			else:
+				mpirun_option = ''
 
 			sleep(1)
 			start = time()
-			cmd = 'mpirun -np %d %s' % (ncpu, nest_exec)
+			cmd = 'mpirun %s -np %d %s' % (mpirun_option, ncpu, nest_exec)
 			rc = subprocess.call(cmd, shell=True)
 
 			if (rc == 1): 
