@@ -1376,6 +1376,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 
 		## odds ratio
 		odds = []
+		mpmath_available = True
 		import warnings
 		with warnings.catch_warnings():
 			warnings.filterwarnings('error')
@@ -1396,11 +1397,15 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 						warn = red('Warning: ') + 'Cannot exponentiate lnE; mpmath is not available'
 						clogger.warning(warn)
 						O11 = O21 = O31 = O41 = np.nan
-				else:
+						mpmath_available = False
+				finally:
 					odds.append(1.)  # O11
-					if maxp >= 1: odds.append(mpmath.exp(one_planet_lnE) / mpmath.exp(constant_lnE))  # O21
-					if maxp >= 2: odds.append(mpmath.exp(two_planet_lnE) / mpmath.exp(constant_lnE))  # O31
-					if maxp == 3: odds.append(mpmath.exp(three_planet_lnE) / mpmath.exp(constant_lnE))  # O41
+					if mpmath_available:
+						if maxp >= 1: odds.append(mpmath.exp(one_planet_lnE) / mpmath.exp(constant_lnE))  # O21
+						if maxp >= 2: odds.append(mpmath.exp(two_planet_lnE) / mpmath.exp(constant_lnE))  # O31
+						if maxp == 3: odds.append(mpmath.exp(three_planet_lnE) / mpmath.exp(constant_lnE))  # O41
+					else:
+						odds = [np.nan] * (maxp+1)
 					# K = mpmath.exp(one_planet_lnE) / mpmath.exp(two_planet_lnE)
 			finally:
 				clogger.info(msg) # print the previous message
