@@ -74,7 +74,7 @@ def lnlike2(p, t, y, yerr):
 
 def lnprior2(p):
     a, jit, tau, gamma, period = p
-    if (0.0005 < a < 0.5 and 1e-7<jit<1e-4 and 40<tau<100000 and 0.2<gamma<5 and 10<period<40):
+    if (0.0005 < a < 0.5 and 1e-7<jit<1e-4 and 40<tau<100000 and 0.2<gamma<5 and 1<period<30):
         return 0.0
     return -np.inf
 
@@ -100,7 +100,7 @@ def fit_gp(model, initial, data, ncpu, nwalkers=20):
     p0, lnp, _ = sampler.run_mcmc(p0, 200)
     sampler.reset()
 
-    niter = 1000
+    niter = 200
     
     msg = blue('    :: ') + 'Running %d MCMC chains for %d iterations...' % (nwalkers, niter)
     clogger.info(msg)
@@ -165,85 +165,85 @@ def do_it(system, training_variable, ncpu=1):
 
 
 
-    plt.figure()
-    for i in range(samples.shape[1]+1):
-        plt.subplot(6,1,i+1)
-        if i == samples.shape[1]:
-            plt.plot(logl)
-        else:
-            plt.plot(samples[:,i])
-    plt.show()
+    # plt.figure()
+    # for i in range(samples.shape[1]+1):
+    #     plt.subplot(6,1,i+1)
+    #     if i == samples.shape[1]:
+    #         plt.plot(logl)
+    #     else:
+    #         plt.plot(samples[:,i])
+    # plt.show()
 
     
 
 
-    # # The positions where the prediction should be computed.
-    x = np.linspace(min(t), max(t), 5000)
-    x = np.hstack((x, t))
-    x.sort()
+    # # # The positions where the prediction should be computed.
+    # x = np.linspace(min(t), max(t), 5000)
+    # x = np.hstack((x, t))
+    # x.sort()
 
-    # # Plot 24 posterior samples.
+    # # # Plot 24 posterior samples.
 
-    # # for s in samples[np.random.randint(len(samples), size=4)]:
-    # #     # Set up the GP for this sample.
-    # #     z1, z2, z3, z4 = s
-    # #     kernel = z1**2 * kernels.ExpSquaredKernel(z2**2) * kernels.ExpSine2Kernel(2./z4**2, z3)
-    # #     gp = george.GP(kernel)
-    # #     gp.compute(t, yerr)
+    # # # for s in samples[np.random.randint(len(samples), size=4)]:
+    # # #     # Set up the GP for this sample.
+    # # #     z1, z2, z3, z4 = s
+    # # #     kernel = z1**2 * kernels.ExpSquaredKernel(z2**2) * kernels.ExpSine2Kernel(2./z4**2, z3)
+    # # #     gp = george.GP(kernel)
+    # # #     gp.compute(t, yerr)
 
-    # #     # Compute the prediction conditioned on the observations and plot it.
-    # #     m = gp.sample_conditional(y, x)
-    # #     plt.plot(x, m, color="#4682b4", alpha=0.3)
+    # # #     # Compute the prediction conditioned on the observations and plot it.
+    # # #     m = gp.sample_conditional(y, x)
+    # # #     plt.plot(x, m, color="#4682b4", alpha=0.3)
 
-    # plot lnp solution
-    best_p[1] = 0.
-    kernel = model[0](*best_p)
-    gp = george.GP(kernel, solver=george.HODLRSolver)
-    gp.compute(t, yerr)
-    print gp.lnlikelihood(y)
-    # Compute the prediction conditioned on the observations and plot it.
-    # t1 = time()
-    m, cov = gp.predict(y, x)
-    m1, cov = gp.predict(y, t)
-    # print time() - t1
-    plt.figure()
-    plt.subplot(211)
+    # # plot lnp solution
+    # best_p[1] = 0.
+    # kernel = model[0](*best_p)
+    # gp = george.GP(kernel, solver=george.HODLRSolver)
+    # gp.compute(t, yerr)
+    # print gp.lnlikelihood(y)
+    # # Compute the prediction conditioned on the observations and plot it.
+    # # t1 = time()
+    # m, cov = gp.predict(y, x)
+    # m1, cov = gp.predict(y, t)
+    # # print time() - t1
+    # plt.figure()
+    # plt.subplot(211)
 
-    # phase, fwhm_sim = np.loadtxt('/home/joao/phd/data/simulated/HD41248/HD41248_simul_oversampled.rdb', unpack=True, usecols=(0, 4), skiprows=2)
-    # plt.plot(phase*18.3+t[0], fwhm_sim - fwhm_sim.mean(), 'g-')
+    # # phase, fwhm_sim = np.loadtxt('/home/joao/phd/data/simulated/HD41248/HD41248_simul_oversampled.rdb', unpack=True, usecols=(0, 4), skiprows=2)
+    # # phase, fwhm_sim = np.loadtxt('/home/joao/phd/data/simulated/HD41248/output_HD41248_AE.dat', unpack=True, usecols=(0, 4), skiprows=2)
+    # # plt.plot(phase*18.3+t[0], fwhm_sim - fwhm_sim.mean(), 'g-')
 
-    plt.plot(x, m, color='r', alpha=0.8)
-    # plt.plot(t, m1, color='r', alpha=0.8)
-    # Plot the data
-    plt.errorbar(t, y, yerr=yerr, fmt=".k", capsize=0)
-    # plt.plot(t, system.extras.rhk_activity - system.extras.rhk_activity.mean(), "og")
-    plt.ylabel(training_variable)
-    # Plot the residuals
-    plt.subplot(212)
-    plt.errorbar(t, y - m1, yerr=yerr, fmt=".k", capsize=0)
+    # plt.plot(x, m, color='r', alpha=0.8)
+    # # plt.plot(t, m1, color='r', alpha=0.8)
+    # # Plot the data
+    # plt.errorbar(t, y, yerr=yerr, fmt=".k", capsize=0)
+    # # plt.plot(t, system.extras.rhk_activity - system.extras.rhk_activity.mean(), "og")
+    # plt.ylabel(training_variable)
+    # # Plot the residuals
+    # plt.subplot(212)
+    # plt.errorbar(t, y - m1, yerr=yerr, fmt=".k", capsize=0)
 
-    plt.xlabel('Time [days]')
+    # plt.xlabel('Time [days]')
 
-    plt.figure()
-    ax = plt.subplot(211)
-    ts = BasicTimeSeries()
-    ts.time = t
-    ts.vrad = y
-    ts.error = yerr
-    per = gls(ts)
-    per._plot(axes=ax, newFig=False)
-    ax = plt.subplot(212)
-    ts.vrad = y-m1
-    per = gls(ts)
-    per._plot(axes=ax, newFig=False)
+    # plt.figure()
+    # ax = plt.subplot(211)
+    # ts = BasicTimeSeries()
+    # ts.time = t
+    # ts.vrad = y
+    # ts.error = yerr
+    # per = gls(ts)
+    # per._plot(axes=ax, newFig=False)
+    # ax = plt.subplot(212)
+    # ts.vrad = y-m1
+    # per = gls(ts)
+    # per._plot(axes=ax, newFig=False)
 
-    plt.show()
-    # sys.exit(0)
+    # plt.show()
 
     # fig = triangle.corner(samples, plot_contours=False)
 
-    enter = raw_input('Press Enter to continue: ')
-    if enter == 'n':
-        sys.exit(0)
+    # enter = raw_input('Press Enter to continue: ')
+    # if enter == 'n':
+    #     sys.exit(0)
 
     return best_p, std
