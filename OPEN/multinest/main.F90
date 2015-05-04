@@ -17,12 +17,11 @@ program main
     character(len=40) line
     character(len=1) delim
     character(len=5), dimension(10) :: args
-    character(len=100) :: fmt
+    !character(len=100) :: fmt
     integer :: nargs, k, ind1, ind2
     integer, dimension(:), allocatable :: n_each_observ
 
     real(kind=8), parameter :: kmax = 2129d0 ! m/s
-    real(kind=8), dimension(6) :: a
 
     namelist /NEST_parameters/ sdim, nest_nlive, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &

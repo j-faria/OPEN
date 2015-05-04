@@ -183,10 +183,9 @@ contains
 		integer context ! any additional information user wants to pass
 		logical ending ! is this the final call?
 		! local variables
-		integer, dimension(nobserv) :: t_limits
 		integer, parameter :: Npredict = 1000
-		double precision, dimension(size(times) + Npredict) :: t, velt, mu, std
-		double precision, dimension(size(times) + Npredict, size(times) + Npredict) :: cov
+		double precision, dimension(:), allocatable :: t, velt, mu, std
+		double precision, dimension(:,:), allocatable :: cov
 		character(len=100) gppredictfile
 		integer i, ipar, map_index, n
 		character(len=100) :: fmt
@@ -205,6 +204,7 @@ contains
 			write(*,'(5a13)') (/"t1", "t2", "t3", "t4", "t5" /)
 			write(fmt,'(a,i2,a)')  '(', 5, 'f13.7)'
 			write(*,fmt) paramConstr(nPar*4 - 4:)
+			!print *, paramConstr(nPar*4 - 4:)
 
 		else if (nplanets == 1 .and. using_jitter) then  ! 1 planet + jitter
 			write(*,'(7a13)') (/"    P", "    K", "  ecc", "omega", "   t0", "    s", " vsys" /)
@@ -289,6 +289,8 @@ contains
 		write(*,*) ' '
 
 		if (ending .and. using_gp) then
+			allocate(t(n+Npredict), velt(n+Npredict), mu(n+Npredict), std(n+Npredict))
+			allocate(cov(n+Npredict, n+Npredict))
 			gppredictfile = TRIM(nest_root)//'gp.dat'
 
 			map_index = nPar*3 ! this is where the MAP parameters start in the paramConstr array
