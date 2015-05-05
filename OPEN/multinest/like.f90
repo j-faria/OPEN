@@ -25,9 +25,9 @@ contains
         allocate(times(N), rvs(N), errors(N))
         allocate(train_var(N))
         allocate(vel(N), r(N), sigma(N))
-        allocate(vel_oversampled(5*N), times_oversampled(5*N))
-        allocate(last_vel_oversampled(5*N, 3))
-        allocate(covmat(N,N), inv_covmat(N,N))
+        !allocate(vel_oversampled(5*N), times_oversampled(5*N))
+        !allocate(last_vel_oversampled(5*N, 3))
+        !allocate(covmat(N,N), inv_covmat(N,N))
     end subroutine likelihood_init
 
     subroutine likelihood_finish()
@@ -36,8 +36,8 @@ contains
         deallocate(observ)
         deallocate(times, rvs, errors)
         deallocate(vel, r, sigma)
-        deallocate(last_vel_oversampled, vel_oversampled, times_oversampled)
-        deallocate(covmat, inv_covmat)
+        !deallocate(last_vel_oversampled, vel_oversampled, times_oversampled)
+        !deallocate(covmat, inv_covmat)
     end subroutine likelihood_finish        
 
     subroutine slikelihood(Cube,slhood,context)
