@@ -215,6 +215,7 @@ Options:
     --MAPfeed     Force feedback on the current MAP parameters
     --maxp=mp     Maximum number of planets to include in automatic run [default: 3]
     --restart     Fully restart a previous automatic model selection run
+    --nml=None    Specify the `full` path to the namelist file
 """
 
 restrict_usage = \
@@ -992,6 +993,7 @@ class EmbeddedMagics(Magics):
         doMAPfeedback = args['--MAPfeed']
         maxp = int(args['--maxp'])
         restart = args['--restart']
+        nml_path = args['--nml']
 
         try: 
             ncpu = int(args['--ncpu'])
@@ -1011,7 +1013,7 @@ class EmbeddedMagics(Magics):
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, skip_train_mcmc=skip_train_mcmc, lin=lin_quantity, 
                           doplot=doplot, saveplot=saveplot, feed=dofeedback, MAPfeed=doMAPfeedback,
-                          restart=restart)
+                          restart=restart, nml=nml_path)
 
     @needs_local_scope
     @line_magic

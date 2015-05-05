@@ -10,19 +10,19 @@ program main
 
     implicit none
 
-    integer i
-    integer :: iou, ierr
+    integer :: i, iou, ierr
     integer :: PGOPEN
     integer :: n
+
+    character(len=100) cmdline
     character(len=40) line
     character(len=1) delim
     character(len=5), dimension(10) :: args
-    character(len=100) :: fmt
+    !character(len=100) :: fmt
     integer :: nargs, k, ind1, ind2
     integer, dimension(:), allocatable :: n_each_observ
 
     real(kind=8), parameter :: kmax = 2129d0 ! m/s
-    real(kind=8), dimension(6) :: a
 
     namelist /NEST_parameters/ sdim, nest_nlive, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &
@@ -30,26 +30,29 @@ program main
                                training, trained_parameters, trained_std, &
                                lin_dep, n_lin_dep
 
-    ! read configuration values from namelist
-    ! CWD is set by the preprocessor to the directory where this file main.F90 lives
-    iou = 8
-    open(unit=iou, file=CWD//"/namelist1", status='old', action='read', delim='quote', iostat=ierr)
-    if (ierr /= 0) then
-      stop 'Failed to open namelist file'
-    else
-      read(iou, nml=NEST_parameters)
-      close(iou)
-    end if
-
-
-#ifdef MPI
     !MPI initializations
+#ifdef MPI
     call MPI_INIT(ierr)
     if (ierr/=MPI_SUCCESS) then
             write(*,*)'Error starting MPI. Terminating.'
             call MPI_ABORT(MPI_COMM_WORLD,ierr)
     end if
 #endif
+
+    !! read configuration values from namelist
+    ! namelist file from first cmd line argument
+    call get_command_argument(1, cmdline, status=ierr)
+    if (ierr /= 0) error stop 'Failed to retrieve namelist filename from cmd line'
+
+    iou = 8
+    open(unit=iou, file=trim(cmdline), status='old', action='read', delim='quote', iostat=ierr)
+    if (ierr /= 0) then
+      error stop 'Failed to open namelist file'
+    else
+      read(iou, nml=NEST_parameters)
+      close(iou)
+    end if
+
 
 #ifdef PLOT 
     ! initialize graphics device

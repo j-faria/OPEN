@@ -746,7 +746,7 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, skip_train_mcmc=False, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False):
+def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, skip_train_mcmc=False, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False, nml=None):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -854,7 +854,19 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 			# in this case, the vsys is before the hyperparameters
 			print '%8s %14.3f %9.3f %14.3f %14.3f' % ('vsys', par_mean[5*i+5], par_sigma[5*i+5], par_mle[5*i+5], par_map[5*i+5])
 
-	namelist_file = os.path.join(this_file_abs_path, 'multinest/namelist1')
+	if nml is None:
+		namelist_file = os.path.join(this_file_abs_path, 'multinest/namelist1')
+	else:
+		if not os.path.exists(nml):
+			msg = red('ERROR: ') + 'File "%s" does not appear to exist.' % nml
+			clogger.fatal(msg)
+			return
+		else:
+			msg = yellow('Warning: ') + 'File "%s" will be changed' % nml
+			clogger.info(msg)
+			namelist_file = nml
+
+
 	nest_exec = os.path.join(this_file_abs_path, 'multinest/nest')
 
 	# determine available number of cpu cores
@@ -1036,7 +1048,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		clogger.info(msg)
 
 		start = time()
-		cmd = 'mpirun %s -np %d %s' % (mpirun_option, ncpu, nest_exec)
+		cmd = 'mpirun %s -np %d %s %s' % (mpirun_option, ncpu, nest_exec, namelist_file)
 		rc = subprocess.call(cmd, shell=True)
 
 		if (rc == 1): 
@@ -1257,7 +1269,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 
 			sleep(1)
 			start = time()
-			cmd = 'mpirun %s -np %d %s' % (mpirun_option, ncpu, nest_exec)
+			cmd = 'mpirun %s -np %d %s %s' % (mpirun_option, ncpu, nest_exec, namelist_file)
 			rc = subprocess.call(cmd, shell=True)
 
 			if (rc == 1): 
