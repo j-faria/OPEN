@@ -746,7 +746,7 @@ def do_lm(system, x0):
 	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
 
 
-def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, skip_train_mcmc=False, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False, nml=None):
+def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, skip_train_mcmc=False, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False, nml=None, startp=[]):
 	"""
 	Run the MultiNest algorithm on the current system. 
 	Arguments
@@ -764,6 +764,8 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 		saveplot: save all plots from automatic run
 		feed: when running automatic model selection, whether to provide sampling feedback
 		restart: whether to restart a previous automatic run
+		nml: The path to the namelist file if not default (OPEN/multinest/namelist1)
+		startp: List of planet models to start over -> overrides resume
 	"""
 	from time import sleep, time
 	from commands import getoutput
@@ -1171,7 +1173,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				else: print line,
 
 		# this is hardcoded, for now
-		nlive_dict = {0:1000, 1:1000, 2:1000, 3:1000}
+		nlive_dict = {0:100, 1:1000, 2:2000, 3:3000}
 
 		for npl in range(0, maxp+1):
 
@@ -1205,7 +1207,7 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				else: print line,
 
 			# if resuming from a previous run, set the appropriate namelist flag
-			if resume:
+			if resume and (npl not in startp):
 				replacer = '    nest_resume=.true.\n'
 				for line in fileinput.input(namelist_file, inplace=True):
 					if 'nest_resume' in line: print replacer,
