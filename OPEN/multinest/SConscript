@@ -43,7 +43,7 @@ rvN = env.Command("get_rvN.f90", "../ext/get_rvN.f90", Copy("$TARGET", "$SOURCE"
 FFLAGS = '-m64 -O3 -flto -march=native -fPIC -ffree-line-length-none' #+ ' -Wall'
 if MPI: FFLAGS += ' -DMPI -lmpi'
 FFLAGS += r' -DCWD=\'%s\'' % (os.getcwd(),)
-FFLAGS += ' -DPLOT' # -lpgplot -lX11 -lz -L/home/joao/Software/mesasdk/lib'
+# FFLAGS += ' -DPLOT' # -lpgplot -lX11 -lz -L/home/joao/Software/mesasdk/lib'
 FFLAGS += ' -I' + MultiNest_dir
 
 env = env.Clone(F90=mpif90_exec if MPI else 'gfortran',
@@ -51,13 +51,13 @@ env = env.Clone(F90=mpif90_exec if MPI else 'gfortran',
 	            LINKFLAGS='',
 	            # F90COMSTR='Compiling $SOURCE',
 	            F90FLAGS=FFLAGS,
-	            LIBS=['nest3', 'lapack', 'blas'] + ['pgplot', 'X11', 'z'], 
-	            LIBPATH=[MultiNest_dir] + ['-L/home/joao/Software/mesasdk/pgplot'],
+	            LIBS=['nest3', 'lapack', 'blas'],# + ['pgplot', 'X11', 'z'], 
+	            LIBPATH=[MultiNest_dir],# + ['-L/home/joao/Software/mesasdk/pgplot'],
 	            FORTRANMODDIRPREFIX = '-J',  # option used by gfortran to specify where to put .mod files for compiled modules
 	            FORTRANMODDIR='.'
 	            )
 
-env.Append(RPATH='/home/joao/Software/mesasdk/pgplot')
+# env.Append(RPATH='/home/joao/Software/mesasdk/pgplot')
 
 if GetOption('gfortran') is None:
 	pass
