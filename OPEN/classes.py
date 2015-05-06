@@ -1580,6 +1580,23 @@ class MCMC_nest:
         # this makes a namedtuple of all the parameter values
         self.trace = p._make(self.posterior_samples[:-1-j,:])
 
+
+    def get_fit_statistics(self, system):
+        """
+        Read the [root]phys_live.points file which contains the current set of
+        live points, to obtain the maximum likelihood value.
+        """
+        filename = self.root + 'phys_live.points'
+        live_points = np.genfromtxt(filename, unpack=True)
+
+        max_llike = max(live_points[-2])
+        k = live_points.shape[0]
+        n = system.time.size
+
+        self.AIC = 2*k - 2*max_llike
+        self.BIC = k*np.log(n) -2*max_llike
+        self.logL = max_llike
+
     def compress_chains(self):
         """
         Save all MultiNest output files in a zip file, allowing for future restarts.
@@ -1604,6 +1621,12 @@ class MCMC_nest:
     def print_best_solution(self, system):
 
         par_mean, par_sigma, par_mle, par_map = self.par_mean, self.par_sigma, self.par_mle, self.par_map
+
+        try:
+            self.AIC
+        except AttributeError:
+            self.get_fit_statistics(system)
+
 
         msg = yellow('RESULT: ') + 'Parameters summary'
         clogger.info(msg)
@@ -1664,6 +1687,10 @@ class MCMC_nest:
             for i in range(nobs):
                 j = -nobs+i
                 print '%8s %14.3f %9.3f %14.3f %14.3f' % ('offs'+str(i+1), par_mean[j], par_sigma[j], par_mle[j], par_map[j])
+
+        print yellow('\nfit')
+        print '  logL: %8.3f   AIC: %8.3f   BIC:%8.3f' % (self.logL, self.AIC, self.BIC)
+        print
 
     def confidence_intervals(self):
         try:
