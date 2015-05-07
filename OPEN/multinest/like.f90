@@ -50,7 +50,7 @@ contains
         real(kind=8), intent(in) :: Cube(nest_nPar)
         real(kind=8), intent(out) :: slhood
         integer, intent(in) :: context
-        real(kind=8) :: lhood, lhood_test(1,1), det, jitter
+        real(kind=8) :: lhood, lhood_test(1,1), det, jitter, var
         integer :: i, n, ierr, iendpar
         character(len=100) :: fmt
 
@@ -151,9 +151,15 @@ contains
 
         else if (using_jitter) then
             jitter = Cube(nest_nPar-nextra+1)
-            sigma = errors**2 + jitter**2
+            do i=1,n
+                var = errors(i)*errors(i) + jitter*jitter
+                lhood = lhood - 0.5*lntwopi - 0.5*log(var) - 0.5*(r(i)**2)/var
+            end do
+
+!             sigma(:) = errors(:)**2 + jitter**2
             !lhood = - n*lnstwopi - sum(log(sqrt(sigma)) + 0.5d0 * r**2 / sigma)
-            lhood = -0.5d0*n*lntwopi - n*sum(log(sqrt(sigma))) -0.5d0*sum(r**2 / sigma)
+!             lhood = -0.5d0*n*lntwopi - n*sum(log(sqrt(sigma))) -0.5d0*sum(r**2 / sigma)
+!             print *, lhood
             ! lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(r**2 / sigma)
         else
             lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(r**2 / errors**2)
