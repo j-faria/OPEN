@@ -480,8 +480,6 @@ class rvSeries:
         tt = np.linspace(self.time.min(), self.time.max(), 100*np.ptp(self.time)/P)
         final = np.zeros_like(tt)
 
-        print len(tt)
-        get_rvn = get_rvn_os
         get_rvn(tt, P, K, ecc, omega, T0, gam, final)
 
         ### observations + fitted curve + residuals
@@ -594,7 +592,6 @@ class rvSeries:
         gam = gam[0]
 
         final = np.zeros_like(self.time)
-        get_rvn = get_rvn_os
         get_rvn(self.time, P, K, ecc, omega, T0, gam, final)
         self.fit['residuals'] = self.vrad - final
         self.fit['chi2'] = sum((self.fit['residuals'] / self.error)**2)
@@ -1210,8 +1207,6 @@ class MCMC_dream:
 
         self.nchains = len(self.chain_filenames)
         self.burnin = burnin
-
-        self.get_rvn = get_rvn_os
 
         self.read_chains()
 

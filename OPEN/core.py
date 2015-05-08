@@ -24,7 +24,7 @@ import pylab
 import matplotlib.pyplot as plt
 
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
-from scipy.optimize import leastsq, curve_fit
+from scipy.optimize import leastsq, curve_fit, minimize
 from scipy.stats.stats import spearmanr, pearsonr
 from scipy.stats import nanmean, nanstd
 from scipy.odr import odrpack
@@ -122,9 +122,9 @@ def do_fit(system, verbose):
 		return None
 
 	p0 = peak[0] # initial guess period
-	k0 = system.vrad.max()
-	e0 = 0.0
-	om0 = 0.0
+	k0 = 0.5*system.vrad.max()
+	e0 = 0.1
+	om0 = 0.1
 	t0 = system.time.min()
 	g0 = system.vrad.mean()
 
@@ -132,11 +132,11 @@ def do_fit(system, verbose):
 	clogger.info(msg)
 	initial_guess = [p0, k0, e0, om0, t0, g0]
 
-	## call levenberg markardt fit
-	lm = do_lm(system, initial_guess)
-	lm_par = lm[0]
-	# lm_par[1] = abs(lm_par[1])
-	# lm_par[3] = np.rad2deg(lm_par[3])
+	## call scipy's minimize
+	res = do_lm(system, initial_guess)
+	best_par = res.x
+	# best_par[1] = abs(best_par[1])
+	# best_par[3] = np.rad2deg(best_par[3])
 
 	## loop over planets
 	msg = yellow('RESULT: ') + 'Best fit is'
@@ -144,12 +144,12 @@ def do_fit(system, verbose):
 	print("%3s %12s %10s %10s %10s %15s %9s" % \
 		('', 'P[days]', 'K[km/s]', 'e', unichr(0x3c9).encode('utf-8')+'[deg]', 'T0[days]', 'gam') )
 	for i, planet in enumerate(list(ascii_lowercase)[:1]):
-		P, K, ecc, omega, T0, gam = [lm_par[j::6] for j in range(6)]
+		P, K, ecc, omega, T0, gam = [best_par[j::6] for j in range(6)]
 		print("%3s %12.1f %10.2f %10.2f %10.2f %15.2f %9.2f" % (planet, P[i], K[i], ecc[i], omega[i], T0[i], gam[i]) )
 
 	# save fit in the system
-	system.save_fit(lm_par, 0.)
-	par_all = lm_par  # backup
+	system.save_fit(best_par, 0.)
+	par_all = best_par  # backup
 
 	# j=2
 	# while j<3:
@@ -726,24 +726,28 @@ def do_genetic(system, just_gen=False, npop=500, ngen=50):
 
 def do_lm(system, x0):
 
-	vel = zeros_like(system.time)
-
+	time = system.time
+	rv = system.vrad
 	def chi2_n_leastsq(params):
 		""" Fitness function for N planet model """
+		vel = zeros_like(time)
 		P, K, ecc, omega, T0, gam = [params[i::6] for i in range(6)]
+		# print P, K, ecc, omega, T0, gam
 
-		if any(e > 1 or e < 0 for e in ecc): return 1e99
-		# if any(k < 0 for k in K): return 1e99
-
-		get_rvn(system.time, P, K, ecc, omega, T0, gam[0], vel)
-		return (system.vrad - vel) / system.error
+		get_rvn(time, P, K, ecc, omega, T0, gam[0], vel)
+		resid = (rv - vel) / system.error
+		return np.sum(resid**2, axis=0)
 
 	def chi2_2(params):
 		P, K, ecc, omega, T0, gam = params
 		get_rvn(system.time, P, K, ecc, omega, T0, gam, vel)
 		return system.vrad - vel
 
-	return leastsq(chi2_n_leastsq, x0, full_output=0, ftol=1e-15, maxfev=int(1e6))
+	# bound for the parameters
+	bnds = [(0,None), (0,None), (0,1), (0,2*np.pi), (None,None), (None,None)]
+	res = minimize(chi2_n_leastsq, x0, method='SLSQP', bounds=bnds, options={'disp':True})
+	return res
+	# return leastsq(chi2_n_leastsq, x0, args=(system.time, system.vrad), full_output=1, ftol=1e-15, maxfev=int(1e6))
 
 
 def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, ncpu=None, training=None, skip_train_mcmc=False, lin=None, doplot=True, saveplot=False, feed=False, MAPfeed=False, restart=False, nml=None, startp=[]):
