@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/j-faria/OPEN.svg?branch=develop)](https://travis-ci.org/j-faria/OPEN)
+
 OPEN
 ====
 
