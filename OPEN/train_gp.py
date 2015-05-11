@@ -63,11 +63,16 @@ GPfuncs['QuasiPeriodic'] = (k1, lnlike1, lnprior1, lnprob1)
 
 
 k2 = lambda a,jit,tau,gamma,period: WhiteKernel(jit) + a * ExpSquaredKernel(tau) * ExpSine2Kernel(gamma, period)
+kernel = k2(*[1., 1., 1., 1., 1.])
+gp = george.GP(kernel, solver=george.HODLRSolver)
 def lnlike2(p, t, y, yerr):
     # z1, z2, z3, z4 = p
     # kernel = z1**2 * kernels.ExpSquaredKernel(z2**2) * kernels.ExpSine2Kernel(2./z4**2, z3)
-    kernel = k2(*p)
-    gp = george.GP(kernel, solver=george.HODLRSolver)
+    
+    # kernel = k2(*p)
+    # gp = george.GP(kernel, solver=george.HODLRSolver)
+
+    gp.kernel.pars = p
     gp.compute(t, yerr)
     # print gp.lnlikelihood(y)
     return gp.lnlikelihood(y)
@@ -151,7 +156,7 @@ def do_it(system, training_variable, ncpu=1):
     model = GPfuncs['QuasiPeriodicJitter']
 
     # print y.ptp()
-    initial = np.array([0.01, 1e-5, 5000, 1, 25])
+    initial = np.array([0.01, 1e-5, 5000, 1, 23])
     # best_p = initial
     sampler, best_p, logl = fit_gp(model, initial, data, ncpu)
     samples = sampler.flatchain 
