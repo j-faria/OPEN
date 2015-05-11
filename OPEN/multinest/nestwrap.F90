@@ -149,11 +149,11 @@ contains
 
 ! 		! this is experimental !!!!!!!!!!!
 ! 		! and it doesn't seem to solve the problem...
-		if (nplanets == 2) then
-			if (Cube(1) > Cube(6)) then
-				call swap(Cube(1:5), Cube(6:10))
-			end if
-		end if
+! 		if (nplanets == 2) then
+! 			if (Cube(1) > Cube(6)) then
+! 				call swap(Cube(1:5), Cube(6:10))
+! 			end if
+! 		end if
 
 ! 		print *, Cube
 		!call loglike function here 
