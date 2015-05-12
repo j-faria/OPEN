@@ -102,12 +102,17 @@ contains
 		! prior for period(s)
 		do i = 1, nPar-nextra, 5
 			! uncomment the following line for Jeffreys prior
-			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+! 			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 			! uncomment the following two lines for individual prior (2 planets case)
-! 			if (i==1) Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
-! 			if (i==6) Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			if (i==1) then
+				Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
+			else
+				Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			endif
+
 
 ! 			if (i==1) Cube(i) = GaussianPrior(Cube(i), 2.2185733d0, 1.9d-6)
+! 			if (i==1 .and. nplanets==2) Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
 		end do
 
 		! priors for ecc, omega, t0
@@ -149,11 +154,11 @@ contains
 
 ! 		! this is experimental !!!!!!!!!!!
 ! 		! and it doesn't seem to solve the problem...
-		if (nplanets == 2) then
-			if (Cube(1) > Cube(6)) then
-				call swap(Cube(1:5), Cube(6:10))
-			end if
-		end if
+! 		if (nplanets == 2) then
+! 			if (Cube(1) > Cube(6)) then
+! 				call swap(Cube(1:5), Cube(6:10))
+! 			end if
+! 		end if
 
 ! 		print *, Cube
 		!call loglike function here 

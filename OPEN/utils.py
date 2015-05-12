@@ -10,8 +10,12 @@ Utility functions or snippets for all sorts of things
 
 from math import sqrt, ceil
 from sys import stdout
+import signal
+from contextlib import contextmanager
 import os
 import subprocess
+import time
+
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -110,6 +114,22 @@ def stdout_write(msg):
 	Useful to print in the same line """
 	stdout.write(msg)
 	stdout.flush()
+
+
+## time limit context manager
+class TimeoutException(Exception): pass
+
+@contextmanager
+def time_limit(seconds):
+    def signal_handler(signum, frame):
+        raise TimeoutException, "Time limit (%ds) exceeded." % seconds
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
 
 
 def get_star_name(system):

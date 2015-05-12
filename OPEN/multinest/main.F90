@@ -255,7 +255,7 @@ program main
     do i = 1, sdim-nextra, 5
         !! Period, Jeffreys, 0.2d - 365000d
         spriorran(i,1)= 0.2d0
-        !spriorran(i,2)= 365000d0
+!         spriorran(i,2)= 365000d0
         spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
 
         !! semi amplitude K, Mod. Jeffreys (or Uniform)

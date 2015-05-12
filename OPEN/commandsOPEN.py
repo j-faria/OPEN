@@ -216,6 +216,7 @@ Options:
     --maxp=mp     Maximum number of planets to include in automatic run [default: 3]
     --restart     Fully restart a previous automatic model selection run
     --nml=None    Specify the `full` path to the namelist file
+    --startp=None Comma-separated list of planets to start from the beginning (overide -r)
 """
 
 restrict_usage = \
@@ -995,6 +996,12 @@ class EmbeddedMagics(Magics):
         restart = args['--restart']
         nml_path = args['--nml']
 
+        startp = args['--startp']
+        if startp is not None:
+            startp = [int(i) for i in startp.split(',')]
+        else:
+            startp = []
+
         try: 
             ncpu = int(args['--ncpu'])
         except TypeError:
@@ -1013,7 +1020,7 @@ class EmbeddedMagics(Magics):
                           resume=resume, ncpu=ncpu, verbose=verbose,
                           training=train_quantity, skip_train_mcmc=skip_train_mcmc, lin=lin_quantity, 
                           doplot=doplot, saveplot=saveplot, feed=dofeedback, MAPfeed=doMAPfeedback,
-                          restart=restart, nml=nml_path)
+                          restart=restart, nml=nml_path, startp=startp)
 
     @needs_local_scope
     @line_magic
