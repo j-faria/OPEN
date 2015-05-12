@@ -1177,7 +1177,8 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
 				else: print line,
 
 		# this is hardcoded, for now
-		nlive_dict = {0:100, 1:1000, 2:2000, 3:3000}
+		nlive_dict = {0:2000, 1:2000, 2:2000, 3:2000}
+		# nlive_dict = {0:1000, 1:1000, 2:1000, 3:500}
 
 		for npl in range(0, maxp+1):
 
