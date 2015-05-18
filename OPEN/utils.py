@@ -198,13 +198,7 @@ def selectable_plot(system, **kwargs):
         i, x, y = ind[0], np.take(system.time, ind)[0], np.take(system.vrad, ind)[0]
         indices_to_remove.append(i)
 
-        # if times == 0:
-        #     print
-        #     msg = blue('INFO: ')
-        #     times += 1
-        # else:
         msg = blue('    : ')
-
         msg += 'going to remove observation %d -> %8.2f, %8.2f' % (i+1, x, y)
         clogger.info(msg)
         # print 'onpick3 scatter:', ind, np.take(system.time, ind), np.take(system.vrad, ind)
@@ -218,9 +212,55 @@ def selectable_plot(system, **kwargs):
     ax.set_ylabel('RV [%s]'%system.units)
     fig.canvas.mpl_connect('pick_event', onpick3)
     plt.show()
+    
+    # wait for user input to finish
     raw_input('')
+    plt.close(fig)
 
     return unique(indices_to_remove)
+
+def selectable_plot_chunks(system, **kwargs):
+    from shell_colors import yellow, blue
+    from .logger import clogger
+    msg = blue('INFO: ') + 'Click on the plot to select the data chunks.'
+    clogger.info(msg)
+    msg = blue('    : ') + 'Press ENTER when you are finished'
+    clogger.info(msg)
+    print ''
+
+    chunkx = []
+    chunkx.append(system.time.min())
+    global chunkid
+    chunkid = 1
+    def onpick3(event):
+        global chunkid
+        x, y = event.xdata, event.ydata
+
+        msg = blue('    : ')
+        msg += 'chunk %d: %8.2f --> %8.2f' % (chunkid, chunkx[chunkid-1], x)
+        clogger.info(msg)
+
+        chunkx.append(x)
+        chunkid += 1
+
+    fig, ax = plt.subplots()
+    e = ax.errorbar(system.time, system.vrad, system.error, fmt='o', picker=True)
+    # col = ax.scatter(system.time, system.vrad, picker=True)
+    ax.set_xlabel('Time [days]')
+    ax.set_ylabel('RV [%s]'%system.units)
+    fig.canvas.mpl_connect('button_press_event', onpick3)
+
+    # wait for user input to finish
+    raw_input('')
+    plt.close(fig)
+
+    return chunkx
+
+    # return unique(indices_to_remove)
+
+
+
+
 
 def julian_day_to_date(J):
     """ Returns the date corresponding to a julian day number"""
