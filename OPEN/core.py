@@ -47,7 +47,9 @@ except ImportError:
     periodogram_CLEAN_available = False
 
 from shell_colors import yellow, red, blue
-from .utils import julian_day_to_date, ask_yes_no, get_number_cores, var, time_limit, TimeoutException
+from .utils import julian_day_to_date, ask_yes_no, get_number_cores, \
+                   var, time_limit, TimeoutException, \
+                   selectable_plot, selectable_plot_chunks
 from .prior_funcs import random_from_jeffreys, random_from_modjeffreys
 import train_gp
 
@@ -202,9 +204,9 @@ def do_fit(system, verbose):
     return None
 
 
-def do_restrict(system, quantity, *args):
+def do_restrict(system, option, *args, **kwargs):
     ## restrict by uncertainty value
-    if quantity == 'error':
+    if option == 'error':
         maxerr = args[0]
         msg = blue('INFO: ') + 'Removing data with uncertainty higher than %f m/s' % maxerr
         clogger.info(msg)
@@ -238,7 +240,7 @@ def do_restrict(system, quantity, *args):
 
 
     ## restrict by date (JD)
-    if quantity == 'date':
+    if option == 'date':
         msg = blue('INFO: ') + 'Retaining data between %i and %i JD' % (args[0], args[1])
         clogger.info(msg)
         minjd, maxjd = args[0], args[1]
@@ -278,7 +280,7 @@ def do_restrict(system, quantity, *args):
         system.extras = extra(**d)
 
     ## restrict to values from one year
-    if quantity == 'year':
+    if option == 'year':
         msg = blue('INFO: ') + 'Retaining data from %i' % args[0]
         clogger.info(msg)
         yr = args[0]
@@ -313,7 +315,7 @@ def do_restrict(system, quantity, *args):
         system.extras = extra(**d)    
 
     ## restrict to values from a year range
-    if quantity == 'years':
+    if option == 'years':
         msg = blue('INFO: ') + 'Retaining data between %i and %i' % (args[0], args[1])
         clogger.info(msg)
         yr1, yr2 = args[0], args[1]
@@ -347,6 +349,50 @@ def do_restrict(system, quantity, *args):
             d[field] = system.extras_full[i][keepers]
         extra = namedtuple('Extra', system.extras_names, verbose=False)
         system.extras = extra(**d)
+
+
+    ## restrict by index or with GUI
+    if option in ('gui', 'index'):
+        if option == 'index':
+            ind_to_remove = map(int, args[0].split(','))
+            ind_to_remove = [i-1 for i in ind_to_remove]
+            for i in ind_to_remove:
+                x, y = np.take(system.time, i), np.take(system.vrad, i)
+                msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i+1, x, y)
+                clogger.info(msg)
+        else:
+            ind_to_remove = selectable_plot(system, style='ro')
+
+        n = len(ind_to_remove)
+        if n == 0:
+            msg = blue('    : ') + 'Not removing any observations'
+            clogger.info(msg)
+            return
+
+        if kwargs.get('noask') or ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
+            system.provenance.values()[0][1] += n
+            # remove observations with indices ind_to_remove from
+            # system.(time,vrad,error); leave *_full arrays intact
+            system.time = np.delete(system.time, ind_to_remove)
+            system.vrad = np.delete(system.vrad, ind_to_remove)
+            system.error = np.delete(system.error, ind_to_remove)
+            # remove observations with indices ind_to_remove from
+            # system.extras.*; leave system.extras_full.* arrays intact
+            for i, arr in enumerate(system.extras):
+                field_name = system.extras._fields[i]
+                replacer = {field_name:np.delete(arr, ind_to_remove)}
+                system.extras = system.extras._replace(**replacer)
+            msg = blue('    : ') + 'Done'
+            clogger.info(msg)
+
+            # delete system.per to force re-calculation
+            try:
+                del system.per
+            except AttributeError:
+                pass
+        else:
+            msg = blue('    : ') + 'Not removing any observations.'
+            clogger.info(msg)   
 
     return
 
