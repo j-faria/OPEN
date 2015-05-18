@@ -1762,7 +1762,7 @@ def do_RJ_DNest3(system, resume=False, verbose=False, ncpu=None):
 
 
 
-def do_correlate(system, vars=(), verbose=False, remove=False):
+def do_correlate(system, vars=(), verbose=False, remove=False, chunks=False):
     """
     Correlations between radial velocities and/or other diagnostics
     """
@@ -1834,6 +1834,7 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
     plt.ylabel(var2)
     plt.xlabel(var1)
     plt.tight_layout()
+    plt.title('Correlation total dataset')
     plt.show()
 
     if remove:
@@ -1850,6 +1851,55 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
         msg = blue('INFO: ') + 'Removing linear dependence RV ~ %s' % vs[i]
         clogger.info(msg)
 
+        # do weghted fit, ODR only if errors on variables
+        weighted = not (np.count_nonzero(e1) == 0 or np.count_nonzero(e2) == 0)
+
+        # we will remove linear dependences in individual chunks
+        if chunks:
+        	# temporaries
+            x, y = None, None 
+            ee1, ee2 = None, None
+
+            chunkx = selectable_plot_chunks(system)
+            nchunks = len(chunkx) - 1
+
+            msg = blue('    : ') + 'Using %d individual chunks' % nchunks
+            clogger.info(msg)
+
+            fig1 = plt.figure()
+            fig2 = system.do_plot_obs()
+            for i in range(nchunks):
+                cond = np.logical_and(chunkx[i] <= system.time, system.time < chunkx[i+1])
+                x = v1[cond]
+                y = v2[cond]
+                ee1, ee2 = e1[cond], e2[cond]
+
+
+                ax = fig1.add_subplot(1, nchunks, i+1)
+                ax.errorbar(x, y, xerr=ee1, yerr=ee2, fmt='o')
+
+                if weighted:
+                    def f(B, x): return B[0]*x + B[1]
+                    linear = odrpack.Model(f)
+                    data = odrpack.Data(x, y, wd=1./ee1**2, we=1./ee2**2)
+                    odr = odrpack.ODR(data, linear, beta0=[1., 1.])
+                    output = odr.run()
+                    yp = np.polyval(output.beta, x)
+                    
+                else:
+                    m, b = np.polyfit(x, y, 1)
+                    yp = np.polyval([m, b], x)
+
+
+                fig2.axes[1].plot(system.time[cond], yp, 'r-o')
+                system.vrad[cond] = system.vrad[cond] - yp
+
+            ax.set_title('Correlations individual chunks')
+
+            return
+
+
+
         # weghted fit, ODR (only do if errors on variables)
         if not (np.count_nonzero(e1) == 0 or np.count_nonzero(e2) == 0):
             def f(B, x): return B[0]*x + B[1]
@@ -1857,15 +1907,19 @@ def do_correlate(system, vars=(), verbose=False, remove=False):
             data = odrpack.Data(v1, v2, wd=1./e1**2, we=1./e2**2)
             odr = odrpack.ODR(data, linear, beta0=[1., 1.])
             output = odr.run()
-            yp = np.polyval(output.beta, v1)
-
-            system.vrad = system.vrad - yp
+            m, b = output.beta
+            yp = np.polyval([m, b], v1)
 
         else:  # non-weighted fit, OLS
             m, b = np.polyfit(v1, v2, 1)
             yp = np.polyval([m, b], v1)
 
-            system.vrad = system.vrad - yp
+
+        fig = system.do_plot_obs()
+        fig.axes[1].plot(system.time, yp, 'r-o')
+
+        # actually remove the correlation from the RVs
+        system.vrad = system.vrad - yp
 
         # force recalculation of periodogram
         try:

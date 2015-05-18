@@ -128,10 +128,11 @@ Options:
 correlate_usage = \
 """
 Usage:
-    correlate <var1> <var2> [-v] [-r]
+    correlate <var1> <var2> [-v] [-r] [--chunks]
 Options:
     -v --verbose  Verbose statistical output 
     -r --remove   Remove linear dependence from RV
+    --chunks      Remove linear dependence on individual chunks
 """
 
 
@@ -719,6 +720,7 @@ class EmbeddedMagics(Magics):
 
         verb = args['--verbose']
         rem = args['--remove']
+        chunks = args['--chunks']
 
         if local_ns.has_key('default'):
             system = local_ns['default']
@@ -730,7 +732,8 @@ class EmbeddedMagics(Magics):
 
         var1 = args['<var1>']
         var2 = args['<var2>']
-        result = core.do_correlate(system, vars=(var1, var2), verbose=verb, remove=rem)
+
+        result = core.do_correlate(system, vars=(var1, var2), verbose=verb, remove=rem, chunks=chunks)
 
     @needs_local_scope
     @line_magic
