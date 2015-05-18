@@ -134,15 +134,49 @@ def time_limit(seconds):
 
 def get_star_name(system):
     """ Return the name of the star (works for standard HARPS filenames) """
-    full_path = system.provenance.keys()[0]
-    bn = os.path.basename(full_path)
-    i = bn.rfind('_harps_mean_corr.rdb')
-    if i == -1:
-        i = bn.rfind('_harps_mean.rdb')
-    if i == -1:
-        i = bn.rfind('_harps.rdb')
-    star = bn[:i]
+    if len(system.provenance) > 1:
+        full_paths = system.provenance.keys()
+        common = longest_common_substring_array(full_paths)
+        bn = os.path.basename(common)
+        star = bn.replace('_', '').replace('.rdb', '')
+    else:
+        full_path = system.provenance.keys()[0]
+        bn = os.path.basename(full_path)
+        i = bn.rfind('_harps_mean_corr.rdb')
+        if i == -1:
+            i = bn.rfind('_harps_mean.rdb')
+        if i == -1:
+            i = bn.rfind('_harps.rdb')
+        star = bn[:i]
     return star
+
+## code from http://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring
+def longest_common_substring(s1, s2):
+    """ Longest-common-substring between two strings s1 and s2. """
+    m = [[0] * (1 + len(s2)) for i in xrange(1 + len(s1))]
+    longest, x_longest = 0, 0
+    for x in xrange(1, 1 + len(s1)):
+        for y in xrange(1, 1 + len(s2)):
+            if s1[x - 1] == s2[y - 1]:
+                m[x][y] = m[x - 1][y - 1] + 1
+                if m[x][y] > longest:
+                    longest = m[x][y]
+                    x_longest = x
+            else:
+                m[x][y] = 0
+    return s1[x_longest - longest: x_longest]
+
+
+## code from http://stackoverflow.com/questions/2892931/longest-common-substring-from-more-than-two-strings-python
+def longest_common_substring_array(data):
+    """ Get the longest-common-substring in an array of strings. """
+    substr = ''
+    if len(data) > 1 and len(data[0]) > 0:
+        for i in range(len(data[0])):
+            for j in range(len(data[0])-i+1):
+                if j > len(substr) and all(data[0][i:i+j] in x for x in data):
+                    substr = data[0][i:i+j]
+    return substr
 
 
 ### Matplotlib advanced plot interaction stuff
