@@ -17,7 +17,7 @@ from .logger import clogger, logging
 from .utils import ask_yes_no, get_star_name
 
 from ext.blombscargle import blombscargle
-from ext.glombscargle import glombscargle
+from ext.glombscargle import glombscargle, glombscargle_extra_out
 
 
 
@@ -394,7 +394,7 @@ class gls(PeriodogramBase):
   """
 
   def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
-               norm="HorneBaliunas", stats=False, ext=True, force_notrend=False):
+               norm="HorneBaliunas", stats=False, ext=True, force_notrend=False, full_output=False):
     self.name = 'Generalized Lomb-Scargle'
     try:
       self.star_name = get_star_name(rv)
@@ -404,6 +404,7 @@ class gls(PeriodogramBase):
     self.power = None
     self.freq = freq
     self.ofac, self.hifac = ofac, hifac
+    self.fullout = full_output
     self.t = rv.time
     self.th = rv.time - min(rv.time)
     if quantity == 'vrad':
@@ -534,9 +535,13 @@ class gls(PeriodogramBase):
       self.__buildFreq(plow=plow)
     # Circular frequencies
     omegas = 2.*pi * self.freq
+    self.omegas = omegas
 
-    # unnormalized power and an estimate of the number of independent frequencies 
-    self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas, ncpu)
+    if self.fullout:
+      self._upow, self.M, self.A, self.B, self.offset = glombscargle_extra_out(self.t, self.y, self.error, omegas, ncpu)
+    else:
+      # unnormalized power and an estimate of the number of independent frequencies 
+      self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas, ncpu)
 
     self.N = len(self.y)
     # Normalization:
