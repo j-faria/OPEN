@@ -211,7 +211,7 @@ program main
     !! initialize the GP "object"
     if (using_gp) then
         
-        call init_HODLR(N)
+        !call init_HODLR(N)
 
         ! this is the jitter, a white noise homoskedastic kernel
         k3 = DiagonalKernel((/1.d0/))
