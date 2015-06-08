@@ -58,11 +58,12 @@ Options:
 plot_usage = \
 """
 Usage:
-    plot (obs | fwhm | rhk | s | bis | contrast | resid) [--save=filename]
+    plot (obs|fwhm|rhk|s|bis|contrast|resid) [--together=q] [--save=filename]
     plot -n SYSTEM
     plot -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
+    --together=q     Plot together with another quantity
     --save=filename  Save figure as filename
     -h --help        Show this help message
 """
@@ -97,11 +98,12 @@ wf_usage = \
 Usage:
     wf 
     wf -n SYSTEM
-    wf --dials
+    wf [--dials] [--freq]
     wf -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
     --dials       Plot phase "dials" in largest (3) peaks
+    --freq        Plot as a function of frequency
     -h --help     Show this help message
 """
 
@@ -415,10 +417,17 @@ class EmbeddedMagics(Magics):
                                    'name with the -n option'
             clogger.fatal(msg)
             return
-        
+
+        together = False
+        if args['--together']:
+            together = True
+            second_quantity = args['--together']
+
         # plot the observed radial velocities
         if args['obs']:
-            system.do_plot_obs(save=args['--save'])
+            if together: system.do_plot_obs_together(q=second_quantity, save=args['--save'])
+            else: system.do_plot_obs(save=args['--save'])
+
         # plot residuals from fit
         if args['resid']:
             system.do_plot_resid(save=args['--save'])
@@ -432,11 +441,13 @@ class EmbeddedMagics(Magics):
                           'sn', 'sn', 'sn', 'sn']
         for i, e in enumerate(extras_available):
             try:
-                if args[extras_mapping[i]]: 
-                    system.do_plot_extras(e, save=args['--save'])
+                if args[extras_mapping[i]]:
+                    if together: system.do_plot_extras_together(e, save=args['--save'])
+                    else: system.do_plot_extras(e, save=args['--save'])
                     return
             except KeyError:
                 pass
+
 
     @needs_local_scope
     @line_magic
@@ -593,7 +604,10 @@ class EmbeddedMagics(Magics):
             print green(' done')
         
         try: 
-            system.wf._plot()
+            if args['--freq']:
+                system.wf._plot_freq()
+            else:
+                system.wf._plot()
         except AttributeError:
             system.wf = periodograms.SpectralWindow(system.per.freq, system.time)
 

@@ -371,6 +371,86 @@ class rvSeries:
         # pg.QtGui.QApplication.exec_()
 
 
+    def do_plot_obs_together(self, q=None, newFig=True, leg=False, save=None, offsets=None, LP=False):
+        """ Plot the observed radial velocities as a function of time, together with other variables.
+        Data from each file are color coded and labeled.
+        """
+
+        ## handle inexistent field
+        q = q.split(',')
+        nvar = len(q)
+        for qq in q:
+            if qq not in self.extras._fields:
+              from shell_colors import red
+              msg = red('ERROR: ') + 'The name "%s" is not available in extras.\n' % q
+              clogger.fatal(msg)
+              return
+
+        colors = 'bgrcmykw' # lets hope for less than 9 data-sets
+        t, rv, err = self.time, self.vrad, self.error # temporaries
+        
+        if newFig: 
+            fig = plt.figure()
+        ax2 = fig.add_subplot(1+nvar,1,1)
+        ax2.set_ylabel('RV [%s]'%self.units)
+
+        ny, years = self.get_years_observations()
+        ax1 = ax2.twiny()
+        ax1.xaxis.tick_bottom()
+        ax2.xaxis.tick_top()
+        ax2.plot(years, self.vrad.mean() * np.ones_like(years), alpha=0) # Create a dummy plot
+
+        # plot each files' values
+        if offsets:
+            assert isinstance(offsets, list)
+            assert len(offsets) == len(self.provenance)
+
+        for i, (fname, [n, nout]) in enumerate(sorted(self.provenance.iteritems())):
+            m = n-nout # how many values are there after restriction
+            
+            # e = pg.ErrorBarItem(x=t[:m], y=rv[:m], \
+            #                     height=err[:m], beam=0.5,\
+            #                     pen=pg.mkPen(None))
+                                # pen={'color': 0.8, 'width': 2})
+            # p.addItem(e)
+            # p.plot(t[:m], rv[:m], symbol='o')
+            offs = offsets[i] if offsets else 0.
+            ax1.errorbar(t[:m], rv[:m]+offs, yerr=err[:m], \
+                         fmt='o'+colors[i], label=fname)
+            t, rv, err = t[m:], rv[m:], err[m:]
+        
+        if LP:
+            # this is 1 October 2012
+            ax1.axvline(x=56202, ls='--', color='k')
+
+        if leg: ax1.legend()
+        ax2.ticklabel_format(useOffset=False)
+
+        ## plot the other quantities
+        for i, qq in enumerate(q):
+            ax3 = fig.add_subplot(1+nvar, 1, 2+i, sharex=ax1)
+            if qq=='rhk': 
+                ax3.errorbar(self.time, self.extras.rhk, yerr=self.extras.sig_rhk, fmt='o')
+            elif qq=='fwhm':
+                f = 2.35e-3 if self.units=='m/s' else 2.35
+                ax3.errorbar(self.time, self.extras.fwhm, yerr=f*self.error, fmt='o')
+            else:
+                ind = self.extras._fields.index(qq) # index corresponding to this quantity
+                plt.plot(self.time, self.extras[ind], 'o', label=qq)
+
+            ax3.set_ylabel(qq)
+
+        ax3.set_xlabel('Time [days]', labelpad=20)
+        plt.tight_layout()
+        if save:
+            msg = yellow('INFO: ') + 'Saving figure to %s' % save
+            clogger.info(msg)
+            plt.savefig(save)
+
+        return fig
+        # plt.show()
+        # pg.QtGui.QApplication.exec_()
+
     def do_plot_drift(self):
         """ Plot the observed radial velocities as a function of time, plus an
         extra drift of specified degree (see *mod*). Lower panel presents RV 
@@ -443,10 +523,13 @@ class rvSeries:
         # p = pg.plot()
         if extra == 'rhk':
             plt.errorbar(t, self.extras.rhk, yerr=self.extras.sig_rhk, fmt='o', label=extra)
-        elif extra == 'fwhm' and ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
-            m, b = np.polyfit(t, self.extras[i], 1)
-            yp = np.polyval([m, b], t)
-            plt.plot(t, self.extras[i]-yp, 'o', label=extra+' (linear trend removed)')
+        # elif extra == 'fwhm' and ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+        #     m, b = np.polyfit(t, self.extras[i], 1)
+        #     yp = np.polyval([m, b], t)
+        #     plt.plot(t, self.extras[i]-yp, 'o', label=extra+' (linear trend removed)')
+        elif extra == 'fwhm':
+            f = 2.35e-3 if self.units=='m/s' else 2.35
+            plt.errorbar(t, self.extras.fwhm, yerr= f*self.error, fmt='o', label=extra)
         else:
             plt.plot(t, self.extras[i], 'o', label=extra)
         
