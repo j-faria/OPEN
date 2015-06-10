@@ -13,6 +13,7 @@ before_install:
 
 install: 
   - sudo apt-get install $DEPENDS
+  - sudo ln -fs /usr/bin/gfortran-4.9 /usr/bin/gfortran && gfortran --version
   - python scons/scons.py
 
 # command to run tests
