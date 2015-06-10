@@ -7,6 +7,10 @@ env:
     - DEPENDS="gfortran-4.9"
 
 # command to install dependencies
+before_install:
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update -qq
+
 install: 
   - sudo apt-get install $DEPENDS
   - python scons/scons.py
