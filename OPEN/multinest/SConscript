@@ -49,10 +49,11 @@ FFLAGS += ' -I' + MultiNest_dir
 env = env.Clone(F90=mpif90_exec if MPI else 'gfortran',
 	            LINK=mpif90_exec if MPI else 'gfortran',
 	            LINKFLAGS='',
-	            # F90COMSTR='Compiling $SOURCE',
 	            F90FLAGS=FFLAGS,
-	            LIBS=['nest3', 'lapack', 'blas'],# + ['pgplot', 'X11', 'z'], 
+	            CPPFLAGS='-fPIC -O2 -ffast-math -ffinite-math-only',
+	            LIBS=['nest3', 'lapack', 'blas', 'stdc++'],# + ['pgplot', 'X11', 'z'], 
 	            LIBPATH=[MultiNest_dir],# + ['-L/home/joao/Software/mesasdk/pgplot'],
+	            CPPPATH=['/home/joao/Software/HODLR/header', '/usr/include/eigen3'],
 	            FORTRANMODDIRPREFIX = '-J',  # option used by gfortran to specify where to put .mod files for compiled modules
 	            FORTRANMODDIR='.'
 	            )
@@ -78,10 +79,11 @@ def print_cmd_line(s, target, src, env):
     if 'CopySOAction' in s: return
     sys.stdout.write(" Making %s...\n"% (' and '.join([str(x) for x in target])))
 
-env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
+#env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
 
 
 source_files = Glob('*.f90') + Glob('*.F90')
+source_files += Glob('*.cpp')
 # remove file which is to be compiled by F2PY
 source_files = [f for f in source_files if 'gp_python_wrapper.f90' not in str(f)] 
 
@@ -99,9 +101,9 @@ Depends(nest, libnest)
 
 
 ## F2PY builder
-f2py_flags = ' --quiet '
+f2py_flags = ' '
 f2py_flags += '--f90flags="-ffree-line-length-none" '
-f2py_flags += '--opt="-O3" --fcompiler=gnu95 '
+f2py_flags += '--opt="-O3" --fcompiler=gnu95 -lstdc++ '
 
 ## on some machines, the gp.so extension needs to be linked
 ## with lapack explicitely
@@ -116,11 +118,12 @@ if GetOption('gfortran') is None:
 else:
 	f2py_flags += '--f90exec=' + GetOption('gfortran')
 
-bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES 1>> f2py-warn.log' + f2py_flags)
+bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES' + f2py_flags)
 env.Append(BUILDERS={'F2PY': bld})
 
 # only object files without .mod
 obj_for_gp = ['array_utils.o', 'get_rvN.o', 'gp_utils.o', 'random.o']
+obj_for_gp += ['fort_hodlr_wrappers.o', 'HODLRwrapper.o', 'Matrix_Entry_Routine.o']
 objs = [obj for obj in comps if str(obj) in obj_for_gp]
 # print [str(f) for f in objs]
 
