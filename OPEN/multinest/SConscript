@@ -103,7 +103,7 @@ Depends(nest, libnest)
 ## F2PY builder
 f2py_flags = ' '
 f2py_flags += '--f90flags="-ffree-line-length-none" '
-f2py_flags += '--opt="-O3" --fcompiler=gnu95 -lstdc++ '
+f2py_flags += '--opt="-O3" --fcompiler=gnu95 ' #-lstdc++ '
 
 ## on some machines, the gp.so extension needs to be linked
 ## with lapack explicitely
