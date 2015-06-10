@@ -1,7 +1,15 @@
 language: python
 python:
   - "2.7"
+
+env:
+  global:
+    - DEPENDS="gfortran-4.9"
+
 # command to install dependencies
-install: "python scons/scons.py"
+install: 
+  - sudo apt-get install $DEPENDS
+  - python scons/scons.py
+
 # command to run tests
 script: nosetests test.py
