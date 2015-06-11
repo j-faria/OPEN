@@ -18,7 +18,7 @@ program main
     character(len=40) line
     character(len=1) delim
     character(len=5), dimension(10) :: args
-    !character(len=100) :: fmt
+    character(len=100) :: fmt
     integer :: nargs, k, ind1, ind2
     integer, dimension(:), allocatable :: n_each_observ
 
@@ -146,12 +146,13 @@ program main
     if (sdim==1 .or. sdim==2) then
         nest_nClsPar=1
     else
-        nest_nClsPar=3
+        nest_nClsPar=5
     end if
 
 
     !! initialize data size dependant variables
     call likelihood_init(n)
+
 
     !include linear dependences in the model
     if (lin_dep) then
@@ -209,6 +210,9 @@ program main
 
     !! initialize the GP "object"
     if (using_gp) then
+        
+        !call init_HODLR(N)
+
         ! this is the jitter, a white noise homoskedastic kernel
         k3 = DiagonalKernel((/1.d0/))
 
@@ -254,17 +258,17 @@ program main
     ! the mathematical form is only used when rescaling
     do i = 1, sdim-nextra, 5
         !! Period, Jeffreys, 0.2d - 365000d
-        spriorran(i,1)= 0.2d0
+        spriorran(i,1)= 1d0 !0.2d0
 !         spriorran(i,2)= 365000d0
-        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
+       spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
 
         !! semi amplitude K, Mod. Jeffreys (or Uniform)
-!         spriorran(i+1,1)=0.d0
-        spriorran(i+1,1)=0.d0
-        spriorran(i+1,2)= maxval(rvs) - minval(rvs)
+!        spriorran(i+1,1)=1.d0
+        spriorran(i+1,1)= sum(errors) / n
+!         spriorran(i+1,2)= maxval(rvs) - minval(rvs)
         ! the true upper limit depends on e and P, and it will only be set when rescaling.
-        !spriorran(i+1,2)=kmax 
-        !spriorran(i+1,2)=30.d0
+!        spriorran(i+1,2)=kmax 
+        spriorran(i+1,2)=10.d0
 
         !! eccentricity, Uniform, 0-1
 !         spriorran(i+2,1)=0d0
@@ -289,8 +293,10 @@ program main
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], jitter, vsys_obs1, [vsys_obs2]
         i = sdim-nextra+1 ! index of jitter parameter
-        spriorran(i,1)= 1d0
-        spriorran(i,2)= kmax
+        !spriorran(i,1)= 1d0
+        spriorran(i,1)= sum(errors) / n
+        spriorran(i,2)= 10d0 !kmax
+!         spriorran(i,2)= maxval(rvs) - minval(rvs)
         ! when data is in km/s
 !         spriorran(i,1)= 0.001d0
 !         spriorran(i,2)= kmax * 1d-3
@@ -298,8 +304,8 @@ program main
 
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+2 
-        spriorran(i:,1)= -kmax
-        spriorran(i:,2)= kmax
+        spriorran(i:,1)= minval(rvs) ! -kmax
+        spriorran(i:,2)= maxval(rvs) ! kmax
 
     else if (using_gp) then
     ! parameter array organization in this case:
@@ -320,7 +326,7 @@ program main
             spriorran(i,2)= maxval(rvs) - minval(rvs)
             ! jitter 
             spriorran(i+1,1)= 0.d0
-            spriorran(i+1,2)= maxval(errors)
+            spriorran(i+1,2)= 0.d0 !maxval(rvs) - minval(rvs) !maxval(errors)
             ! timescale for growth / decay of active regions (d)
             spriorran(i+2,1)= trained_parameters(3)
             spriorran(i+2,2)= trained_std(3)
@@ -335,15 +341,18 @@ program main
             i = sdim-nextra+nobserv+1
             spriorran(i,1)= 0.d0
             spriorran(i,2)= maxval(rvs) - minval(rvs)
+            ! jitter 
+            spriorran(i+1,1)= 0.d0
+            spriorran(i+1,2)= 0.d0
             ! timescale for growth / decay of active regions (d)
-            spriorran(i+1,1)= 1d0
-            spriorran(i+1,2)= 50.d0
+            spriorran(i+2,1)= 1d0
+            spriorran(i+2,2)= 1000.d0
             ! periodicity (recurrence) timescale -> rotation period of the star
-            spriorran(i+2,1)= 30.d0
-            spriorran(i+2,2)= 50.d0
+            spriorran(i+3,1)= 10.d0
+            spriorran(i+3,2)= 20.d0
             ! smoothing parameter (?)
-            spriorran(i+3,1)= 0.1d0
-            spriorran(i+3,2)= 10d0
+            spriorran(i+4,1)= 0.1d0
+            spriorran(i+4,2)= 10d0
         end if
         
     else

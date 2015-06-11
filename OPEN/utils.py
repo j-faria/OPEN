@@ -134,15 +134,49 @@ def time_limit(seconds):
 
 def get_star_name(system):
     """ Return the name of the star (works for standard HARPS filenames) """
-    full_path = system.provenance.keys()[0]
-    bn = os.path.basename(full_path)
-    i = bn.rfind('_harps_mean_corr.rdb')
-    if i == -1:
-        i = bn.rfind('_harps_mean.rdb')
-    if i == -1:
-        i = bn.rfind('_harps.rdb')
-    star = bn[:i]
+    if len(system.provenance) > 1:
+        full_paths = system.provenance.keys()
+        common = longest_common_substring_array(full_paths)
+        bn = os.path.basename(common)
+        star = bn.replace('_', '').replace('.rdb', '')
+    else:
+        full_path = system.provenance.keys()[0]
+        bn = os.path.basename(full_path)
+        i = bn.rfind('_harps_mean_corr.rdb')
+        if i == -1:
+            i = bn.rfind('_harps_mean.rdb')
+        if i == -1:
+            i = bn.rfind('_harps.rdb')
+        star = bn[:i]
     return star
+
+## code from http://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring
+def longest_common_substring(s1, s2):
+    """ Longest-common-substring between two strings s1 and s2. """
+    m = [[0] * (1 + len(s2)) for i in xrange(1 + len(s1))]
+    longest, x_longest = 0, 0
+    for x in xrange(1, 1 + len(s1)):
+        for y in xrange(1, 1 + len(s2)):
+            if s1[x - 1] == s2[y - 1]:
+                m[x][y] = m[x - 1][y - 1] + 1
+                if m[x][y] > longest:
+                    longest = m[x][y]
+                    x_longest = x
+            else:
+                m[x][y] = 0
+    return s1[x_longest - longest: x_longest]
+
+
+## code from http://stackoverflow.com/questions/2892931/longest-common-substring-from-more-than-two-strings-python
+def longest_common_substring_array(data):
+    """ Get the longest-common-substring in an array of strings. """
+    substr = ''
+    if len(data) > 1 and len(data[0]) > 0:
+        for i in range(len(data[0])):
+            for j in range(len(data[0])-i+1):
+                if j > len(substr) and all(data[0][i:i+j] in x for x in data):
+                    substr = data[0][i:i+j]
+    return substr
 
 
 ### Matplotlib advanced plot interaction stuff
@@ -164,13 +198,7 @@ def selectable_plot(system, **kwargs):
         i, x, y = ind[0], np.take(system.time, ind)[0], np.take(system.vrad, ind)[0]
         indices_to_remove.append(i)
 
-        # if times == 0:
-        #     print
-        #     msg = blue('INFO: ')
-        #     times += 1
-        # else:
         msg = blue('    : ')
-
         msg += 'going to remove observation %d -> %8.2f, %8.2f' % (i+1, x, y)
         clogger.info(msg)
         # print 'onpick3 scatter:', ind, np.take(system.time, ind), np.take(system.vrad, ind)
@@ -184,9 +212,55 @@ def selectable_plot(system, **kwargs):
     ax.set_ylabel('RV [%s]'%system.units)
     fig.canvas.mpl_connect('pick_event', onpick3)
     plt.show()
+    
+    # wait for user input to finish
     raw_input('')
+    plt.close(fig)
 
     return unique(indices_to_remove)
+
+def selectable_plot_chunks(system, **kwargs):
+    from shell_colors import yellow, blue
+    from .logger import clogger
+    msg = blue('INFO: ') + 'Click on the plot to select the data chunks.'
+    clogger.info(msg)
+    msg = blue('    : ') + 'Press ENTER when you are finished'
+    clogger.info(msg)
+    print ''
+
+    chunkx = []
+    chunkx.append(system.time.min())
+    global chunkid
+    chunkid = 1
+    def onpick3(event):
+        global chunkid
+        x, y = event.xdata, event.ydata
+
+        msg = blue('    : ')
+        msg += 'chunk %d: %8.2f --> %8.2f' % (chunkid, chunkx[chunkid-1], x)
+        clogger.info(msg)
+
+        chunkx.append(x)
+        chunkid += 1
+
+    fig, ax = plt.subplots()
+    e = ax.errorbar(system.time, system.vrad, system.error, fmt='o', picker=True)
+    # col = ax.scatter(system.time, system.vrad, picker=True)
+    ax.set_xlabel('Time [days]')
+    ax.set_ylabel('RV [%s]'%system.units)
+    fig.canvas.mpl_connect('button_press_event', onpick3)
+
+    # wait for user input to finish
+    raw_input('')
+    plt.close(fig)
+
+    return chunkx
+
+    # return unique(indices_to_remove)
+
+
+
+
 
 def julian_day_to_date(J):
     """ Returns the date corresponding to a julian day number"""

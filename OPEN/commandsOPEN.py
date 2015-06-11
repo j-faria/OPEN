@@ -23,7 +23,7 @@ from numpy import sqrt, mean, min, delete, take
 # intra-package imports
 from .docopt import docopt, DocoptExit
 from .classes import rvSeries
-from .utils import stdout_write, ask_yes_no, selectable_plot, write_yorbit_macro
+from .utils import stdout_write, ask_yes_no, write_yorbit_macro
 from .logger import clogger, logging
 import core
 import periodograms
@@ -58,11 +58,12 @@ Options:
 plot_usage = \
 """
 Usage:
-    plot (obs | fwhm | rhk | s | bis | contrast | resid) [--save=filename]
+    plot (obs|fwhm|rhk|s|bis|contrast|resid) [--together=q] [--save=filename]
     plot -n SYSTEM
     plot -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
+    --together=q     Plot together with another quantity
     --save=filename  Save figure as filename
     -h --help        Show this help message
 """
@@ -97,11 +98,12 @@ wf_usage = \
 Usage:
     wf 
     wf -n SYSTEM
-    wf --dials
+    wf [--dials] [--freq]
     wf -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
     --dials       Plot phase "dials" in largest (3) peaks
+    --freq        Plot as a function of frequency
     -h --help     Show this help message
 """
 
@@ -128,10 +130,11 @@ Options:
 correlate_usage = \
 """
 Usage:
-    correlate <var1> <var2> [-v] [-r]
+    correlate <var1> <var2> [-v] [-r] [--chunks]
 Options:
     -v --verbose  Verbose statistical output 
     -r --remove   Remove linear dependence from RV
+    --chunks      Remove linear dependence on individual chunks
 """
 
 
@@ -414,10 +417,17 @@ class EmbeddedMagics(Magics):
                                    'name with the -n option'
             clogger.fatal(msg)
             return
-        
+
+        together = False
+        if args['--together']:
+            together = True
+            second_quantity = args['--together']
+
         # plot the observed radial velocities
         if args['obs']:
-            system.do_plot_obs(save=args['--save'])
+            if together: system.do_plot_obs_together(q=second_quantity, save=args['--save'])
+            else: system.do_plot_obs(save=args['--save'])
+
         # plot residuals from fit
         if args['resid']:
             system.do_plot_resid(save=args['--save'])
@@ -431,11 +441,13 @@ class EmbeddedMagics(Magics):
                           'sn', 'sn', 'sn', 'sn']
         for i, e in enumerate(extras_available):
             try:
-                if args[extras_mapping[i]]: 
-                    system.do_plot_extras(e, save=args['--save'])
+                if args[extras_mapping[i]]:
+                    if together: system.do_plot_extras_together(e, save=args['--save'])
+                    else: system.do_plot_extras(e, save=args['--save'])
                     return
             except KeyError:
                 pass
+
 
     @needs_local_scope
     @line_magic
@@ -592,7 +604,10 @@ class EmbeddedMagics(Magics):
             print green(' done')
         
         try: 
-            system.wf._plot()
+            if args['--freq']:
+                system.wf._plot_freq()
+            else:
+                system.wf._plot()
         except AttributeError:
             system.wf = periodograms.SpectralWindow(system.per.freq, system.time)
 
@@ -719,6 +734,7 @@ class EmbeddedMagics(Magics):
 
         verb = args['--verbose']
         rem = args['--remove']
+        chunks = args['--chunks']
 
         if local_ns.has_key('default'):
             system = local_ns['default']
@@ -730,7 +746,8 @@ class EmbeddedMagics(Magics):
 
         var1 = args['<var1>']
         var2 = args['<var2>']
-        result = core.do_correlate(system, vars=(var1, var2), verbose=verb, remove=rem)
+
+        result = core.do_correlate(system, vars=(var1, var2), verbose=verb, remove=rem, chunks=chunks)
 
     @needs_local_scope
     @line_magic
@@ -1104,47 +1121,53 @@ class EmbeddedMagics(Magics):
                 return
             core.do_restrict(system, 'years', yr1, yr2)
 
-        if args['--gui'] or args['--index']:
-            if args['--index']:
-                ind_to_remove = map(int, args['--index'].split(','))
-                ind_to_remove = [i-1 for i in ind_to_remove]
-                for i in ind_to_remove:
-                    x, y = take(system.time, i), take(system.vrad, i)
-                    msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i+1, x, y)
-                    clogger.info(msg)
-            else:
-                ind_to_remove = selectable_plot(system, style='ro')
+        if args['--gui']:
+            core.do_restrict(system, 'gui')
 
-            n = len(ind_to_remove)
-            if n == 0:
-                msg = blue('    : ') + 'Not removing any observations'
-                clogger.info(msg)
-                return
+        if args['--index']:
+            core.do_restrict(system, 'index', args['--index'], noask=args['--noask'])
 
-            if args['--noask'] or ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
-                system.provenance.values()[0][1] += n
-                # remove observations with indices ind_to_remove from
-                # system.(time,vrad,error); leave *_full arrays intact
-                system.time = delete(system.time, ind_to_remove)
-                system.vrad = delete(system.vrad, ind_to_remove)
-                system.error = delete(system.error, ind_to_remove)
-                # remove observations with indices ind_to_remove from
-                # system.extras.*; leave system.extras_full.* arrays intact
-                for i, arr in enumerate(system.extras):
-                    field_name = system.extras._fields[i]
-                    replacer = {field_name:delete(arr, ind_to_remove)}
-                    system.extras = system.extras._replace(**replacer)
-                msg = blue('    : ') + 'Done'
-                clogger.info(msg)
+        # if args['--gui'] or args['--index']:
+        #     if args['--index']:
+        #         ind_to_remove = map(int, args['--index'].split(','))
+        #         ind_to_remove = [i-1 for i in ind_to_remove]
+        #         for i in ind_to_remove:
+        #             x, y = take(system.time, i), take(system.vrad, i)
+        #             msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i+1, x, y)
+        #             clogger.info(msg)
+        #     else:
+        #         ind_to_remove = selectable_plot(system, style='ro')
 
-                # delete system.per to force re-calculation
-                try:
-                    del system.per
-                except AttributeError:
-                    pass
-            else:
-                msg = blue('    : ') + 'Not removing any observations.'
-                clogger.info(msg)                
+        #     n = len(ind_to_remove)
+        #     if n == 0:
+        #         msg = blue('    : ') + 'Not removing any observations'
+        #         clogger.info(msg)
+        #         return
+
+        #     if args['--noask'] or ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
+        #         system.provenance.values()[0][1] += n
+        #         # remove observations with indices ind_to_remove from
+        #         # system.(time,vrad,error); leave *_full arrays intact
+        #         system.time = delete(system.time, ind_to_remove)
+        #         system.vrad = delete(system.vrad, ind_to_remove)
+        #         system.error = delete(system.error, ind_to_remove)
+        #         # remove observations with indices ind_to_remove from
+        #         # system.extras.*; leave system.extras_full.* arrays intact
+        #         for i, arr in enumerate(system.extras):
+        #             field_name = system.extras._fields[i]
+        #             replacer = {field_name:delete(arr, ind_to_remove)}
+        #             system.extras = system.extras._replace(**replacer)
+        #         msg = blue('    : ') + 'Done'
+        #         clogger.info(msg)
+
+        #         # delete system.per to force re-calculation
+        #         try:
+        #             del system.per
+        #         except AttributeError:
+        #             pass
+        #     else:
+        #         msg = blue('    : ') + 'Not removing any observations.'
+        #         clogger.info(msg)                
 
 
     @needs_local_scope

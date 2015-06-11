@@ -88,9 +88,9 @@ contains
 			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 			Cube(i+1) = UniformPrior(Cube(i+1), spriorran(i+1,1), spriorran(i+1,2))
 
-			Cube(i+2) = GaussianPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2))
-			Cube(i+3) = GaussianPrior(Cube(i+3), spriorran(i+3,1), spriorran(i+3,2))
-			Cube(i+4) = GaussianPrior(Cube(i+4), spriorran(i+4,1), spriorran(i+4,2))
+			Cube(i+2) = UniformPrior(Cube(i+2), spriorran(i+2,1), spriorran(i+2,2))
+			Cube(i+3) = UniformPrior(Cube(i+3), spriorran(i+3,1), spriorran(i+3,2))
+			Cube(i+4) = UniformPrior(Cube(i+4), spriorran(i+4,1), spriorran(i+4,2))
 
 		else
 			! prior for systematic velocity
@@ -102,15 +102,20 @@ contains
 		! prior for period(s)
 		do i = 1, nPar-nextra, 5
 			! uncomment the following line for Jeffreys prior
-! 			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
 			! uncomment the following two lines for individual prior (2 planets case)
-			if (i==1) then
-				Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
-			else
-				Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
-			endif
+!  			if (i==1 .and. nplanets>1) then
+!  				!Cube(i) = JeffreysPrior(Cube(i), 0.85359165d0, 5.6d-7)
+! 				Cube(i) = JeffreysPrior(Cube(i), 27d0, 32d0)
+!  			else
+!  				Cube(i) = JeffreysPrior(Cube(i), 500d0, 1500d0)
+!  			endif
 
-
+! 			if (i==1) then
+! 				Cube(i) = GaussianPrior(Cube(i), 2513.198262d0, 627.139176d0)
+! 			else
+! 				Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+! 			end if
 ! 			if (i==1) Cube(i) = GaussianPrior(Cube(i), 2.2185733d0, 1.9d-6)
 ! 			if (i==1 .and. nplanets==2) Cube(i) = GaussianPrior(Cube(i), 0.85359165d0, 5.6d-7)
 		end do
@@ -138,7 +143,7 @@ contains
 			kmax = spriorran(i,2)
 ! 			kmax = spriorran(i,2) * (spriorran(i-1,1) / Cube(i-1))**(1/3.d0) * 1.d0/(sqrt(1-Cube(i+1)**2))
 			! uncomment the following line for Modified Jeffreys prior
-			Cube(i) = ModJeffreysPrior(Cube(i), 1.d0, kmax)
+			Cube(i) = ModJeffreysPrior(Cube(i), spriorran(i,1), kmax)
 			! uncomment the following line for Jeffreys prior
 			!Cube(i) = JeffreysPrior(Cube(i), spriorran(i,1), kmax)
 			! uncomment the following line for a uniform prior

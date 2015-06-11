@@ -1,7 +1,20 @@
 language: python
 python:
   - "2.7"
+
+env:
+  global:
+    - DEPENDS="gfortran-4.9"
+
 # command to install dependencies
-install: "python scons/scons.py"
+before_install:
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update -qq
+
+install: 
+  - sudo apt-get install $DEPENDS
+  - sudo ln -fs /usr/bin/gfortran-4.9 /usr/bin/gfortran && gfortran --version
+  - python scons/scons.py
+
 # command to run tests
 script: nosetests test.py

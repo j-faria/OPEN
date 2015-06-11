@@ -1,5 +1,6 @@
 module params
-    use gputils
+    use gputils, only: Kernel, GP, WhiteKernel, DiagonalKernel, ExpKernel, & 
+                       ExpSquaredKernel, ExpSineSquaredKernel, SumKernels, ProductKernels
     implicit none
 
 ! Debug
@@ -112,7 +113,7 @@ module params
       
     !max modes expected, for memory allocation
     integer nest_maxModes 
-    parameter(nest_maxModes=5)
+    parameter(nest_maxModes=10)
       
     !number of parameters to cluster (for mode detection)
     integer nest_nClsPar  ! usually set to 3
