@@ -258,24 +258,24 @@ program main
     ! the mathematical form is only used when rescaling
     do i = 1, sdim-nextra, 5
         !! Period, Jeffreys, 0.2d - 365000d
-        spriorran(i,1)= 0.2d0
-!         spriorran(i,2)= 75d0
+        spriorran(i,1)= 1d0 !0.2d0
+!         spriorran(i,2)= 365000d0
        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
 
         !! semi amplitude K, Mod. Jeffreys (or Uniform)
-        spriorran(i+1,1)=1.d0
-!         spriorran(i+1,1)= sum(errors) / n
+!        spriorran(i+1,1)=1.d0
+        spriorran(i+1,1)= sum(errors) / n
 !         spriorran(i+1,2)= maxval(rvs) - minval(rvs)
         ! the true upper limit depends on e and P, and it will only be set when rescaling.
-       spriorran(i+1,2)=kmax 
-!         spriorran(i+1,2)=10.d0
+!        spriorran(i+1,2)=kmax 
+        spriorran(i+1,2)=10.d0
 
         !! eccentricity, Uniform, 0-1
-        spriorran(i+2,1)=0d0
-        spriorran(i+2,2)=1d0
+!         spriorran(i+2,1)=0d0
+!         spriorran(i+2,2)=1d0
         !! eccentricity, Beta(0.867, 3.03), based on Kipping (2013)
-!         spriorran(i+2,1)=0.867d0
-!         spriorran(i+2,2)=3.03d0
+        spriorran(i+2,1)=0.867d0
+        spriorran(i+2,2)=3.03d0
 
         !! long. periastron, Uniform, 0-2pi rad
         spriorran(i+3,1)=0d0
@@ -293,8 +293,10 @@ program main
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], jitter, vsys_obs1, [vsys_obs2]
         i = sdim-nextra+1 ! index of jitter parameter
-        spriorran(i,1)= 1d0
-        spriorran(i,2)= kmax
+        !spriorran(i,1)= 1d0
+        spriorran(i,1)= sum(errors) / n
+        spriorran(i,2)= 10d0 !kmax
+!         spriorran(i,2)= maxval(rvs) - minval(rvs)
         ! when data is in km/s
 !         spriorran(i,1)= 0.001d0
 !         spriorran(i,2)= kmax * 1d-3
@@ -302,8 +304,8 @@ program main
 
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+2 
-        spriorran(i:,1)= minval(rvs) !-kmax
-        spriorran(i:,2)= maxval(rvs) !kmax
+        spriorran(i:,1)= minval(rvs) ! -kmax
+        spriorran(i:,2)= maxval(rvs) ! kmax
 
     else if (using_gp) then
     ! parameter array organization in this case:
