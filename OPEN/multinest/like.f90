@@ -67,9 +67,17 @@ contains
 !         write(*,'(f10.3, i3)') (rvs(i), observ(i), i=1,n)
         iendpar = nest_nPar-nextra
         if (using_jitter) iendpar = iendpar+1
+!             iendpar = iendpar-1
+        
         do i=1,nobserv
             where(observ == i) vel = Cube(iendpar+i)
         end do
+
+        if (trend) then
+!             print *, Cube
+!             print *, Cube(iendpar+i+1)
+            vel = vel + Cube(iendpar+i+1)*(times-mean_time)
+        end if
 
         ! get the radial velocity model with these parameters (in vel)
         if (nplanets > 0) then

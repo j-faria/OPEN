@@ -74,7 +74,14 @@ contains
 
 			! prior for systematic velocity
 			i = npar-nextra+2 ! index of (first) systematic velocity
-			Cube(i:) = UniformPrior(Cube(i:), spriorran(i:,1), spriorran(i:,2))			
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+
+			! prior for trend parameters
+			if (trend) then
+				i = npar-nextra+3
+				Cube(i) = GaussianPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			end if
+
 
 		else if (using_gp) then
 			! prior for systematic velocity
@@ -95,7 +102,13 @@ contains
 		else
 			! prior for systematic velocity
 			i = npar-nextra+1 ! index of (first) systematic velocity
-			Cube(i:) = UniformPrior(Cube(i:), spriorran(i:,1), spriorran(i:,2))
+			Cube(i) = UniformPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+
+			! prior for trend parameters
+			if (trend) then
+				i = npar-nextra+2
+				Cube(i) = GaussianPrior(Cube(i), spriorran(i,1), spriorran(i,2))
+			end if			
 		end if
 
 

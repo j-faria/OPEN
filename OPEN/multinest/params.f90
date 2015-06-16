@@ -24,6 +24,9 @@ module params
     !train the gaussian process beforehand
     logical training
     real(kind=8), dimension(5) :: trained_parameters, trained_std
+    !linear/quadratic trend in the model
+    logical trend
+    integer trend_degree
     !extra linear dependence in the model
     !how many variables
     logical lin_dep
@@ -39,6 +42,7 @@ module params
     real(kind=8), allocatable, dimension(:) :: times_oversampled, vel_oversampled
     real(kind=8), allocatable, dimension(:, :) :: last_vel_oversampled
     real(kind=8), allocatable, dimension(:,:) :: covmat, inv_covmat
+    real(kind=8) :: mean_time
 
     integer nest_context
 

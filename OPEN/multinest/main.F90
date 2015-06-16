@@ -28,6 +28,7 @@ program main
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &
                                nest_root, nest_context, &
                                training, trained_parameters, trained_std, &
+                               trend, trend_degree, &
                                lin_dep, n_lin_dep
 
     !MPI initializations
@@ -80,6 +81,13 @@ program main
 !        stop 'Conflict between "sdim" and "nest_context"'
 !    end if
 
+    trend = .false.
+    if (nest_context/1000 > 0) then
+        trend = .true.
+        trend_degree = nest_context/1000
+        nest_context = nest_context - (nest_context / 1000)*1000
+    end if
+
     if (mod(nest_context, 10) == 2) then
         if (nest_context / 100 == 2) then
 #ifdef MPI
@@ -105,9 +113,9 @@ program main
         end if
     end if
 
+
     !doing debug?
     doing_debug = .false.
-
 
     !! load data
     open(unit=15, file='input.rv', status="old")
@@ -135,6 +143,7 @@ program main
 
 
     !! some parameters and allocations depend on the ones set on the namelist / input file
+    nextra = nextra + trend_degree 
     nplanets = mod(nest_context,100) / 10 ! this is good for now
     sdim = 5*nplanets + nobserv + nextra
     allocate(spriorran(sdim, 2))
@@ -143,7 +152,7 @@ program main
 
     !! the number of parameters to cluster is usually set to 3
     !! but it cannot be greater than sdim
-    if (sdim==1 .or. sdim==2) then
+    if (sdim < 4) then
         nest_nClsPar=1
     else
         nest_nClsPar=5
@@ -189,6 +198,9 @@ program main
         stop 'Number of observations is less than dimensionality. Aborting!'
 #endif
     end if
+
+    ! calculate the mean time to be used in the trend
+    mean_time = sum(times) / size(times)
 
 
     if (nobserv == 1) then ! if only one observatory, observ is always 1
@@ -247,7 +259,7 @@ program main
     end if
 
     !! extra parameters are systematic velocities for each observatory 
-    !! plus, if present, the jitter or the hyperparameters
+    !! plus, if present, the jitter, trends or the hyperparameters
     nextra = nextra + nobserv
 
 
@@ -304,8 +316,15 @@ program main
 
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+2 
-        spriorran(i:,1)= minval(rvs) ! -kmax
-        spriorran(i:,2)= maxval(rvs) ! kmax
+        spriorran(i,1)= minval(rvs) ! -kmax
+        spriorran(i,2)= maxval(rvs) ! kmax
+
+        !! trend 
+        if (trend_degree > 0) then
+            i = sdim-nextra+3
+            spriorran(i,1)= 0d0
+            spriorran(i,2)= 0.1d0
+        end if
 
     else if (using_gp) then
     ! parameter array organization in this case:
@@ -360,8 +379,15 @@ program main
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2]
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+1
-        spriorran(i:,1)= minval(rvs) ! -kmax
-        spriorran(i:,2)= maxval(rvs) ! kmax
+        spriorran(i,1)= minval(rvs) ! -kmax
+        spriorran(i,2)= maxval(rvs) ! kmax
+
+        !! trend 
+        if (trend_degree > 0) then
+            i = sdim-nextra+2
+            spriorran(i,1)= 0d0
+            spriorran(i,2)= 0.1d0
+        end if
 
     end if    
 
