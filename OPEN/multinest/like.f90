@@ -162,7 +162,11 @@ contains
 !             print *, lhood
             ! lhood = - 0.5d0*log(twopi**n * product(sqrt(sigma))) -0.5d0 * sum(r**2 / sigma)
         else
-            lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(r**2 / errors**2)
+            do i=1,n
+                var = errors(i)*errors(i)
+                lhood = lhood - 0.5*lntwopi - 0.5*log(var) - 0.5*(r(i)**2)/var
+            end do
+            ! lhood = -0.5d0*n*lntwopi - n*sum(log(errors)) -0.5d0*sum(r**2 / errors**2)
             ! lhood = - 0.5d0*log(twopi**n * product(errors)) -0.5d0 * sum(r**2 / errors**2)
         end if
 
