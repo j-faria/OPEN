@@ -360,8 +360,8 @@ program main
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2]
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+1
-        spriorran(i:,1)= -500.d0
-        spriorran(i:,2)= 500.d0
+        spriorran(i:,1)= minval(rvs) ! -kmax
+        spriorran(i:,2)= maxval(rvs) ! kmax
 
     end if    
 
