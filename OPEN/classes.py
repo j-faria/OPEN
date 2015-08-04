@@ -27,10 +27,9 @@ except Exception:
     print 'pyqtgraph will not be installed'
 
 import rvIO
-from .utils import unique, get_tt
 from .logger import clogger, logging
-from shell_colors import yellow, blue
-from .utils import day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde, get_star_name
+from .shell_colors import yellow, blue
+from .utils import unique, get_tt, day2year, rms, ask_yes_no, triangle_plot, triangle_plot_kde, get_star_name
 from ext.get_rvN import get_rvn
 # from ext.get_rvN_MultiSite import get_rvn as get_rvn_ms
 from ext.gp import gp_predictor
@@ -60,6 +59,19 @@ params = {'text.latex.preamble': [r'\usepackage{lmodern}',
           'text.latex.unicode': True,
           'axes.unicode_minus': True,
           }
+
+class MyFormatter(ticker.ScalarFormatter):
+    """ Axis ticks formatter to replace the big minus sign with a smaller, prettier one. """
+    def __call__(self, x, pos=None):
+        # call the original LogFormatter
+        rv = ticker.ScalarFormatter.__call__(self, x, pos)
+        # check if we really use TeX
+        if plt.rcParams["text.usetex"]:
+            # if we have the string ^{- there is a negative exponent
+            # where the minus sign is replaced by the short hyphen
+            rv = re.sub(r'-', r'\mhyphen', rv)
+        return rv
+
 
 class rvSeries:
     """
@@ -132,6 +144,8 @@ class rvSeries:
         # self.time = get_time(data)
         # self.vrad, self.error = get_RV(data)
 
+        self.data = data
+        
         self.time, self.vrad, self.error = data.pop('jdb'), data.pop('vrad'), data.pop('svrad')
 
         # by default
@@ -178,6 +192,14 @@ class rvSeries:
     # properties of the star
     star_mass = 1.0  # in Msun, default 1.0
 
+
+    @property
+    def star_name(self):
+        return self.__star_name
+    @star_name.getter
+    def star_name(self):
+        self.__star_name = get_star_name(self)
+        return self.__star_name
 
     def save(self, filename):
         rvIO.write_rv(self, filename)
@@ -378,11 +400,13 @@ class rvSeries:
 
         ## handle inexistent field
         q = q.split(',')
+        print q
         nvar = len(q)
         for qq in q:
+            print qq
             if qq not in self.extras._fields:
               from shell_colors import red
-              msg = red('ERROR: ') + 'The name "%s" is not available in extras.\n' % q
+              msg = red('ERROR: ') + 'The name "%s" is not available in extras.\n' % qq
               clogger.fatal(msg)
               return
 
@@ -390,7 +414,7 @@ class rvSeries:
         t, rv, err = self.time, self.vrad, self.error # temporaries
         
         if newFig: 
-            fig = plt.figure()
+            fig = plt.figure(figsize=(8,5+3*nvar))
         ax2 = fig.add_subplot(1+nvar,1,1)
         ax2.set_ylabel('RV [%s]'%self.units)
 
