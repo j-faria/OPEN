@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from sys import float_info
 from multiprocessing import cpu_count
 
+from .shell_colors import yellow, blue
 from .logger import clogger, logging
 from .utils import ask_yes_no, get_star_name
 
@@ -863,9 +864,8 @@ class bgls(PeriodogramBase):
         The normalization used.
   """
 
-  def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
-               norm="HorneBaliunas", stats=False, ext=False):
-    self.name = 'Generalized Lomb-Scargle'
+  def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad', stats=False, ext=False):
+    self.name = 'Bayesian Generalized Lomb-Scargle'
 
     self.power = None
     self.freq = freq
@@ -900,19 +900,10 @@ class bgls(PeriodogramBase):
         return 
       self.error = rv.error
 
-    self.norm = norm
     # Check and assign normalization
     self.label = {'title': 'Generalized Lomb Periodogram',\
                   'xlabel': 'Frequency',\
-                  'ylabel': "Normalization not implemented!"}
-    if self.norm == "Scargle":
-      self.label["ylabel"] = "Normalized Power (Scargle 1982)"
-    elif self.norm == "HorneBaliunas":
-      self.label["ylabel"] = "Normalized Power (Horne & Baliunas 1986)"
-    elif self.norm == "Cumming":
-      self.label["ylabel"] = "Normalized Power (Cumming 1999)"
-    else:
-      pass
+                  'ylabel': "Posterior pdf"}
     
     self._stats = stats
     if ext: 
@@ -985,25 +976,23 @@ class bgls(PeriodogramBase):
 
     p = [10**mpmath.mpf(x) for x in logp]
 
+    msg = yellow('RESULT: ') + 'Maximum of posterior distribution - %s' % mpmath.nstr(max(p))
+    clogger.info(msg)
+    msg = blue('INFO: ') + 'Normalizing by this value'
+    clogger.info(msg)
+
+
     p = array(p) / max(p)  # normalize
 
     p[p < (float_info.min * 10)] = 0
     self._upow = array([float(pp) for pp in p])
+    self.power = self._upow
 
     self.N = len(self.y)
     # An ad-hoc estimate of the number of independent frequencies 
     # see discussion following [ZK09]_ Eq. (24)
     self.M = (max(self.freq)-min(self.freq)) * (self.th.max() - self.th.min())
 
-    # Normalization:
-    if self.norm == "Scargle":
-      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
-      self.power = self._upow/float(popvar)
-    if self.norm == "HorneBaliunas":
-      self.power = (self.N-1.)/2.*self._upow
-    if self.norm == "Cumming":
-      self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
-    
     # Output statistics
     if self._stats:
       self._output()
@@ -1011,34 +1000,8 @@ class bgls(PeriodogramBase):
     #   self._plot()
 
   def __calcPeriodogramFast(self):
-    """ Compute the GLS using the Fortran extension 
-    which allows speedups of ~6x."""
+    raise NotImplementedError('There is no fast version of BGLS yet.')
 
-    # Build frequency array if not present
-    if self.freq is None:
-      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
-      self.__buildFreq(plow=plow)
-    # Circular frequencies
-    omegas = 2.*pi * self.freq
-
-    # unnormalized power and an estimate of the number of independent frequencies 
-    self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas)
-
-    self.N = len(self.y)
-    # Normalization:
-    if self.norm == "Scargle":
-      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
-      self.power = self._upow/float(popvar)
-    if self.norm == "HorneBaliunas":
-      self.power = (self.N-1.)/2.*self._upow
-    if self.norm == "Cumming":
-      self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
-    
-    # Output statistics
-    if self._stats:
-      self._output()
-    # if self._showPlot:
-    #   self._plot()
 
   def __buildFreq(self, plow=0.5):
     """
@@ -1053,60 +1016,10 @@ class bgls(PeriodogramBase):
     self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
   def prob(self, Pn):
-    """
-      Probability of obtaining the given power.
-    
-      Calculate the probability to obtain a power higher than
-      `Pn` from the noise, which is assumed to be Gaussian.
-      
-      .. note:: This depends on the normalization
-        (see [ZK09]_ for further details).
-
-        - `Scargle`: 
-        .. math::
-          exp(-Pn)
-
-        - `HorneBaliunas`: 
-        .. math::
-          \\left(1 - 2 \\times \\frac{Pn}{N-1} \\right)^{(N-3)/2}
-        
-        - `Cumming`: 
-        .. math:: 
-          \\left(1+2\\times \\frac{Pn}{N-3}\\right)^{-(N-3)/2}
-      
-      Parameters
-        Pn : float
-          Power threshold.
-      
-      Returns
-        Probability : float
-          The probability to obtain a power equal or
-          higher than the threshold from the noise.
-    """
-    if self.norm=="Scargle": return exp(-Pn)
-    if self.norm=="HorneBaliunas": return (1.-2.*Pn/(self.N-1.))**((self.N-3.)/2.)
-    if self.norm=="Cumming": return (1.+2.*Pn/(self.N-3.))**(-(self.N-3.)/2.)
+    raise NotImplementedError('Not implemented for BGLS yet.')
 
   def probInv(self, Prob):
-    """
-      Calculate minimum power for a given probability.
-    
-      This function is the inverse of `Prob(Pn)`.
-      Returns the minimum power for a given probability threshold Prob.
-      
-      Parameters
-        Prob : float
-          Probability threshold.
-      
-      Returns
-        Power threshold : float
-          The minimum power for the given
-          false-alarm probability threshold.
-    """
-    if self.norm=="Scargle": return -log(Prob)
-    if self.norm=="HorneBaliunas": return (self.N-1.)/2.*(1.-Prob**(2./(self.N-3.)))
-    if self.norm=="Cumming": return (self.N-3.)/2.*(Prob**(-2./(self.N-3.))-1.)
-
+    raise NotImplementedError('Not implemented for BGLS yet.')
 
 
 # This is the Hoeffding-test periodicity metric based upon 
