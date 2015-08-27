@@ -84,6 +84,16 @@ def var(array, weights=None, biased=False):
             return np.sum(weights*(x-np.average(x, weights=weights))**2) / (V1 - (V2/V1))
 
 
+def wstd(array, weights=None, biased=False):
+    """
+    Return the weighted standard deviation,
+    corrected for small samples (if biased=False). 
+    """
+    x = np.atleast_1d(array)
+    xvar = var(array, weights=weights, biased=biased)
+    return np.sqrt(xvar)
+
+
 
 def get_tp(P, ecc, omega, tt):
     """ 
@@ -148,6 +158,17 @@ def get_star_name(system):
         if i == -1:
             i = bn.rfind('_harps.rdb')
         star = bn[:i]
+    return star
+
+def get_star_name_from_path(full_path):
+    """ Return the name of the star (works for standard HARPS filenames) """
+    bn = os.path.basename(full_path)
+    i = bn.rfind('_harps_mean_corr.rdb')
+    if i == -1:
+        i = bn.rfind('_harps_mean.rdb')
+    if i == -1:
+        i = bn.rfind('_harps.rdb')
+    star = bn[:i]
     return star
 
 ## code from http://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring
