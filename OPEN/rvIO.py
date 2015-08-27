@@ -16,7 +16,7 @@ from numpy import genfromtxt, savetxt, mean
 
 # intra-package imports
 from .logger import clogger, logging
-from .utils import notnan
+from .utils import notnan, ask_yes_no
 from shell_colors import blue, yellow
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
@@ -125,49 +125,71 @@ def write_rv(system, filename, **kwargs):
     -------
         nothing
     """
-    print filename
 
     if os.path.isfile(filename):
         # this file exists
-        clogger.warning(yellow('Warning: ')+'File already exists. Replace? [y/n]')
-        if ask_yes_no(' '):
+        clogger.warning(yellow('Warning: ')+'File already exists. Replace? [Y/n]')
+        if ask_yes_no(' ', default=True):
             pass
         else:
             clogger.info(blue('INFO: ')+'Aborting.')
             return
 
-    header_basic1 = ['jdb', 'vrad', 'svrad']
-    header_basic2 = ['-'*len(s) for s in header_basic1]
 
-    header_drs35_1 = ['jdb', 'vrad', 'svrad', 'fwhm', 'contrast', 'bis_span', \
-                     'noise', 's_mw', 'sig_s', 'rhk', 'sig_rhk', 'sn_CaII', \
-                     'sn10', 'sn50', 'sn60']
-    header_drs35_2 = ['-'*len(s) for s in header_drs35_1]
+    with open(system.provenance.keys()[0]) as f:
+        header1 = f.readline()
+        header2 = f.readline()
 
-    header_drs34_1 = ['jdb', 'vrad', 'svrad', 'fwhm', 'contrast', 'bis_span', \
-                      'noise', 'sn10', 'sn50', 'sn60']
-    header_drs34_2 = ['-'*len(s) for s in header_drs34_1]
+    extras_original_order = header1.split()[3:]
+    if system.units == 'm/s':
+        mean_vrad = system.vrad.mean()
+        X = [system.time, (system.vrad - mean_vrad)*1e-3 + mean_vrad, system.error*1e-3]
+    else:
+        X = [system.time, system.vrad, system.error]
 
-    if len(system.extras) == 0: # basic
-        head = '\t'.join(header_basic1) + '\n' + '\t'.join(header_basic2)
-        fmt = ['%12.6f', '%9.5f', '%7.5f']
-        X = zip(system.time, system.vrad, system.error)
-        savetxt(filename, X, fmt=fmt, \
-                delimiter='\t', header=head, comments='')
+    for e in extras_original_order:
+        # find extras index
+        i = system.extras._fields.index(e)
+        X.append(system.extras[i])
 
-    elif len(system.extras) == 7:
-        head = '\t'.join(header_drs34_1) + '\n' + '\t'.join(header_drs34_2)
-        fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*7
-        X = zip(system.time, system.vrad, system.error, *list(system.extras))
-        savetxt(filename, X, fmt=fmt, \
-                delimiter='\t', header=head, comments='')
 
-    elif len(system.extras) == 12:
-        head = '\t'.join(header_drs35_1) + '\n' + '\t'.join(header_drs35_2)
-        fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*12
-        X = zip(system.time, system.vrad, system.error, *list(system.extras))
-        savetxt(filename, X, fmt=fmt, \
-                delimiter='\t', header=head, comments='')
+    fmt = ['%12.6f', '%8.5f', '%7.5f'] + ['%7.5f']*len(system.extras)
+    savetxt(filename, zip(*X), fmt=fmt, delimiter='\t', header=header1+header2[:-1], comments='')
+
+    clogger.info(blue('INFO: ')+'Wrote to file '+filename)
+
+    # header_basic1 = ['jdb', 'vrad', 'svrad']
+    # header_basic2 = ['-'*len(s) for s in header_basic1]
+
+    # header_drs35_1 = ['jdb', 'vrad', 'svrad', 'fwhm', 'contrast', 'bis_span', \
+    #                  'noise', 's_mw', 'sig_s', 'rhk', 'sig_rhk', 'sn_CaII', \
+    #                  'sn10', 'sn50', 'sn60']
+    # header_drs35_2 = ['-'*len(s) for s in header_drs35_1]
+
+    # header_drs34_1 = ['jdb', 'vrad', 'svrad', 'fwhm', 'contrast', 'bis_span', \
+    #                   'noise', 'sn10', 'sn50', 'sn60']
+    # header_drs34_2 = ['-'*len(s) for s in header_drs34_1]
+
+    # if len(system.extras) == 0: # basic
+    #     head = '\t'.join(header_basic1) + '\n' + '\t'.join(header_basic2)
+    #     fmt = ['%12.6f', '%9.5f', '%7.5f']
+    #     X = zip(system.time, system.vrad, system.error)
+    #     savetxt(filename, X, fmt=fmt, \
+    #             delimiter='\t', header=head, comments='')
+
+    # elif len(system.extras) == 7:
+    #     head = '\t'.join(header_drs34_1) + '\n' + '\t'.join(header_drs34_2)
+    #     fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*7
+    #     X = zip(system.time, system.vrad, system.error, *list(system.extras))
+    #     savetxt(filename, X, fmt=fmt, \
+    #             delimiter='\t', header=head, comments='')
+
+    # elif len(system.extras) == 12:
+    #     head = '\t'.join(header_drs35_1) + '\n' + '\t'.join(header_drs35_2)
+    #     fmt = ['%12.6f', '%9.5f', '%7.5f'] + ['%7.5f']*12
+    #     X = zip(system.time, system.vrad, system.error, *list(system.extras))
+    #     savetxt(filename, X, fmt=fmt, \
+    #             delimiter='\t', header=head, comments='')
 
 
 
