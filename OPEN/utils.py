@@ -269,6 +269,7 @@ def selectable_plot_chunks(system, **kwargs):
     # col = ax.scatter(system.time, system.vrad, picker=True)
     ax.set_xlabel('Time [days]')
     ax.set_ylabel('RV [%s]'%system.units)
+    ax.margins(0.1)
     fig.canvas.mpl_connect('button_press_event', onpick3)
 
     # wait for user input to finish
