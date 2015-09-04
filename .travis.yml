@@ -4,7 +4,7 @@ python:
 
 env:
   global:
-    - DEPENDS="gfortran-4.9"
+    - DEPENDS="gfortran-4.9 libblas-dev"
 
 # command to install dependencies
 before_install:
