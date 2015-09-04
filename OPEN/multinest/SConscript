@@ -78,7 +78,7 @@ def print_cmd_line(s, target, src, env):
     if 'CopySOAction' in s: return
     sys.stdout.write(" Making %s...\n"% (' and '.join([str(x) for x in target])))
 
-# env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
+env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
 
 
 source_files = Glob('*.f90') + Glob('*.F90')
@@ -99,7 +99,7 @@ Depends(nest, libnest)
 
 
 ## F2PY builder
-f2py_flags = ' '#--quiet '
+f2py_flags = '--quiet '
 f2py_flags += '--f90flags="-ffree-line-length-none" '
 f2py_flags += '--opt="-O3" --fcompiler=gnu95 '# + '-lstdc++ '
 
@@ -116,7 +116,7 @@ if GetOption('gfortran') is None:
 else:
 	f2py_flags += '--f90exec=' + GetOption('gfortran')
 
-bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES' + f2py_flags)
+bld = Builder(action = f2py_exec + ' -m $MODULE -c $SOURCES 1>> f2py-warn.log' + f2py_flags)
 env.Append(BUILDERS={'F2PY': bld})
 
 # only object files without .mod
