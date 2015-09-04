@@ -3,7 +3,7 @@ module like
     use params
     use gputils, only: gp_n_planet_pars
     use utils1, only: logSumExp
-    use Nested, only: MPI_COMM_WORLD
+!     use Nested, only: MPI_COMM_WORLD
 
     !use lib_matrix, only: inverse, determinant
     implicit none
