@@ -51,7 +51,7 @@ env = env.Clone(F90=mpif90_exec if MPI else 'gfortran',
 	            LINKFLAGS='',
 	            # F90COMSTR='Compiling $SOURCE',
 	            F90FLAGS=FFLAGS,
-	            LIBS=['nest3', 'lapack', 'blas'],# + ['pgplot', 'X11', 'z'], 
+	            LIBS=['nest3', 'lapack', 'blas'],#, 'stdc++'] ,# + ['pgplot', 'X11', 'z'], 
 	            LIBPATH=[MultiNest_dir],# + ['-L/home/joao/Software/mesasdk/pgplot'],
 	            FORTRANMODDIRPREFIX = '-J',  # option used by gfortran to specify where to put .mod files for compiled modules
 	            FORTRANMODDIR='.'
@@ -78,7 +78,7 @@ def print_cmd_line(s, target, src, env):
     if 'CopySOAction' in s: return
     sys.stdout.write(" Making %s...\n"% (' and '.join([str(x) for x in target])))
 
-env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
+# env['PRINT_CMD_LINE_FUNC'] = print_cmd_line
 
 
 source_files = Glob('*.f90') + Glob('*.F90')
@@ -101,7 +101,7 @@ Depends(nest, libnest)
 ## F2PY builder
 f2py_flags = ' --quiet '
 f2py_flags += '--f90flags="-ffree-line-length-none" '
-f2py_flags += '--opt="-O3" --fcompiler=gnu95 '
+f2py_flags += '--opt="-O3" --fcompiler=gnu95 ' + '-lstdc++ '
 
 ## on some machines, the gp.so extension needs to be linked
 ## with lapack explicitely
