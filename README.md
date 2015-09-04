@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.org/j-faria/OPEN.svg?branch=develop)](https://travis-ci.org/j-faria/OPEN)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/j-faria/OPEN/blob/master/LICENSE)
+[![Coverage Status](https://coveralls.io/repos/j-faria/OPEN/badge.svg?branch=master&service=github)](https://coveralls.io/github/j-faria/OPEN?branch=master)
 
 OPEN
 ====
