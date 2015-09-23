@@ -201,4 +201,6 @@ class rvfile(file):
     def readuncommented(self):
         lines = self.readlines()
         uncommented = [ l for l in lines if (l.strip() and l.strip()[0].isdigit()) ]
+        if len(uncommented) == 0:
+            uncommented = [ l for l in lines if (l.strip() and l.split()[1][0].isdigit()) ]
         return uncommented
