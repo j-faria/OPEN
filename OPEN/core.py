@@ -68,7 +68,10 @@ def do_fit(system, verbose):
         if (system.model.has_key('drift') and degree == len(system.model['drift'])-1):
             msg = yellow('RESULT: ') + 'Fit of degree %d done! Coefficients:' % degree
             clogger.info(msg)
-            msg = yellow('      : ') + '[slope, intercept] = ' + '[%8.5f, %8.5f]' % tuple(system.model['drift'])
+            if degree == 1:
+                msg = yellow('      : ') + '[slope, intercept] = ' + '[%8.5f, %8.5f]' % tuple(system.model['drift'])
+            else:
+                msg = yellow('      : ') + (degree+1)*'%8.5f, ' % tuple(system.model['drift'])
             clogger.info(msg)
             return
 
@@ -77,7 +80,7 @@ def do_fit(system, verbose):
             system.vrad = system.vrad_full
 
         if degree > 0:
-            z = np.polyfit(system.time, system.vrad, degree, w=1./system.error**2)
+            z = np.polyfit(system.time, system.vrad, degree, w=1./system.error)
             # save info to system
             system.model['drift'] = z
             # plot fitted drift
@@ -88,7 +91,10 @@ def do_fit(system, verbose):
             ## output some information
             msg = yellow('RESULT: ') + 'Fit of degree %d done! Coefficients:' % degree
             clogger.info(msg)
-            msg = yellow('      : ') + '[slope, intercept] = ' + '[%8.5f, %8.5f]' % tuple(system.model['drift'])
+            if degree == 1:
+                msg = yellow('      : ') + '[slope, intercept] = ' + '[%8.5f, %8.5f]' % tuple(system.model['drift'])
+            else:
+                msg = yellow('      : ') + (degree+1)*'%8.5f, ' % tuple(system.model['drift'])
             clogger.info(msg)
             msg = yellow('      : ') + '[value at mean time] = %8.5f' % poly(system.time.mean())
             clogger.info(msg)
