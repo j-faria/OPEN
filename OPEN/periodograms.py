@@ -532,7 +532,7 @@ class gls(PeriodogramBase):
     # Build frequency array if not present
     if self.freq is None:
       plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
-      # plow = 0.5
+      self.plow = plow
       self.__buildFreq(plow=plow)
     # Circular frequencies
     omegas = 2.*pi * self.freq
@@ -1244,19 +1244,25 @@ class SpectralWindow(PeriodogramBase):
     self._plot(dials=False)
 
 
-  def _calcWindowFunction(self):
+  def _calcWindowFunction(self, new=False):
     n = self.time.size
 
-    self.W = np.fromiter((np.sum(np.exp(-2.j*pi*f*self.time))/n for f in self.freq), np.complex_, self.freq.size)
-    # self.W = array([sum([exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq])
-
-    self.amp = np.absolute(self.W)
-    self.phase = np.arctan2(self.W.imag, self.W.real)
+    if not new:
+      self.W = np.fromiter((np.sum(np.exp(-2.j*pi*f*self.time))/n for f in self.freq), np.complex_, self.freq.size)
+      # self.W = array([sum([exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq])
+      self.amp = np.absolute(self.W)
+      self.power = self.amp
+      self.phase = np.arctan2(self.W.imag, self.W.real)
+    else:
+      self.W2 = np.fromiter((np.sum(np.exp(-2.j*pi*f*self.time))/n for f in self.freq2), np.complex_, self.freq2.size)
+      self.amp2 = np.absolute(self.W2)
+      self.power2 = self.amp2
+      self.phase2 = np.arctan2(self.W2.imag, self.W2.real)
 
 
   def _plot(self, dials=False, ndials=3):
     """
-      Plot the spectral window function as a function of frequency.
+      Plot the spectral window function as a function of period.
     """
     self.fig = plt.figure()
     self.ax = self.fig.add_subplot(1,1,1)
@@ -1292,9 +1298,53 @@ class SpectralWindow(PeriodogramBase):
       self.ax.semilogx([1./fmax3,1./fmax3+0.025*cos(ph3)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph3)],'k-',lw=1)
 
 
-    self.fig.tight_layout()
+    # self.fig.tight_layout()
     plt.show()
 
+
+  def _plot_freq(self, dials=False, ndials=3):
+    """
+      Plot the spectral window function as a function of frequency.
+    """
+    # we need different trial frequencies for this plot
+    self.freq2 = np.linspace(1e-5, 4.2, 1e4)
+    self._calcWindowFunction(new=True)
+    self.fig = plt.figure()
+    self.ax = self.fig.add_subplot(1,1,1)
+    # self.ax.set_title("Spectral Window Function")
+    self.ax.set_xlabel("Frequency")
+    self.ax.set_ylabel("Window function")
+    self.ax.plot(self.freq2, self.amp2, 'b-')
+
+    # Trying to get labels on top representing frequency - does not work!
+    # self.ax2 = self.ax.twiny()
+    # def tick_function(X):
+    #   V = 1./X
+    #   return ["%.e" % z for z in V]
+
+    # bottom_tick_loc = self.ax.get_xticks()
+    # self.ax2.set_xticks(bottom_tick_loc)
+    # self.ax2.set_xticklabels(tick_function(bottom_tick_loc))
+    # self.ax2.set_xlabel(r"Frequency [day$^{-1}$]")
+    # # self.ax2.get_xaxis().get_major_formatter().set_scientific(True)
+
+    if dials:
+      fmax1, fmax2, fmax3 = self.get_peaks(n=3)
+      max_amp = max(self.amp2)
+
+      self.ax.semilogx(fmax1, max_amp+0.1, marker='$\circ$', markersize=10, c='k', mew=0.3)
+      self.ax.semilogx(fmax3, max_amp+0.1, marker='$\circ$', markersize=10, c='k', mew=0.3)
+      self.ax.semilogx(fmax2, max_amp+0.1, marker='$\circ$', markersize=10, c='k', mew=0.3)
+
+      ph1 = ph2 = ph3 = 0.3
+
+      self.ax.semilogx([fmax1, fmax1+0.025*cos(ph1)], [max_amp+0.1, max_amp+0.1+0.025*sin(ph1)], 'k-', lw=1)
+      self.ax.semilogx([fmax2, fmax2+0.025*cos(ph2)], [max_amp+0.1, max_amp+0.1+0.025*sin(ph2)], 'k-', lw=1)
+      self.ax.semilogx([fmax3, fmax3+0.025*cos(ph3)], [max_amp+0.1, max_amp+0.1+0.025*sin(ph3)], 'k-', lw=1)
+
+
+    # self.fig.tight_layout()
+    plt.show()
 
 
 #####################################################################
