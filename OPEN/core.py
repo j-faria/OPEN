@@ -258,6 +258,55 @@ def do_restrict(system, option, *args, **kwargs):
         system.vrad = system.vrad_full[vals]
         system.error = system.error_full[vals]
 
+        # remove observations with indices ind_to_remove from
+        # system.extras.*; leave system.extras_full.* arrays intact
+        for i, arr in enumerate(system.extras):
+            field_name = system.extras._fields[i]
+            replacer = {field_name:arr[vals]}
+            system.extras = system.extras._replace(**replacer)
+
+
+
+    ## restrict by signal to noise (on order 60)
+    if option == 'sn':
+        maxsn = args[0]
+        msg = blue('INFO: ') + 'Removing data with S/N ratio on order 60 higher than %.0f' % maxsn
+        clogger.info(msg)
+
+        # we have to keep a record of how many values come out of each file
+        t, rv, err = system.time_full, system.vrad_full, system.error_full # temporaries
+        for i, (fname, [n1, n2]) in enumerate(sorted(system.provenance.iteritems())):
+            # print i, n1, n2
+            # print err[:n1]
+
+            val = system.extras.sn60[:n1] > maxsn
+            nout = (val == False).sum()
+            # system.provenance keeps the record
+            if nout >= n1: 
+                system.provenance[fname][1] = n1
+            else:
+                system.provenance[fname][1] = nout
+
+            # print (val == False).sum(), n1
+            t, rv, err = t[n1:], rv[n1:], err[n1:]
+
+        # now build the full boolean vector 
+        vals = system.extras.sn60 > maxsn
+        print vals, len(vals)
+
+        # and pop out the values from time, vrad, and error
+        # leaving all *_full vectors intact
+        system.time = system.time_full[vals]
+        system.vrad = system.vrad_full[vals]
+        system.error = system.error_full[vals]
+
+        # remove observations with indices ind_to_remove from
+        # system.extras.*; leave system.extras_full.* arrays intact
+        for i, arr in enumerate(system.extras):
+            field_name = system.extras._fields[i]
+            replacer = {field_name:arr[vals]}
+            system.extras = system.extras._replace(**replacer)
+
 
     ## restrict by date (JD)
     if option == 'date':

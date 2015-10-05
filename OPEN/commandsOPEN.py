@@ -226,6 +226,7 @@ restrict_usage = \
 """
 Usage:
     restrict [(err <maxerr>)]
+    restrict [(sn <maxsn>)]
     restrict [(jd <minjd> <maxjd>)]
     restrict [(year <yr>)]
     restrict [(years <yr1> <yr2>)]
@@ -1092,12 +1093,23 @@ class EmbeddedMagics(Magics):
                 return
             core.do_restrict(system, 'error', maxerr)
 
+        if args['sn']: 
+            try:
+                maxsn = float(args['<maxsn>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'maxsn shoud be a number!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'sn', maxsn)
+
+
+
         if args['jd']:
             try:
                 maxjd = int(args['<maxjd>'])
                 minjd = int(args['<minjd>'])
             except ValueError:
-                msg = red('ERROR: ') + 'minjd and maxjd shoud be numbers!'
+                msg = red('ERROR: ') + 'minjd and maxjd shoud be integer numbers!'
                 clogger.fatal(msg)
                 return
             core.do_restrict(system, 'date', minjd, maxjd)
