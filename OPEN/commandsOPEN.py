@@ -41,7 +41,7 @@ Options:
     -d                  Set this as default system.
     -v --verbose        Verbose output about data just read.
     --quiet             Do not print any output.
-    --skip=<sn>         How many header lines to skip [default: 0].
+    --skip=<sn>         How many header lines to skip [default: 2].
     --nomps             Do not convert data to m/s
     -h --help           Show this help message.
 """
