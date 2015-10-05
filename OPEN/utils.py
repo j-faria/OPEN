@@ -14,7 +14,8 @@ import signal
 from contextlib import contextmanager
 import os
 import subprocess
-import time
+# import time
+from re import findall
 
 
 import numpy as np
@@ -143,7 +144,7 @@ def time_limit(seconds):
 
 
 def get_star_name(system):
-    """ Return the name of the star (works for standard HARPS filenames) """
+    """ Return the name of the star (works for standard HARPS filenames and HD,HIP,CD catalogs) """
     if len(system.provenance) > 1:
         full_paths = system.provenance.keys()
         common = longest_common_substring_array(full_paths)
@@ -152,12 +153,13 @@ def get_star_name(system):
     else:
         full_path = system.provenance.keys()[0]
         bn = os.path.basename(full_path)
-        i = bn.rfind('_harps_mean_corr.rdb')
-        if i == -1:
-            i = bn.rfind('_harps_mean.rdb')
-        if i == -1:
-            i = bn.rfind('_harps.rdb')
-        star = bn[:i]
+        star = findall('HD\d+|HIP\d+', bn)[0]
+        # i = bn.rfind('_harps_mean_corr.rdb')
+        # if i == -1:
+        #     i = bn.rfind('_harps_mean.rdb')
+        # if i == -1:
+        #     i = bn.rfind('_harps.rdb')
+        # star = bn[:i]
     return star
 
 def get_star_name_from_path(full_path):
