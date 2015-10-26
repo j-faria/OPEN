@@ -19,7 +19,10 @@ import numpy as np
 import george
 from george import kernels
 from george.kernels import ExpSquaredKernel, ExpSine2Kernel, WhiteKernel
-import triangle
+try:
+    import triangle
+except ImportError:
+    import corner as triangle
 import emcee
 from time import time
 
