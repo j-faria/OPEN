@@ -153,7 +153,11 @@ def get_star_name(system):
     else:
         full_path = system.provenance.keys()[0]
         bn = os.path.basename(full_path)
-        star = findall('HD\d+|HIP\d+', bn)[0]
+        try:
+            star = findall('HD\d+|HIP\d+|BD-\d+|CD-\d+', bn)[0]
+        except IndexError:
+            # we can't find usual names so fall back to this
+            star = bn.replace('_', '').replace('.rdb', '').replace('.rv', '')
         # i = bn.rfind('_harps_mean_corr.rdb')
         # if i == -1:
         #     i = bn.rfind('_harps_mean.rdb')
