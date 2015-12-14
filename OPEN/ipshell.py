@@ -20,7 +20,17 @@ try:
     from contextlib import nested
 except:
     from IPython.utils.nested_context import nested
-from IPython.config.loader import Config
+
+from IPython.utils.shimmodule import ShimWarning
+with warnings.catch_warnings(ShimWarning):
+    warnings.filterwarnings('error')
+    try:
+        from IPython.config.loader import Config
+        from IPython.utils.traitlets import Bool, CBool, Unicode
+    except Warning: 
+        from traitlets.config.loader import Config
+        from traitlets import Bool, CBool, Unicode
+
 from IPython.core import ultratb
 from IPython.core.magic import Magics, magics_class, line_magic
 try: 
@@ -31,7 +41,7 @@ except ImportError:
     # for IPython 0.13 we had to do this instead
     from IPython.frontend.terminal.interactiveshell import TerminalInteractiveShell
     from IPython.frontend.terminal.ipapp import load_default_config
-from IPython.utils.traitlets import Bool, CBool, Unicode
+
 from IPython.utils.io import ask_yes_no
 
 # intra-package imports
