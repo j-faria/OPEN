@@ -15,15 +15,14 @@ from contextlib import contextmanager
 import os
 import subprocess
 # import time
-from re import findall
-
+import re
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import Ellipse
-import matplotlib.cm as cm
+# from matplotlib.colors import LinearSegmentedColormap
+# from matplotlib.patches import Ellipse
+# import matplotlib.cm as cm
 
 
 mjup2mearth  = 317.828
@@ -151,12 +150,14 @@ def get_star_name(system):
         bn = os.path.basename(common)
         star = bn.replace('_', '').replace('.rdb', '')
     else:
+        pattern = re.compile(r"(\w+[-]\d+|HD\d+|HIP\d+)")
         full_path = system.provenance.keys()[0]
         bn = os.path.basename(full_path)
         try:
-            star = findall('HD\d+|HIP\d+', bn)[0]
+            star = pattern.findall(bn)[0]
         except IndexError:
             star = 'unknown'
+
         # i = bn.rfind('_harps_mean_corr.rdb')
         # if i == -1:
         #     i = bn.rfind('_harps_mean.rdb')
@@ -169,7 +170,7 @@ def get_star_name_from_path(full_path):
     """ Return the name of the star (works for standard HARPS filenames) """
     bn = os.path.basename(full_path)
     try:
-        star = findall('HD\d+|HIP\d+|BD-\d+|CD-\d+', bn)[0]
+        star = re.findall('HD\d+|HIP\d+|BD-\d+|CD-\d+', bn)[0]
     except IndexError:  # didn't find correct name
         star = None
 
