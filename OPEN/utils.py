@@ -30,6 +30,7 @@ msun2mjup = 1047.3486
 msun2mnep = 19412.24
 msun2mearth = 328900.56
 mearth2msun = 1./msun2mearth
+msun = 1.98892e30 # in kg, need source
 au2m = 149597870700.
 m2au = 1./au2m
 jd2s = 86400.
@@ -209,6 +210,11 @@ def longest_common_substring_array(data):
                 if j > len(substr) and all(data[0][i:i+j] in x for x in data):
                     substr = data[0][i:i+j]
     return substr
+
+
+
+def escape_underscores(string):
+    return string.replace('_', '\_')
 
 
 ### Matplotlib advanced plot interaction stuff
