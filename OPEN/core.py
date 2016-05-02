@@ -48,6 +48,7 @@ except ImportError:
 
 from shell_colors import yellow, red, blue
 from .utils import julian_day_to_date, ask_yes_no, get_number_cores, \
+                   msun, mjup2mearth, \
                    var, time_limit, TimeoutException, \
                    selectable_plot, selectable_plot_chunks
 from .prior_funcs import random_from_jeffreys, random_from_modjeffreys
@@ -2527,6 +2528,319 @@ def do_Dawson_Fabrycky(system):
     # savefig(name+'_DF.ps',orientation = 'Landscape')
     plt.tight_layout()
     plt.show()
+
+
+
+def do_detection_limits(system):
+
+    from .ext.keplerian import keplerian
+    from .periodograms import gls as gls_periodogram
+    from .periodograms import glombscargle
+    # import Annelies' script
+    sys.path.append('/home/joao/phd/large_program/annelies_programs')
+    import gls as detlimits_Annelies
+
+    # sys.path.append('/home/joao/phd/many-measurements')
+    # from data_from_sweetcat import M, P, ind_eu, feh, mask
+
+    # def HDnumber(string):
+    #     m = re.findall(r"(\d+)", string)[0]
+    #     return int(m)
+
+    G = 6.67300e-11 # Gravitational constant in m^3*kg^-1*s^-2
+
+    # FAP level (in percent)
+    FAP = 1.0
+    # no. of permutations (use 1000 for 1% fap or 10000 for 0.1% fap)
+    perm = int(1000/FAP)   
+
+    # Jupiter Mass in Earth masses
+    Mjup = mjup2mearth
+
+    # trial_periods = np.linspace(0.5, 600, 500)
+    trial_periods = np.logspace(np.log10(0.5), np.log10(600), 500)
+    trial_frequencies = 1./trial_periods
+    trial_omegas = 2.*np.pi * trial_frequencies  # circular frequencies
+
+    star = system.star_name
+
+    # get masses (and uncertainties) for all stars
+    with open('/home/joao/phd/data/metadata/sample_masses.rdb') as f:
+        lines = f.readlines()
+    masses = {line.split()[0]:[float(v) for v in line.split()[1:]] for line in lines[2:]}
+
+    # set the mass
+    system.star_mass = masses[star][0] * msun # store the mass in kg
+
+    tspan = np.ptp(system.time) # get timespan of observations
+
+
+    msg = blue('INFO: ') + star + '\n'
+    msg += blue('    : ') + 'mass: %4.2f Msun, %e kg\n' % (masses[star][0], system.star_mass)
+    msg += blue('    : ') + 'timespan: %f d\n' % tspan
+    clogger.info(msg)
+
+    # calculate the periodogram of the observations
+    t1 = time.time()
+    try:
+        system.per
+    except AttributeError:
+        system.per = gls_periodogram(system)
+    t2 = time.time()
+    # print star, 'took %4.2f seconds for the periodogram' % (t2-t1)
+    
+
+    try:  # if we did it before, skip the calculation
+        d = system.detection_limits
+
+        msg = blue('INFO: ') + 'using previously calculated values'
+        clogger.info(msg)
+
+        detected_masses = d['det_masses']
+        detected_K = d['detected_K']
+        res = d['Annelies_res']
+
+    except AttributeError:  # otherwise do it
+        type_periodogram = '_' + system.per.__class__.__name__
+        # temporary periodogram instance where we can change attributes
+        temp_per = copy.copy(system.per)
+        # access the instance's __calcPeriodogramFast function
+        exec 'calc = temp_per.'+type_periodogram+'__calcPeriodogramFast' in locals()
+
+        # set instance's per attribute to the trial frequencies, 
+        # to get the power at these frequencies
+        temp_per.freq = trial_frequencies
+
+        # get the powers for all data permutations
+        msg = blue('INFO: ') + 'calculating periodogram permutations...'
+        clogger.info(msg)
+
+        Powers = []
+        for k in xrange(perm):
+            ## this makes permutations (WITHOUT repetition)
+            # permutted = np.random.permutation(zip(temp_per.y, temp_per.error))
+            # y = permutted[:,0]
+            # error = permutted[:,1]
+
+            ## this makes permutations (WITH repetition)
+            permutted = np.random.choice(temp_per.y.size, temp_per.y.size)
+            y = temp_per.y[permutted]
+            error = temp_per.error[permutted]
+
+            power_at_trial_P = glombscargle(system.time, y, error, trial_omegas)[0]
+            Powers.append(power_at_trial_P)
+            # print power_at_trial_P
+        
+        Powers = np.vstack(Powers[:])
+        # Powers is an array of shape (nperm, n_trial_periods)
+        # it holds the periodogram power for each trial period, for each permutation of the data
+
+        # get the power corresponding to the given FAP, for all trial periods
+        faps_for_trial_periods = []
+        for i, P in enumerate(trial_periods):
+            powers_sorted = np.sort(Powers[:, i]) # sort all Powers for each trial period
+            index = int(perm*(1-FAP/100.))
+            faps_for_trial_periods.append(powers_sorted[index])
+
+        faps_for_trial_periods = np.array(faps_for_trial_periods)
+        # print faps_for_trial_periods
+
+        msg = blue('INFO: ') + 'injecting planets...'
+        clogger.info(msg)
+
+        ## injection of planets
+        # detections = np.zeros((trial_periods.size, 100), dtype=bool)
+        # injected_masses = np.empty((trial_periods.size, 100))
+        detected_K = np.zeros(trial_periods.size)
+        detected_masses = np.zeros(trial_periods.size)
+        for i, P in enumerate(trial_periods):
+            K_detected_vect_temp = []
+            for phase in np.arange(system.time[0], system.time[0]+P, P/10.):
+                ## instead of looping over K, we do a binary search for the lowest detected K
+                K_detected = 10000.
+                K_no_detected = 0.
+                K_previous = K_detected
+                j=0
+                while abs(K_detected-K_no_detected) > 0.000001:
+                    K = K_detected
+                    phases = np.linspace(system.time[0], system.time[0]+P, 10)
+                    cf = np.array(2*np.pi*(1./P))  # circular frequency
+                    ## parameters for planets with same P and K but all phases
+                    # planet_pars = np.array([P, K, 0., 0., 0., 0.])
+                    # planet_pars = np.tile(planet_pars, (10, 1))
+                    # planet_pars[:, 4] = phases
+
+                    planet_pars = np.array([P, K, 0., 0., phase, 0.])
+                    planet_pars = np.tile(planet_pars, (1, 1))
+
+                    # the kep function adds the signal from one planet with parameters pars
+                    # to the RV of the star. ***This assumes the RV are only noise***
+                    kep = lambda pars: keplerian(system.time, *pars) + system.vrad
+                    new_data = np.array(map(kep, planet_pars))
+                    # new_data is an array with shape (nphases, ntimes) with the RVs
+                    # of injected planets for every phase
+
+                    # calculate periodogram powers at current injection period for the new data sets
+                    gls = lambda y: glombscargle(system.time, y, system.error, cf)[0]
+                    new_powers = np.array(map(gls, new_data))
+                    # new_powers is an array with shape (nphases, 1) with the
+                    # periodogram power for the current injection period, for every phase
+
+                    # a signal is considered detected (with this K) if the periodogram gives a peak with 
+                    # a given FAP for all 10 phases. That is, if all powers are > then fap for this trial period
+                    power_comparisons = new_powers > faps_for_trial_periods[i]
+
+                    # is this K detected?
+                    det = power_comparisons.all()  # True/False
+                    
+                    if det:  # if detected, save minimum mass and continue
+                        K_previous = K_detected
+                        K_detected = (K_detected+K_no_detected)/2.
+                        # detections[i,j] = det
+                        # minimum mass of this injected planet
+                        # else:  # if not, assume smaller planets will no be detected, get out of K loop, go to next period
+                    else:
+                        K_no_detected = K_detected
+                        K_detected = K_previous
+                
+                K_detected_vect_temp.append(K_detected)
+
+            # m = 7.4e-24 * K * ((P * system.star_mass**2) / (2*np.pi*G))**(1/3.)
+            # m = ((P*24.*3600.*system.star_mass**2)/(2*np.pi*G))**(1/3.) * K / 5.9736e24
+
+            # injected_masses[i,j] = m
+
+            j+=1
+
+            ind = K_detected_vect_temp.index(max(K_detected_vect_temp))
+            # K_detected_vect.append((K_detected_vect_temp)[ind])
+
+            # detections[i,:j] = True
+            # detected_K[i] = K_detected
+            detected_K[i] = (K_detected_vect_temp)[ind]
+            m = ((P*24.*3600.*system.star_mass**2)/(2*np.pi*G))**(1/3.) * detected_K[i] / 5.9736e24
+            detected_masses[i] = m
+
+
+        msg = blue('INFO: ') + "starting Annelies' code"
+        clogger.info(msg)
+
+        # results with Annelies' code
+        res = detlimits_Annelies.detection_limit_fixed(list(system.time), list(system.vrad), list(system.error), 
+                                                       FAP, 'circ', mass=masses[star][0])
+        
+
+        t2 = time.time()
+        msg = yellow('Result: ') + 'Calculation took %4.2f seconds' % (t2-t1)
+        clogger.info(msg)
+
+        d = {'star': star,
+             'tspan': tspan,
+             'N': system.time.size,
+             'powers': Powers,
+             'newpowers': new_powers,
+             # 'detections': detections,
+             'det_masses': detected_masses,
+             'detected_K': detected_K,
+             'faps': faps_for_trial_periods,
+             'Annelies_res': res,
+             }
+
+        # save to system
+        system.detection_limits = d
+
+
+    msg = blue('INFO: ') + 'preparing plots...'
+    clogger.info(msg)
+
+    #### plotting
+    N = system.time.size
+
+        # last K to be detected, as a function of period
+        # detected_K = d[f]['detected_K']
+        # detected_K_Ann = np.array(d[f]['Annelies_res'][1])
+
+    # last mass to be detected
+    detected_masses_Ann = np.array(res[2])
+
+    detected_masses_1ms = np.array(res[3])
+    detected_masses_3ms = np.array(res[4])
+    detected_masses_5ms = np.array(res[5])
+    detected_masses_7ms = np.array(res[6])
+
+
+    ### K, P diagram showing detections
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    ax1.set_title('%s   N=%d' % (star, N) )
+    # ax1.set_title('observed RV', loc='right')
+    # m = minmax(trial_K)
+    # n = minmax(trial_periods)
+    # ax1.imshow(det.astype(int).T, cmap=plt.cm.jet_r, extent=[n[0], n[1], m[0], m[1]], aspect='auto', interpolation='none')
+    # ax1.plot(trial_periods, detected_K, 'k')
+    # ax1.plot(trial_periods, detected_K_Ann)
+    # ax1.plot(trial_periods, detected_K)
+    # ax1.axvline(x=d[f]['tspan'], color='k', ls='--', lw=2)
+    ax1.set_ylabel('K')
+
+    ax2 = ax1#fig.add_subplot(212)
+    ax2.plot(trial_periods, detected_masses, 'k-', lw=1.5)
+    # ax2.plot(trial_periods, detected_masses_Ann, 'b-')
+    ax2.plot(trial_periods, detected_masses_1ms, 'r--', lw=0.6, alpha=0.7, label='1m/s')
+    ax2.plot(trial_periods, detected_masses_3ms, 'r--', lw=0.6, alpha=0.7, label='3m/s')
+    ax2.plot(trial_periods, detected_masses_5ms, 'r--', lw=0.6, alpha=0.7, label='5m/s')
+    # ax2.plot(trial_periods, detected_masses_7ms, 'r--', lw=2, label='7m/s')
+    # ax2.axvline(x=d[f]['tspan'], color='k', ls='--', lw=2)
+
+    # heatmap, xedges, yedges = np.histogram2d(keplerP[~np.isnan(keplerM)], keplerM[~np.isnan(keplerM)], bins=50)
+    # extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    # extent = [0.5, 600, 0, 30]
+    # ax2.imshow(heatmap, extent=extent)
+
+    # cmap = sns.cubehelix_palette(start=0, light=1, as_cmap=True)
+    # sns.kdeplot(np.clip(keplerP, 0.5, 600), np.clip(keplerM, 0., 30), shade=True, ax=ax2)
+
+
+    # ax2.scatter(keplerP, keplerM, s=2, alpha=0.2, color='b')
+    ax2.set_xscale('log')
+    # ax2.set_yscale('log')
+
+    ax2.set_xlim(trial_periods.min(), trial_periods.max())
+    # ax2.set_ylim([0, 50])
+
+    # ax2.axvline(x=3, color='k', ls='--', lw=2)
+    ylim = ax2.get_ylim()
+    ax2.vlines(x=50, ymin=10, ymax=ylim[1], color='g', linestyles='--', lw=2)
+    ax2.hlines(y=10, xmin=0, xmax=50, color='g', linestyles='--', lw=2)
+
+
+    ax2.set_xlabel('Period [d]')
+    ax2.set_ylabel(r'Mass [M$_\oplus$]')
+
+    ### mass, P diagram showing detections
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # ax.set_title('%s   N=%d' % (star, N) )
+    # m = np.min(injected_masses)+1e-6, np.max(injected_masses)
+    # n = minmax(trial_periods)
+    # ax.imshow(det.astype(int).T, cmap=plt.cm.jet_r, extent=[n[0], n[1], m[0], m[1]], aspect='auto', interpolation='none')
+    # # ax.errorbar(0.75*np.ptp(trial_periods), 0.75*np.ptp(injected_masses),
+    # #             xerr=0.5*np.ediff1d(trial_periods)[0], 
+    # #             yerr=0.5*abs(np.ediff1d(injected_masses).min()), 
+    # #             color='w')
+    # ax.axvline(x=d[f]['tspan'], color='w', ls='--')
+    # ax.set_xscale('log')
+    # ax.set_yscale('log')
+    # ax.set_xlabel('Period [d]')
+    # ax.set_ylabel(r'Mass [M$_\oplus$]')
+    # ax.set_xlim(*n)
+    # ax.set_ylim(*m)
+
+    plt.show()
+    # fig.savefig(save_path + star + '_DetLim.png')
+
+    return d
+
 
 
 def do_clean(system):

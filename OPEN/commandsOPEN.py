@@ -966,6 +966,21 @@ class EmbeddedMagics(Magics):
 
         # system.vrad = system.vrad - temp
 
+    @needs_local_scope
+    @line_magic
+    def detection_limits(self, parameter_s='', local_ns=None):
+        # use default system or user defined
+        if local_ns.has_key('default'):
+            system = local_ns['default']
+        else:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.do_detection_limits(system)
+
 
     @needs_local_scope
     @line_magic
