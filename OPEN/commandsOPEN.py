@@ -72,7 +72,7 @@ per_usage = \
 """
 Usage:
     per 
-    per [-n SYSTEM] (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l|-z] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
+    per [-n SYSTEM] (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l|-z|-r] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot] [--describe]
     per -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
@@ -81,6 +81,7 @@ Options:
     -b --bayes       Calculate the Bayesian LS periodogram
     -l --ls          Calculate the Lomb-Scargle periodogram with fast algorithm
     -z --hoef        Calculate the Hoeffding-test "periodogram" with Zucker's algorithm
+    -r --multiband   Calculate the multiband periodogram; Vanderplas & Ivezic (2015)
     -f --force       Force recalculation
     --hifac=<hf>     hifac * Nyquist is lowest frequency used [default: 40]
     --ofac=<of>      Oversampling factor [default: 6]
@@ -89,6 +90,7 @@ Options:
     --save=filename  Save figure as filename
     --noplot         Don't plot the periodogram (just creates system.per* instance)
     -v --verbose     Verbose statistical output 
+    --describe       Show a very detailed help message
     -h --help        Show this help message
 """
 
@@ -456,6 +458,7 @@ class EmbeddedMagics(Magics):
         """ Calculate periodograms of various quantities. 
         Type 'per -h' for more help. """
 
+        from shell_colors import red
         try:
             args = parse_arg_string('per', parameter_s)
         except DocoptExit:
@@ -465,6 +468,10 @@ class EmbeddedMagics(Magics):
             return
         # print args
         
+        if args['--describe']:
+            print periodograms.help_text
+            return
+
         # use default system or user defined
         try:
             if local_ns.has_key('default') and not args['-n']:
@@ -473,13 +480,12 @@ class EmbeddedMagics(Magics):
                 system_name = args['-n']
                 system = local_ns[system_name]
         except KeyError:
-            from shell_colors import red
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
             clogger.fatal(msg)
             return
         
-        verb = True if args['--verbose'] else False
+        # verb = True if args['--verbose'] else False
         hf = float(args.pop('--hifac'))
         of = float(args.pop('--ofac'))
         fap = args['--fap']
@@ -491,20 +497,28 @@ class EmbeddedMagics(Magics):
         if args['--hoef']:
             per_fcn = periodograms.hoeffding
             name = 'Hoeffding'
-        if args['--bgls']:
+        elif args['--bgls']:
             per_fcn = periodograms.bgls
             name = 'Bayesian Generalized Lomb-Scargle'
-        if args['--bayes']: 
+        elif args['--bayes']: 
             per_fcn = periodograms.bls
             name = 'Bayesian Lomb-Scargle'
-        if args['--ls']: 
+        elif args['--ls']: 
             per_fcn = periodograms.ls_PressRybicki
             name = 'Lomb Scargle'
-        if args['--gls']: 
+        elif args['--multiband']:
+            per_fcn = periodograms.MultiBandGLS
+            name = 'Multiband Lomb-Scargle'
+            tempmask = system.time > 57170
+            if (~tempmask).all():
+                msg = red('ERROR: ') + 'All observations are before 57170. Multiband periodogram is not appropriate'
+                clogger.fatal(msg)
+                return
+        elif args['--gls']: 
             per_fcn = periodograms.gls
             name ='Generalized Lomb-Scargle'
         # this is the default if user did not specify arguments
-        if per_fcn is None: 
+        else: 
             per_fcn = periodograms.gls
             name ='Generalized Lomb-Scargle'
 

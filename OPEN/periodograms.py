@@ -13,12 +13,50 @@ import matplotlib.pyplot as plt
 from sys import float_info
 from multiprocessing import cpu_count
 
-from .shell_colors import yellow, blue
+from .shell_colors import yellow, blue, red
 from .logger import clogger, logging
 from .utils import ask_yes_no, get_star_name
 
 from ext.blombscargle import blombscargle
 from ext.glombscargle import glombscargle, glombscargle_extra_out
+
+
+try:
+  from gatspy import periodic
+  gatspy_is_available = True
+except ImportError:
+  gatspy_is_available = False
+
+
+help_text = """
+This command calculates a number of different periodograms 
+of the observed radial velocities. The algorithms are:
+
+  -g --gls
+    This is the default option. 
+    It calculates the Generalised Lomb-Scargle periodogram as it is
+    defined in Zechmeister & Kürster, A&A 496, 577–584 (2009).
+    This is equivalent to least-squares fitting of sine waves,
+    includes an offset and individual weights. 
+    The default normalisation is that of Horne & Baliunas, ApJ, 302, 757-763 (1986).
+
+  -m --bgls
+    This option calculates the Bayesian Generalized Lomb-Scargle (BGLS) periodogram
+    as defined by Mortier et al (2014).
+
+  -b --bayes       Calculate the Bayesian LS periodogram
+    Description
+
+  -l --ls
+    Description
+
+  -z --hoef        Calculate the Hoeffding-test "periodogram" with Zucker's algorithm
+    Description
+
+  -r --multiband   Calculate the multiband periodogram; Vanderplas & Ivezic (2015)
+    Description
+"""
+help_text = blue(' : ').join([s+'\n' for s in help_text.split('\n')])
 
 
 
@@ -511,7 +549,7 @@ class gls(PeriodogramBase):
 
     # Normalization:
     if self.norm == "Scargle":
-      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      popvar=raw_input('Input a priori known population variance:')
       self.power = self._upow/float(popvar)
     if self.norm == "HorneBaliunas":
       self.power = (self.N-1.)/2.*self._upow
@@ -639,6 +677,199 @@ class gls(PeriodogramBase):
     if self.norm=="Scargle": return -log(Prob)
     if self.norm=="HorneBaliunas": return (self.N-1.)/2.*(1.-Prob**(2./(self.N-3.)))
     if self.norm=="Cumming": return (self.N-3.)/2.*(Prob**(-2./(self.N-3.))-1.)
+
+
+
+# This is the Multiband Lomb-Scargle (GLS) periodogram as introduced
+# by Vanderplas & Ivezic, ApJ 812:18 (2015)
+#####################################################################
+class MultiBandGLS(PeriodogramBase):
+  """
+  Compute the Multiband Lomb-Scargle periodogram.
+  We use this periodogram when there is data after the HARPS fiber update.
+  This depends on gatspy (http://www.astroml.org/gatspy)
+
+  The constructor takes a RVSeries instance (i.e. a rv curve) as first argument.
+  By default the time of offset is May 28, 2015 the date of the HARPS upgrade,
+  but this can be changed by providing the time_of_offset argument.
+    
+  Parameters
+    rv : RVSeries
+        The radial velocity curve or any object providing the attributes
+        time, vrad and error which define the data.
+    ofac : int
+        Oversampling factor (default=6).
+    hifac : float
+        hifac * "average" Nyquist frequency is highest frequency for 
+        which the periodogram will be calculated (default=1).
+    quantity : string, optional
+        For which quantity to calculate the periodogram. Possibilities are
+        'bis', 'rhk', 'contrast' or 'fwhm' other than the default 'vrad'.
+    norm : string, optional
+        The normalization; either "Scargle", "HorneBaliunas", or 
+        "Cumming". Default is "HorneBaliunas".
+    stats : boolean, optional
+        Set True to obtain some statistical output (default is False).
+  
+  Attributes
+    power : array
+        The normalized power of the GLS.
+    ofac : int
+        The oversampling factor.
+    hifac : float
+        The maximum frequency.
+  """
+
+  def __init__(self, rv, ofac=6, hifac=1, period_range=None, time_of_offset=None, quantity='vrad',
+               norm="HorneBaliunas", stats=False, full_output=False):
+
+    if not gatspy_is_available:
+      msg = red('ERROR: ') + 'gatspy is not available.'
+      clogger.fatal(msg)
+      return 
+
+    self.name = 'Multiband Lomb-Scargle'
+    try:
+      self.star_name = get_star_name(rv)
+    except AttributeError:
+      self.star_name = ''
+
+    self.power = None
+    self.units = ''
+    self.period_range = period_range
+    self.ofac, self.hifac = ofac, hifac
+    self.fullout = full_output
+    self.t = rv.time
+    self.th = rv.time - min(rv.time)
+
+    if time_of_offset is None:
+      # HARPS_upgrade
+      self.time_of_offset = 57170
+    else:
+      assert isinstance(time_of_offset, (int, float)), '"time_of_offset" should be a number.'
+      self.time_of_offset = time_of_offset
+
+    msg = blue('INFO: ') + 'Time of offset is set to %d\n' % self.time_of_offset
+    msg += blue('    : ') + 'Data before and after this time will be considered as different bands'
+    clogger.info(msg)
+
+    self.mask = self.t > self.time_of_offset
+
+    if (~self.mask).all():
+      msg = red('ERROR: ') + 'All observations are before %d. Multiband periodogram is not appropriate' % self.time_of_offset
+      clogger.fatal(msg)
+      raise ValueError
+
+    if quantity == 'vrad':
+      self.y = rv.vrad
+      self.error = rv.error
+      self.units = rv.units
+    elif quantity == 'bis':
+      self.y = rv.extras.bis_span
+      self.error = 2. * rv.error #ones_like(self.y)
+    elif quantity == 'fwhm':
+      self.y = rv.extras.fwhm
+      self.error = 2.35 * rv.error #ones_like(self.y)
+    elif quantity == 'rhk':
+      self.y = rv.extras.rhk
+      self.error = rv.extras.sig_rhk
+    elif quantity == 'contrast':
+      self.y = rv.extras.contrast
+      self.error = ones_like(self.y)
+    elif quantity == 'resid':
+      try:
+        self.y = rv.fit['residuals']
+      except TypeError:
+        clogger.fatal('error!')
+        return 
+      self.error = rv.error
+
+    self.norm = norm
+    self._stats = stats
+
+    self.__calcPeriodogram()
+    
+  def __calcPeriodogram(self):
+
+    model = periodic.LombScargleMultiband(fit_period=True,
+                                          optimizer_kwds={"quiet": True})
+
+    if self.period_range is None:
+      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      phigh = self.t.ptp()
+      model.optimizer.period_range = (plow, phigh)
+
+    else:
+      assert isinstance(self.period_range, tuple), 'period_range must be a tuple (plow, phigh)'
+      assert len(self.period_range) == 2, 'period_range must be a tuple (plow, phigh)'
+      plow = self.period_range[0]
+      model.optimizer.period_range = self.period_range
+
+    self.__buildFreq(plow=plow)
+    periods = 1./self.freq
+
+    model.fit(self.t, self.y, self.error, self.mask)
+    self.power = model.periodogram(periods)
+
+    offset = np.ediff1d(model.ymean_by_filt_)
+    msg = yellow('RESULT: ') + 'Offset value: %f %s' % (offset[0], self.units)
+    clogger.info(msg)
+
+    self.model = model
+
+    # self.N = len(self.y)
+    # # An ad-hoc estimate of the number of independent frequencies 
+    # # see discussion following Eq. (24)
+    # self.M = (max(self.freq)-min(self.freq)) * (self.th.max() - self.th.min())
+
+    # # Normalization:
+    # if self.norm == "Scargle":
+    #   popvar=raw_input('Input a priori known population variance:')
+    #   self.power = self._upow/float(popvar)
+    # if self.norm == "HorneBaliunas":
+    #   self.power = (self.N-1.)/2.*self._upow
+    # if self.norm == "Cumming":
+    #   self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
+    
+    # Output statistics
+    # if self._stats:
+    #   self._output()
+    # if self._showPlot:
+    #   self._plot()
+
+  def _normalize(self):
+    if self.norm == "Scargle":
+      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      self.power = self._upow/float(popvar)
+    if self.norm == "HorneBaliunas":
+      self.power = (self.N-1.)/2.*self._upow
+    if self.norm == "Cumming":
+      self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
+
+  def _normalize_value(self, a):
+    # normalize the value (or array) a
+    if self.norm == "Scargle":
+      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      return a/float(popvar)
+    if self.norm == "HorneBaliunas":
+      return (self.N-1.)/2.*a
+    if self.norm == "Cumming":
+      return (self.N-3.)/2. * a/(1.-max(np.atleast_1d(a)))    
+
+  def __buildFreq(self, plow=0.5):
+    """
+      Build frequency array (`freq` attribute).
+    """
+    xdif = max(self.th)-min(self.th)
+    # print xdif
+    # nout = self.ofac * self.hifac * len(self.th)/2
+    nout = int(xdif * self.ofac / plow)
+    # print self.ofac, nout
+    # sys.exit(0)
+    self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
+
+
+
 
   
 # This is the Bayesian Lomb-Scargle (BLS) periodogram as defined by
@@ -1007,13 +1238,14 @@ class bgls(PeriodogramBase):
     """
       Build frequency array (`freq` attribute).
     """
-    xdif = max(self.th)-min(self.th)
-    # print xdif
-    # nout = self.ofac * self.hifac * len(self.th)/2
-    nout = int(xdif * self.ofac / plow)
-    # print nout
-    # sys.exit(0)
-    self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
+    phigh = self.th[-1]
+    n_steps = int(self.ofac * self.th.size * (1./plow - 1./phigh))
+    # print n_steps
+    # xdif = max(self.th)-min(self.th)
+    ##### nout = self.ofac * self.hifac * len(self.th)/2
+    # nout = int(xdif * self.ofac / plow)
+    # self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
+    self.freq = np.linspace(1./phigh, 1./plow, n_steps)
 
   def prob(self, Pn):
     raise NotImplementedError('Not implemented for BGLS yet.')
@@ -1117,7 +1349,7 @@ class hoeffding(PeriodogramBase):
     """ Compute the Hoeffding-test """
     # Build frequency array if not present
     if self.freq is None:
-      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      plow = 0.5#max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
       self.__buildFreq(plow=plow)
 
     N = self.t.size
