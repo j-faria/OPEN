@@ -1,6 +1,7 @@
 [![Build Status](https://travis-ci.org/j-faria/OPEN.svg?branch=develop)](https://travis-ci.org/j-faria/OPEN)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/j-faria/OPEN/blob/master/LICENSE)
 [![Coverage Status](https://coveralls.io/repos/j-faria/OPEN/badge.svg?branch=master&service=github)](https://coveralls.io/github/j-faria/OPEN?branch=master)
+[![Code Issues](https://www.quantifiedcode.com/api/v1/project/83814cc744824aac8d750ddfa0bb49b4/badge.svg)](https://www.quantifiedcode.com/app/project/83814cc744824aac8d750ddfa0bb49b4)
 
 OPEN
 ====
