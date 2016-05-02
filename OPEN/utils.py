@@ -10,20 +10,31 @@ Utility functions or snippets for all sorts of things
 
 from math import sqrt, ceil
 from sys import stdout
+import signal
+from contextlib import contextmanager
 import os
 import subprocess
+# import time
+import re
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import Ellipse
-import matplotlib.cm as cm
+# from matplotlib.colors import LinearSegmentedColormap
+# from matplotlib.patches import Ellipse
+# import matplotlib.cm as cm
 
 
 mjup2mearth  = 317.828
-
-
+msun2mjup = 1047.3486
+msun2mnep = 19412.24
+msun2mearth = 328900.56
+mearth2msun = 1./msun2mearth
+msun = 1.98892e30 # in kg, need source
+au2m = 149597870700.
+m2au = 1./au2m
+jd2s = 86400.
+mean_sidereal_day = 86164.09054 # in seconds; 23h56m04.09054s
 
 ## this code from 
 ##   http://code.activestate.com/recipes/502263-yet-another-unique-function/
@@ -53,7 +64,37 @@ def wrms(array, weights):
     w = weights #/ sum(weights)
     # return sqrt(sum(x*x for x in array*w))
     return sqrt(sum(w*(array - np.average(array, weights=w))**2) / sum(w))
-    
+
+def var(array, weights=None, biased=False):
+    """ 
+    Calculate the (possibly weighted) sample variance, 
+    and correct for small samples (if biased=False). 
+    """
+    x = np.atleast_1d(array)
+    if weights is None:
+        if biased: 
+            return x.var()
+        else: 
+            return x.var(ddof=1)
+    else:
+        if biased:
+            return np.sum(weights*(x-np.average(x, weights=weights))**2) / np.sum(weights)
+        else:
+            V1 = np.sum(weights)
+            V2 = np.sum(weights**2)
+            return np.sum(weights*(x-np.average(x, weights=weights))**2) / (V1 - (V2/V1))
+
+
+def wstd(array, weights=None, biased=False):
+    """
+    Return the weighted standard deviation,
+    corrected for small samples (if biased=False). 
+    """
+    x = np.atleast_1d(array)
+    xvar = var(x, weights=weights, biased=biased)
+    return np.sqrt(xvar)
+
+
 
 def get_tp(P, ecc, omega, tt):
     """ 
@@ -86,6 +127,95 @@ def stdout_write(msg):
 	stdout.flush()
 
 
+## time limit context manager
+class TimeoutException(Exception): pass
+
+@contextmanager
+def time_limit(seconds):
+    def signal_handler(signum, frame):
+        raise TimeoutException, "Time limit (%ds) exceeded." % seconds
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
+
+
+def get_star_name(system):
+    """ Return the name of the star (works for standard HARPS filenames and HD,HIP,CD catalogs) """
+    if len(system.provenance) > 1:
+        full_paths = system.provenance.keys()
+        common = longest_common_substring_array(full_paths)
+        bn = os.path.basename(common)
+        star = bn.replace('_', '').replace('.rdb', '')
+    else:
+        pattern = re.compile(r"(\w+[-]\d+|HD\d+|HIP\d+)")
+        full_path = system.provenance.keys()[0]
+        bn = os.path.basename(full_path)
+        try:
+            star = pattern.findall(bn)[0]
+        except IndexError:
+            star = 'unknown'
+
+        # i = bn.rfind('_harps_mean_corr.rdb')
+        # if i == -1:
+        #     i = bn.rfind('_harps_mean.rdb')
+        # if i == -1:
+        #     i = bn.rfind('_harps.rdb')
+        # star = bn[:i]
+    return star
+
+def get_star_name_from_path(full_path):
+    """ Return the name of the star (works for standard HARPS filenames) """
+    bn = os.path.basename(full_path)
+    try:
+        star = re.findall('HD\d+|HIP\d+|BD-\d+|CD-\d+', bn)[0]
+    except IndexError:  # didn't find correct name
+        star = None
+
+    # i = bn.rfind('_harps_mean_corr.rdb')
+    # if i == -1:
+    #     i = bn.rfind('_harps_mean.rdb')
+    # if i == -1:
+    #     i = bn.rfind('_harps.rdb')
+    # star = bn[:i]
+    return star
+
+## code from http://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring
+def longest_common_substring(s1, s2):
+    """ Longest-common-substring between two strings s1 and s2. """
+    m = [[0] * (1 + len(s2)) for i in xrange(1 + len(s1))]
+    longest, x_longest = 0, 0
+    for x in xrange(1, 1 + len(s1)):
+        for y in xrange(1, 1 + len(s2)):
+            if s1[x - 1] == s2[y - 1]:
+                m[x][y] = m[x - 1][y - 1] + 1
+                if m[x][y] > longest:
+                    longest = m[x][y]
+                    x_longest = x
+            else:
+                m[x][y] = 0
+    return s1[x_longest - longest: x_longest]
+
+
+## code from http://stackoverflow.com/questions/2892931/longest-common-substring-from-more-than-two-strings-python
+def longest_common_substring_array(data):
+    """ Get the longest-common-substring in an array of strings. """
+    substr = ''
+    if len(data) > 1 and len(data[0]) > 0:
+        for i in range(len(data[0])):
+            for j in range(len(data[0])-i+1):
+                if j > len(substr) and all(data[0][i:i+j] in x for x in data):
+                    substr = data[0][i:i+j]
+    return substr
+
+
+
+def escape_underscores(string):
+    return string.replace('_', '\_')
+
 
 ### Matplotlib advanced plot interaction stuff
 def selectable_plot(system, **kwargs):
@@ -106,13 +236,7 @@ def selectable_plot(system, **kwargs):
         i, x, y = ind[0], np.take(system.time, ind)[0], np.take(system.vrad, ind)[0]
         indices_to_remove.append(i)
 
-        # if times == 0:
-        #     print
-        #     msg = blue('INFO: ')
-        #     times += 1
-        # else:
         msg = blue('    : ')
-
         msg += 'going to remove observation %d -> %8.2f, %8.2f' % (i+1, x, y)
         clogger.info(msg)
         # print 'onpick3 scatter:', ind, np.take(system.time, ind), np.take(system.vrad, ind)
@@ -120,14 +244,62 @@ def selectable_plot(system, **kwargs):
         # fig.show()
 
     fig, ax = plt.subplots()
+    e = ax.errorbar(system.time, system.vrad, system.error, fmt='o')
     col = ax.scatter(system.time, system.vrad, picker=True)
     ax.set_xlabel('Time [days]')
     ax.set_ylabel('RV [%s]'%system.units)
     fig.canvas.mpl_connect('pick_event', onpick3)
     plt.show()
+    
+    # wait for user input to finish
     raw_input('')
+    plt.close(fig)
 
     return unique(indices_to_remove)
+
+def selectable_plot_chunks(system, **kwargs):
+    from shell_colors import yellow, blue
+    from .logger import clogger
+    msg = blue('INFO: ') + 'Click on the plot to select the data chunks.'
+    clogger.info(msg)
+    msg = blue('    : ') + 'Press ENTER when you are finished'
+    clogger.info(msg)
+    print ''
+
+    chunkx = []
+    chunkx.append(system.time.min())
+    global chunkid
+    chunkid = 1
+    def onpick3(event):
+        global chunkid
+        x, y = event.xdata, event.ydata
+
+        msg = blue('    : ')
+        msg += 'chunk %d: %8.2f --> %8.2f' % (chunkid, chunkx[chunkid-1], x)
+        clogger.info(msg)
+
+        chunkx.append(x)
+        chunkid += 1
+
+    fig, ax = plt.subplots()
+    e = ax.errorbar(system.time, system.vrad, system.error, fmt='o', picker=True)
+    # col = ax.scatter(system.time, system.vrad, picker=True)
+    ax.set_xlabel('Time [days]')
+    ax.set_ylabel('RV [%s]'%system.units)
+    ax.margins(0.1)
+    fig.canvas.mpl_connect('button_press_event', onpick3)
+
+    # wait for user input to finish
+    raw_input('')
+    plt.close(fig)
+
+    return chunkx
+
+    # return unique(indices_to_remove)
+
+
+
+
 
 def julian_day_to_date(J):
     """ Returns the date corresponding to a julian day number"""
@@ -142,6 +314,13 @@ def julian_day_to_date(J):
     M = ((h/s + m) % n) + 1
     Y = e/p - y + (n + m - M)/n
     return (Y, M, D)
+
+def date_to_julian_day(day, month, year):
+    """ Returns the julian day corresponding to the date day,month,year """
+    a = (14-month)/12
+    y = year + 4800 - a
+    m = month + 12*a - 3
+    return day + ((153*m+2)/5) + 365*y + y/4 - 32083
 
 
 ### Yorbit related I/O

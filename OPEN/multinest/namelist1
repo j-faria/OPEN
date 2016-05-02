@@ -4,10 +4,14 @@
     ! set to 0 as it is automatically determined from nest_context
     sdim = 0
 
+    !max no. of live points
+    nest_nlive = 500
+
+
     ! additional information to pass to low-level routines
     ! we use this to set the problem
     ! nob is the number of observatories
-    nest_context = 112
+    nest_context = 211
     ! nest_context has three numbers: xyz
     !         x=1 "normal" regression, x=2 gaussian process regression, x=3 gaussian process without planets
     !         y= number of planets in the model
@@ -22,7 +26,7 @@
     nest_IS = .true.
 
     !root for saving output files; character*100
-    nest_root='chains/nest-'
+    nest_root='chains/nest-1planet-'
 
 
     !after how many iterations feedback is required and the output
@@ -37,7 +41,7 @@
     !max no. of iterations, a non-positive value means infinity. 
     !MultiNest will terminate if either it has done max number of 
     !iterations or convergence criterion has been satisfied
-    nest_maxIter=100000
+    nest_maxIter=1000
     
     !feedback on the sampling progress?
     nest_fb=.true.
@@ -50,9 +54,11 @@
 
 
     !train the gaussian process beforehand (only effective if nest_context = 2yz)
-    training = .false.
+    training = .true.
     !values of the trained parameters
-    trained_parameters = 0.d0, 0.d0, 0.d0, 0.d0
+    trained_parameters = 0.d0, 0.d0, 8.750494d0, 13.300407d0, 0.768633d0
+    !values of the "errros" in the trained parameters, to be considered for the priors
+    trained_std = 0.d0, 0.d0, 3.419370d0, 7.232614d0, 1.207830d0
 
 
     !extra linear dependences in the model

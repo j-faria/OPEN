@@ -8,15 +8,55 @@ from classes import PeriodogramBase
 from numpy import *
 import numpy as np
 from numpy.fft import *  
-import cmath
+from scipy.stats import rankdata
 import matplotlib.pyplot as plt
 from sys import float_info
+from multiprocessing import cpu_count
 
+from .shell_colors import yellow, blue, red
 from .logger import clogger, logging
-from .utils import ask_yes_no
+from .utils import ask_yes_no, get_star_name
 
 from ext.blombscargle import blombscargle
-from ext.glombscargle import glombscargle
+from ext.glombscargle import glombscargle, glombscargle_extra_out
+
+
+try:
+  from gatspy import periodic
+  gatspy_is_available = True
+except ImportError:
+  gatspy_is_available = False
+
+
+help_text = """
+This command calculates a number of different periodograms 
+of the observed radial velocities. The algorithms are:
+
+  -g --gls
+    This is the default option. 
+    It calculates the Generalised Lomb-Scargle periodogram as it is
+    defined in Zechmeister & Kürster, A&A 496, 577–584 (2009).
+    This is equivalent to least-squares fitting of sine waves,
+    includes an offset and individual weights. 
+    The default normalisation is that of Horne & Baliunas, ApJ, 302, 757-763 (1986).
+
+  -m --bgls
+    This option calculates the Bayesian Generalized Lomb-Scargle (BGLS) periodogram
+    as defined by Mortier et al (2014).
+
+  -b --bayes       Calculate the Bayesian LS periodogram
+    Description
+
+  -l --ls
+    Description
+
+  -z --hoef        Calculate the Hoeffding-test "periodogram" with Zucker's algorithm
+    Description
+
+  -r --multiband   Calculate the multiband periodogram; Vanderplas & Ivezic (2015)
+    Description
+"""
+help_text = blue(' : ').join([s+'\n' for s in help_text.split('\n')])
 
 
 
@@ -393,12 +433,17 @@ class gls(PeriodogramBase):
   """
 
   def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
-               norm="HorneBaliunas", stats=False, ext=True, force_notrend=False):
+               norm="HorneBaliunas", stats=False, ext=True, force_notrend=False, full_output=False):
     self.name = 'Generalized Lomb-Scargle'
+    try:
+      self.star_name = get_star_name(rv)
+    except AttributeError:
+      self.star_name = ''
 
     self.power = None
     self.freq = freq
     self.ofac, self.hifac = ofac, hifac
+    self.fullout = full_output
     self.t = rv.time
     self.th = rv.time - min(rv.time)
     if quantity == 'vrad':
@@ -504,7 +549,7 @@ class gls(PeriodogramBase):
 
     # Normalization:
     if self.norm == "Scargle":
-      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      popvar=raw_input('Input a priori known population variance:')
       self.power = self._upow/float(popvar)
     if self.norm == "HorneBaliunas":
       self.power = (self.N-1.)/2.*self._upow
@@ -520,20 +565,34 @@ class gls(PeriodogramBase):
   def __calcPeriodogramFast(self):
     """ Compute the GLS using the Fortran extension 
     which allows speedups of ~6x."""
+    ncpu = cpu_count()
 
     # Build frequency array if not present
     if self.freq is None:
       plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
-      # plow = 0.5
+      self.plow = plow
       self.__buildFreq(plow=plow)
     # Circular frequencies
     omegas = 2.*pi * self.freq
+    self.omegas = omegas
 
-    # unnormalized power and an estimate of the number of independent frequencies 
-    self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas)
+    if self.fullout:
+      self._upow, self.M, self.A, self.B, self.offset = glombscargle_extra_out(self.t, self.y, self.error, omegas, ncpu)
+    else:
+      # unnormalized power and an estimate of the number of independent frequencies 
+      self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas, ncpu)
 
     self.N = len(self.y)
     # Normalization:
+    self._normalize()
+    
+    # Output statistics
+    if self._stats:
+      self._output()
+    # if self._showPlot:
+    #   self._plot()
+
+  def _normalize(self):
     if self.norm == "Scargle":
       popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
       self.power = self._upow/float(popvar)
@@ -541,12 +600,16 @@ class gls(PeriodogramBase):
       self.power = (self.N-1.)/2.*self._upow
     if self.norm == "Cumming":
       self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
-    
-    # Output statistics
-    if self._stats:
-      self._output()
-    # if self._showPlot:
-    #   self._plot()
+
+  def _normalize_value(self, a):
+    # normalize the value (or array) a
+    if self.norm == "Scargle":
+      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      return a/float(popvar)
+    if self.norm == "HorneBaliunas":
+      return (self.N-1.)/2.*a
+    if self.norm == "Cumming":
+      return (self.N-3.)/2. * a/(1.-max(np.atleast_1d(a)))    
 
   def __buildFreq(self, plow=0.5):
     """
@@ -556,7 +619,7 @@ class gls(PeriodogramBase):
     # print xdif
     # nout = self.ofac * self.hifac * len(self.th)/2
     nout = int(xdif * self.ofac / plow)
-    # print nout
+    # print self.ofac, nout
     # sys.exit(0)
     self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
@@ -614,6 +677,199 @@ class gls(PeriodogramBase):
     if self.norm=="Scargle": return -log(Prob)
     if self.norm=="HorneBaliunas": return (self.N-1.)/2.*(1.-Prob**(2./(self.N-3.)))
     if self.norm=="Cumming": return (self.N-3.)/2.*(Prob**(-2./(self.N-3.))-1.)
+
+
+
+# This is the Multiband Lomb-Scargle (GLS) periodogram as introduced
+# by Vanderplas & Ivezic, ApJ 812:18 (2015)
+#####################################################################
+class MultiBandGLS(PeriodogramBase):
+  """
+  Compute the Multiband Lomb-Scargle periodogram.
+  We use this periodogram when there is data after the HARPS fiber update.
+  This depends on gatspy (http://www.astroml.org/gatspy)
+
+  The constructor takes a RVSeries instance (i.e. a rv curve) as first argument.
+  By default the time of offset is May 28, 2015 the date of the HARPS upgrade,
+  but this can be changed by providing the time_of_offset argument.
+    
+  Parameters
+    rv : RVSeries
+        The radial velocity curve or any object providing the attributes
+        time, vrad and error which define the data.
+    ofac : int
+        Oversampling factor (default=6).
+    hifac : float
+        hifac * "average" Nyquist frequency is highest frequency for 
+        which the periodogram will be calculated (default=1).
+    quantity : string, optional
+        For which quantity to calculate the periodogram. Possibilities are
+        'bis', 'rhk', 'contrast' or 'fwhm' other than the default 'vrad'.
+    norm : string, optional
+        The normalization; either "Scargle", "HorneBaliunas", or 
+        "Cumming". Default is "HorneBaliunas".
+    stats : boolean, optional
+        Set True to obtain some statistical output (default is False).
+  
+  Attributes
+    power : array
+        The normalized power of the GLS.
+    ofac : int
+        The oversampling factor.
+    hifac : float
+        The maximum frequency.
+  """
+
+  def __init__(self, rv, ofac=6, hifac=1, period_range=None, time_of_offset=None, quantity='vrad',
+               norm="HorneBaliunas", stats=False, full_output=False):
+
+    if not gatspy_is_available:
+      msg = red('ERROR: ') + 'gatspy is not available.'
+      clogger.fatal(msg)
+      return 
+
+    self.name = 'Multiband Lomb-Scargle'
+    try:
+      self.star_name = get_star_name(rv)
+    except AttributeError:
+      self.star_name = ''
+
+    self.power = None
+    self.units = ''
+    self.period_range = period_range
+    self.ofac, self.hifac = ofac, hifac
+    self.fullout = full_output
+    self.t = rv.time
+    self.th = rv.time - min(rv.time)
+
+    if time_of_offset is None:
+      # HARPS_upgrade
+      self.time_of_offset = 57170
+    else:
+      assert isinstance(time_of_offset, (int, float)), '"time_of_offset" should be a number.'
+      self.time_of_offset = time_of_offset
+
+    msg = blue('INFO: ') + 'Time of offset is set to %d\n' % self.time_of_offset
+    msg += blue('    : ') + 'Data before and after this time will be considered as different bands'
+    clogger.info(msg)
+
+    self.mask = self.t > self.time_of_offset
+
+    if (~self.mask).all():
+      msg = red('ERROR: ') + 'All observations are before %d. Multiband periodogram is not appropriate' % self.time_of_offset
+      clogger.fatal(msg)
+      raise ValueError
+
+    if quantity == 'vrad':
+      self.y = rv.vrad
+      self.error = rv.error
+      self.units = rv.units
+    elif quantity == 'bis':
+      self.y = rv.extras.bis_span
+      self.error = 2. * rv.error #ones_like(self.y)
+    elif quantity == 'fwhm':
+      self.y = rv.extras.fwhm
+      self.error = 2.35 * rv.error #ones_like(self.y)
+    elif quantity == 'rhk':
+      self.y = rv.extras.rhk
+      self.error = rv.extras.sig_rhk
+    elif quantity == 'contrast':
+      self.y = rv.extras.contrast
+      self.error = ones_like(self.y)
+    elif quantity == 'resid':
+      try:
+        self.y = rv.fit['residuals']
+      except TypeError:
+        clogger.fatal('error!')
+        return 
+      self.error = rv.error
+
+    self.norm = norm
+    self._stats = stats
+
+    self.__calcPeriodogram()
+    
+  def __calcPeriodogram(self):
+
+    model = periodic.LombScargleMultiband(fit_period=True,
+                                          optimizer_kwds={"quiet": True})
+
+    if self.period_range is None:
+      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      phigh = self.t.ptp()
+      model.optimizer.period_range = (plow, phigh)
+
+    else:
+      assert isinstance(self.period_range, tuple), 'period_range must be a tuple (plow, phigh)'
+      assert len(self.period_range) == 2, 'period_range must be a tuple (plow, phigh)'
+      plow = self.period_range[0]
+      model.optimizer.period_range = self.period_range
+
+    self.__buildFreq(plow=plow)
+    periods = 1./self.freq
+
+    model.fit(self.t, self.y, self.error, self.mask)
+    self.power = model.periodogram(periods)
+
+    offset = np.ediff1d(model.ymean_by_filt_)
+    msg = yellow('RESULT: ') + 'Offset value: %f %s' % (offset[0], self.units)
+    clogger.info(msg)
+
+    self.model = model
+
+    # self.N = len(self.y)
+    # # An ad-hoc estimate of the number of independent frequencies 
+    # # see discussion following Eq. (24)
+    # self.M = (max(self.freq)-min(self.freq)) * (self.th.max() - self.th.min())
+
+    # # Normalization:
+    # if self.norm == "Scargle":
+    #   popvar=raw_input('Input a priori known population variance:')
+    #   self.power = self._upow/float(popvar)
+    # if self.norm == "HorneBaliunas":
+    #   self.power = (self.N-1.)/2.*self._upow
+    # if self.norm == "Cumming":
+    #   self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
+    
+    # Output statistics
+    # if self._stats:
+    #   self._output()
+    # if self._showPlot:
+    #   self._plot()
+
+  def _normalize(self):
+    if self.norm == "Scargle":
+      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      self.power = self._upow/float(popvar)
+    if self.norm == "HorneBaliunas":
+      self.power = (self.N-1.)/2.*self._upow
+    if self.norm == "Cumming":
+      self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
+
+  def _normalize_value(self, a):
+    # normalize the value (or array) a
+    if self.norm == "Scargle":
+      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
+      return a/float(popvar)
+    if self.norm == "HorneBaliunas":
+      return (self.N-1.)/2.*a
+    if self.norm == "Cumming":
+      return (self.N-3.)/2. * a/(1.-max(np.atleast_1d(a)))    
+
+  def __buildFreq(self, plow=0.5):
+    """
+      Build frequency array (`freq` attribute).
+    """
+    xdif = max(self.th)-min(self.th)
+    # print xdif
+    # nout = self.ofac * self.hifac * len(self.th)/2
+    nout = int(xdif * self.ofac / plow)
+    # print self.ofac, nout
+    # sys.exit(0)
+    self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
+
+
+
 
   
 # This is the Bayesian Lomb-Scargle (BLS) periodogram as defined by
@@ -839,9 +1095,8 @@ class bgls(PeriodogramBase):
         The normalization used.
   """
 
-  def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad',
-               norm="HorneBaliunas", stats=False, ext=False):
-    self.name = 'Generalized Lomb-Scargle'
+  def __init__(self, rv, ofac=6, hifac=1, freq=None, quantity='vrad', stats=False, ext=False):
+    self.name = 'Bayesian Generalized Lomb-Scargle'
 
     self.power = None
     self.freq = freq
@@ -876,19 +1131,10 @@ class bgls(PeriodogramBase):
         return 
       self.error = rv.error
 
-    self.norm = norm
     # Check and assign normalization
     self.label = {'title': 'Generalized Lomb Periodogram',\
                   'xlabel': 'Frequency',\
-                  'ylabel': "Normalization not implemented!"}
-    if self.norm == "Scargle":
-      self.label["ylabel"] = "Normalized Power (Scargle 1982)"
-    elif self.norm == "HorneBaliunas":
-      self.label["ylabel"] = "Normalized Power (Horne & Baliunas 1986)"
-    elif self.norm == "Cumming":
-      self.label["ylabel"] = "Normalized Power (Cumming 1999)"
-    else:
-      pass
+                  'ylabel': "Posterior pdf"}
     
     self._stats = stats
     if ext: 
@@ -961,25 +1207,23 @@ class bgls(PeriodogramBase):
 
     p = [10**mpmath.mpf(x) for x in logp]
 
+    msg = yellow('RESULT: ') + 'Maximum of posterior distribution - %s' % mpmath.nstr(max(p))
+    clogger.info(msg)
+    msg = blue('INFO: ') + 'Normalizing by this value'
+    clogger.info(msg)
+
+
     p = array(p) / max(p)  # normalize
 
     p[p < (float_info.min * 10)] = 0
     self._upow = array([float(pp) for pp in p])
+    self.power = self._upow
 
     self.N = len(self.y)
     # An ad-hoc estimate of the number of independent frequencies 
     # see discussion following [ZK09]_ Eq. (24)
     self.M = (max(self.freq)-min(self.freq)) * (self.th.max() - self.th.min())
 
-    # Normalization:
-    if self.norm == "Scargle":
-      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
-      self.power = self._upow/float(popvar)
-    if self.norm == "HorneBaliunas":
-      self.power = (self.N-1.)/2.*self._upow
-    if self.norm == "Cumming":
-      self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
-    
     # Output statistics
     if self._stats:
       self._output()
@@ -987,39 +1231,205 @@ class bgls(PeriodogramBase):
     #   self._plot()
 
   def __calcPeriodogramFast(self):
-    """ Compute the GLS using the Fortran extension 
-    which allows speedups of ~6x."""
+    raise NotImplementedError('There is no fast version of BGLS yet.')
 
-    # Build frequency array if not present
-    if self.freq is None:
-      plow = max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
-      self.__buildFreq(plow=plow)
-    # Circular frequencies
-    omegas = 2.*pi * self.freq
-
-    # unnormalized power and an estimate of the number of independent frequencies 
-    self._upow, self.M = glombscargle(self.t, self.y, self.error, omegas)
-
-    self.N = len(self.y)
-    # Normalization:
-    if self.norm == "Scargle":
-      popvar=raw_input('pyTiming::gls - Input a priori known population variance:')
-      self.power = self._upow/float(popvar)
-    if self.norm == "HorneBaliunas":
-      self.power = (self.N-1.)/2.*self._upow
-    if self.norm == "Cumming":
-      self.power = (self.N-3.)/2. * self._upow/(1.-max(self._upow))
-    
-    # Output statistics
-    if self._stats:
-      self._output()
-    # if self._showPlot:
-    #   self._plot()
 
   def __buildFreq(self, plow=0.5):
     """
       Build frequency array (`freq` attribute).
     """
+    phigh = self.th[-1]
+    n_steps = int(self.ofac * self.th.size * (1./plow - 1./phigh))
+    # print n_steps
+    # xdif = max(self.th)-min(self.th)
+    ##### nout = self.ofac * self.hifac * len(self.th)/2
+    # nout = int(xdif * self.ofac / plow)
+    # self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
+    self.freq = np.linspace(1./phigh, 1./plow, n_steps)
+
+  def prob(self, Pn):
+    raise NotImplementedError('Not implemented for BGLS yet.')
+
+  def probInv(self, Prob):
+    raise NotImplementedError('Not implemented for BGLS yet.')
+
+
+# This is the Hoeffding-test periodicity metric based upon 
+# Hoeffding 1948, Ann. Math. Stat. 19, 293
+#####################################################################
+class hoeffding(PeriodogramBase):
+  """
+  Calculate The Hoeffding-test "periodogram".
+
+  This class implements the Hoeffding-test periodicity metric based
+  upon Hoeffding 1948, Ann. Math. Stat. 19, 293 and as developed by
+  Shay Zucker 2015, arXiv:1503.01734
+
+  The constructor takes a RVSeries instance (i.e. a rv curve) as 
+  first argument.
+  There is an optional `freq` array, that can contain the 
+  frequencies on which to calculate the periodogram. If not provided
+  (....)
+    
+  Parameters
+    rv : RVSeries
+        The radial velocity curve or any object providing the attributes
+        time, vrad and error which define the data.
+    ofac : int
+        Oversampling factor (default=6).
+    hifac : float
+        hifac * "average" Nyquist frequency is highest frequency for 
+        which the periodogram will be calculated (default=1).
+    freq : array, optional
+        Contains the frequencies at which to calculate the periodogram.
+        If not given, a frequency array will be automatically generated.
+    quantity : string, optional
+        For which quantity to calculate the periodogram. Possibilities are
+        'bis', 'rhk', 'contrast' or 'fwhm' other than the default 'vrad'.
+    ext : boolean, optional
+        Use Fortran extension in the calculation (default is False)
+  
+  Attributes
+    power : array
+        The normalized power of the GLS.
+    freq : array
+        The frequency array.
+    ofac : int
+        The oversampling factor.
+    hifac : float
+        The maximum frequency.
+    norm : string
+        The normalization used.
+  """
+
+  def __init__(self, rv, ofac=4, hifac=1, freq=None, quantity='vrad', ext=False):
+    self.name = 'Hoeffding'
+
+    self.power = None
+    self.freq = freq
+    self.ofac, self.hifac = ofac, hifac
+    self.t = rv.time
+    self.th = rv.time - min(rv.time)
+    if quantity == 'vrad':
+      self.y = rv.vrad
+      self.error = rv.error
+    elif quantity == 'bis':
+      self.y = rv.extras.bis_span
+      self.error = 2. * rv.error #ones_like(self.y)
+    elif quantity == 'fwhm':
+      # if not force_notrend and ask_yes_no('Should I remove a linear trend first? (y/N) ', False):
+      #   m, b = polyfit(self.t, rv.extras.fwhm, 1)
+      #   yp = polyval([m, b], self.t)
+      #   self.y = rv.extras.fwhm - yp
+      # else:
+      self.y = rv.extras.fwhm
+      self.error = 2.35 * rv.error #ones_like(self.y)
+    elif quantity == 'rhk':
+      self.y = rv.extras.rhk
+      self.error = rv.extras.sig_rhk
+    elif quantity == 'contrast':
+      self.y = rv.extras.contrast
+      self.error = ones_like(self.y)
+    elif quantity == 'resid':
+      try:
+        self.y = rv.fit['residuals']
+      except TypeError:
+        clogger.fatal('error!')
+        return 
+      self.error = rv.error
+
+    self.label = {'title': self.name + ' Periodogram'}
+    
+    if ext: 
+      self.__calcPeriodogramFast()
+    else: 
+      self.__calcPeriodogram()
+    
+  def __calcPeriodogram(self):
+    """ Compute the Hoeffding-test """
+    # Build frequency array if not present
+    if self.freq is None:
+      plow = 0.5#max(0.5, 2*ediff1d(self.t).min()) # minimum meaningful period?
+      self.__buildFreq(plow=plow)
+
+    N = self.t.size
+    Nfreqs = self.freq.size
+
+    # Temporaries
+    t = self.t
+    y = self.y
+
+
+    # Allocate the output vector (to save memory handling time)
+    D = zeros_like(self.freq)
+
+    # Allocate area for auxiliary vectors in advance
+    a = zeros_like(t) #zeros(N,1);
+    b = zeros_like(t) #zeros(N,1);
+    c = zeros_like(t) #zeros(N,1);
+
+    periods = 1./self.freq
+
+    # Convert the original values to ranks, using Scipy's rankdata
+    rankx = rankdata(y)  #tiedrank(x);
+
+    # Serially enumerate the periods (frequencies)
+    for ifreq in range(Nfreqs):
+      # Phase folding
+      phases = np.mod(t, periods[ifreq])
+
+      iphases = np.argsort(phases)
+      sortedphases = phases[iphases]
+
+      # A special treatment for the wrap-around.
+      iphases = np.append(iphases, iphases[0])
+
+      # Calculate Hoeffding test statistic (D)
+      # --------------------------------------
+      # a = 'current' sample rank
+      # b = 'next' sample rank (in terms of the phase ordering)
+      a = rankx[iphases[:-1]] - 1 # rankx(iphases(1:(end-1)))-1;
+      b = rankx[iphases[1:]] - 1 # rankx(iphases(2:end))-1;
+      
+      # Calculate the bivariate rank
+      for ii in range(N):
+        c[ii] = sum((y[iphases[:-1]] < y[iphases[ii]]) & (y[iphases[1:]] < y[iphases[ii+1]]))
+
+      # Calculate the A, B and C statistics in Hoeffding's formulae
+      A = sum(a*(a-1)*b*(b-1)) # sum(a.*(a-1).*b.*(b-1));
+      B = sum((a-1)*(b-1)*c) # sum((a-1).*(b-1).*c);
+      C = sum(c*(c-1)) # sum(c.*(c-1));
+      
+      D[ifreq] = A-2*(N-2)*B+(N-2)*(N-3)*C
+
+      # Save the current phase ordering, assuming next period's ordering 
+      # will not be too much different, thus saving some time.
+      t = t[iphases[:-1]] # t(iphases(1:end-1));
+      y = y[iphases[:-1]] # x(iphases(1:end-1));
+      rankx = rankx[iphases[:-1]] # rankx(iphases(1:end-1));
+    
+    # Apply Hoeffding's normalization
+    D = D/(N*(N-1)*(N-2)*(N-3)*(N-4))
+
+    self._a = a
+    self._b = b
+    self._c = c
+
+    self.power = D
+
+
+  def __calcPeriodogramFast(self):
+    """ """
+    pass
+
+  def _normalize(self):
+    pass
+
+  def _normalize_value(self, a):
+    pass
+
+  def __buildFreq(self, plow=0.5):
+    """ Build frequency array (`freq` attribute) """
     xdif = max(self.th)-min(self.th)
     # print xdif
     # nout = self.ofac * self.hifac * len(self.th)/2
@@ -1029,60 +1439,10 @@ class bgls(PeriodogramBase):
     self.freq = 1./(xdif) + arange(nout)/(self.ofac*xdif)
 
   def prob(self, Pn):
-    """
-      Probability of obtaining the given power.
-    
-      Calculate the probability to obtain a power higher than
-      `Pn` from the noise, which is assumed to be Gaussian.
-      
-      .. note:: This depends on the normalization
-        (see [ZK09]_ for further details).
-
-        - `Scargle`: 
-        .. math::
-          exp(-Pn)
-
-        - `HorneBaliunas`: 
-        .. math::
-          \\left(1 - 2 \\times \\frac{Pn}{N-1} \\right)^{(N-3)/2}
-        
-        - `Cumming`: 
-        .. math:: 
-          \\left(1+2\\times \\frac{Pn}{N-3}\\right)^{-(N-3)/2}
-      
-      Parameters
-        Pn : float
-          Power threshold.
-      
-      Returns
-        Probability : float
-          The probability to obtain a power equal or
-          higher than the threshold from the noise.
-    """
-    if self.norm=="Scargle": return exp(-Pn)
-    if self.norm=="HorneBaliunas": return (1.-2.*Pn/(self.N-1.))**((self.N-3.)/2.)
-    if self.norm=="Cumming": return (1.+2.*Pn/(self.N-3.))**(-(self.N-3.)/2.)
+    pass
 
   def probInv(self, Prob):
-    """
-      Calculate minimum power for a given probability.
-    
-      This function is the inverse of `Prob(Pn)`.
-      Returns the minimum power for a given probability threshold Prob.
-      
-      Parameters
-        Prob : float
-          Probability threshold.
-      
-      Returns
-        Power threshold : float
-          The minimum power for the given
-          false-alarm probability threshold.
-    """
-    if self.norm=="Scargle": return -log(Prob)
-    if self.norm=="HorneBaliunas": return (self.N-1.)/2.*(1.-Prob**(2./(self.N-3.)))
-    if self.norm=="Cumming": return (self.N-3.)/2.*(Prob**(-2./(self.N-3.))-1.)
-
+    pass
 
 
 # This is the ...... periodogram etc etc etc
@@ -1116,19 +1476,25 @@ class SpectralWindow(PeriodogramBase):
     self._plot(dials=False)
 
 
-  def _calcWindowFunction(self):
+  def _calcWindowFunction(self, new=False):
     n = self.time.size
 
-    self.W = np.fromiter((np.sum(np.exp(-2.j*pi*f*self.time))/n for f in self.freq), np.complex_, self.freq.size)
-    # self.W = array([sum([exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq])
-
-    self.amp = np.absolute(self.W)
-    self.phase = np.arctan2(self.W.imag, self.W.real)
+    if not new:
+      self.W = np.fromiter((np.sum(np.exp(-2.j*pi*f*self.time))/n for f in self.freq), np.complex_, self.freq.size)
+      # self.W = array([sum([exp(-2.j*pi*f*t) for t in self.time])/float(n) for f in self.freq])
+      self.amp = np.absolute(self.W)
+      self.power = self.amp
+      self.phase = np.arctan2(self.W.imag, self.W.real)
+    else:
+      self.W2 = np.fromiter((np.sum(np.exp(-2.j*pi*f*self.time))/n for f in self.freq2), np.complex_, self.freq2.size)
+      self.amp2 = np.absolute(self.W2)
+      self.power2 = self.amp2
+      self.phase2 = np.arctan2(self.W2.imag, self.W2.real)
 
 
   def _plot(self, dials=False, ndials=3):
     """
-      Plot the spectral window function as a function of frequency.
+      Plot the spectral window function as a function of period.
     """
     self.fig = plt.figure()
     self.ax = self.fig.add_subplot(1,1,1)
@@ -1164,9 +1530,53 @@ class SpectralWindow(PeriodogramBase):
       self.ax.semilogx([1./fmax3,1./fmax3+0.025*cos(ph3)],[max_amp+0.1,max_amp+0.1+0.025*sin(ph3)],'k-',lw=1)
 
 
-    self.fig.tight_layout()
+    # self.fig.tight_layout()
     plt.show()
 
+
+  def _plot_freq(self, dials=False, ndials=3):
+    """
+      Plot the spectral window function as a function of frequency.
+    """
+    # we need different trial frequencies for this plot
+    self.freq2 = np.linspace(1e-5, 4.2, 1e4)
+    self._calcWindowFunction(new=True)
+    self.fig = plt.figure()
+    self.ax = self.fig.add_subplot(1,1,1)
+    # self.ax.set_title("Spectral Window Function")
+    self.ax.set_xlabel("Frequency")
+    self.ax.set_ylabel("Window function")
+    self.ax.plot(self.freq2, self.amp2, 'b-')
+
+    # Trying to get labels on top representing frequency - does not work!
+    # self.ax2 = self.ax.twiny()
+    # def tick_function(X):
+    #   V = 1./X
+    #   return ["%.e" % z for z in V]
+
+    # bottom_tick_loc = self.ax.get_xticks()
+    # self.ax2.set_xticks(bottom_tick_loc)
+    # self.ax2.set_xticklabels(tick_function(bottom_tick_loc))
+    # self.ax2.set_xlabel(r"Frequency [day$^{-1}$]")
+    # # self.ax2.get_xaxis().get_major_formatter().set_scientific(True)
+
+    if dials:
+      fmax1, fmax2, fmax3 = self.get_peaks(n=3)
+      max_amp = max(self.amp2)
+
+      self.ax.semilogx(fmax1, max_amp+0.1, marker='$\circ$', markersize=10, c='k', mew=0.3)
+      self.ax.semilogx(fmax3, max_amp+0.1, marker='$\circ$', markersize=10, c='k', mew=0.3)
+      self.ax.semilogx(fmax2, max_amp+0.1, marker='$\circ$', markersize=10, c='k', mew=0.3)
+
+      ph1 = ph2 = ph3 = 0.3
+
+      self.ax.semilogx([fmax1, fmax1+0.025*cos(ph1)], [max_amp+0.1, max_amp+0.1+0.025*sin(ph1)], 'k-', lw=1)
+      self.ax.semilogx([fmax2, fmax2+0.025*cos(ph2)], [max_amp+0.1, max_amp+0.1+0.025*sin(ph2)], 'k-', lw=1)
+      self.ax.semilogx([fmax3, fmax3+0.025*cos(ph3)], [max_amp+0.1, max_amp+0.1+0.025*sin(ph3)], 'k-', lw=1)
+
+
+    # self.fig.tight_layout()
+    plt.show()
 
 
 #####################################################################

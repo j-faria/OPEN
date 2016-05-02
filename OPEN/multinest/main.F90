@@ -6,14 +6,15 @@ program main
 
     use strings
     use gputils
-    use array_utils, only: linspace
+    use array_utils, only: linspace, variance
 
     implicit none
 
-    integer i
-    integer :: iou, ierr
+    integer :: i, iou, ierr
     integer :: PGOPEN
     integer :: n
+
+    character(len=100) cmdline
     character(len=40) line
     character(len=1) delim
     character(len=5), dimension(10) :: args
@@ -22,32 +23,37 @@ program main
     integer, dimension(:), allocatable :: n_each_observ
 
     real(kind=8), parameter :: kmax = 2129d0 ! m/s
-    real(kind=8), dimension(6) :: a
 
-    namelist /NEST_parameters/ sdim, &
+    namelist /NEST_parameters/ sdim, nest_nlive, &
                                nest_IS, nest_updInt, nest_resume, nest_maxIter, nest_fb, nest_MAPfb, nest_liveplot, &
                                nest_root, nest_context, &
-                               training, trained_parameters, &
+                               training, trained_parameters, trained_std, &
+                               trend, trend_degree, &
                                lin_dep, n_lin_dep
-    ! read configuration values from namelist
-    iou = 8
-    open(unit=iou, file="./OPEN/multinest/namelist1", status='old', action='read', delim='quote', iostat=ierr)
-    if (ierr /= 0) then
-      stop 'Failed to open namelist file'
-    else
-      read(iou, nml=NEST_parameters)
-      close(iou)
-    end if
 
-
-#ifdef MPI
     !MPI initializations
+#ifdef MPI
     call MPI_INIT(ierr)
     if (ierr/=MPI_SUCCESS) then
             write(*,*)'Error starting MPI. Terminating.'
             call MPI_ABORT(MPI_COMM_WORLD,ierr)
     end if
 #endif
+
+    !! read configuration values from namelist
+    ! namelist file from first cmd line argument
+    call get_command_argument(1, cmdline, status=ierr)
+    if (ierr /= 0) error stop 'Failed to retrieve namelist filename from cmd line'
+
+    iou = 8
+    open(unit=iou, file=trim(cmdline), status='old', action='read', delim='quote', iostat=ierr)
+    if (ierr /= 0) then
+      error stop 'Failed to open namelist file'
+    else
+      read(iou, nml=NEST_parameters)
+      close(iou)
+    end if
+
 
 #ifdef PLOT 
     ! initialize graphics device
@@ -75,13 +81,22 @@ program main
 !        stop 'Conflict between "sdim" and "nest_context"'
 !    end if
 
+    trend = .false.
+    if (nest_context/1000 > 0) then
+        trend = .true.
+        trend_degree = nest_context/1000
+        nest_context = nest_context - (nest_context / 1000)*1000
+    end if
+
     if (mod(nest_context, 10) == 2) then
         if (nest_context / 100 == 2) then
 #ifdef MPI
             call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-            if (i==0) print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
-            call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-            call MPI_ABORT(MPI_COMM_WORLD,1)
+            if (i==0) then
+                print *, '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
+                call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+                call MPI_ABORT(MPI_COMM_WORLD,1)
+            end if
 #else
             stop '==> GP and jitter are incompatible, nest_context cannot be 2.y.2'
 #endif
@@ -94,13 +109,13 @@ program main
         if (nest_context / 100 == 2 .or. nest_context / 100 == 3) then
             ! if 2, using GP plus planets; if 3, using GP only, without planets
             using_gp = .true.
-            nextra = 4  ! hyperparameters of GP
+            nextra = 5  ! hyperparameters of GP
         end if
     end if
 
+
     !doing debug?
     doing_debug = .false.
-
 
     !! load data
     open(unit=15, file='input.rv', status="old")
@@ -128,6 +143,7 @@ program main
 
 
     !! some parameters and allocations depend on the ones set on the namelist / input file
+    nextra = nextra + trend_degree 
     nplanets = mod(nest_context,100) / 10 ! this is good for now
     sdim = 5*nplanets + nobserv + nextra
     allocate(spriorran(sdim, 2))
@@ -136,15 +152,16 @@ program main
 
     !! the number of parameters to cluster is usually set to 3
     !! but it cannot be greater than sdim
-    if (sdim==1 .or. sdim==2) then
+    if (sdim < 4) then
         nest_nClsPar=1
     else
-        nest_nClsPar=3
+        nest_nClsPar=5
     end if
 
 
     !! initialize data size dependant variables
     call likelihood_init(n)
+
 
     !include linear dependences in the model
     if (lin_dep) then
@@ -182,6 +199,9 @@ program main
 #endif
     end if
 
+    ! calculate the mean time to be used in the trend
+    mean_time = sum(times) / size(times)
+
 
     if (nobserv == 1) then ! if only one observatory, observ is always 1
         observ = 1
@@ -202,32 +222,44 @@ program main
 
     !! initialize the GP "object"
     if (using_gp) then
-        !write(*,*) 'Using Gaussian Process model'
-        !k3 = DiagonalKernel((/1.d0/))
-        !kernel_to_pass => k3
-        k5 = ExpSquaredKernel((/ 1.d0 /))
-        !kernel_to_pass => k5
-        k6 = ExpSineSquaredKernel((/ 1.d0, 25.d0 /))
+        
+        !call init_HODLR(N)
 
-        k8 = ProductKernels((/1.d0, 1.d0 /))
+        ! this is the jitter, a white noise homoskedastic kernel
+        k3 = DiagonalKernel((/1.d0/))
+
+        ! the quasi periodic terms
+        k5 = ExpSquaredKernel((/ 1.d0 /)) ! pars(1) --> lengthscale
+        k6 = ExpSineSquaredKernel((/ 25.d0, 1.d0 /)) ! pars(1) --> period; pars(2) --> correlation scale
+
+        ! the product of the two kernels
+        k8 = ProductKernels((/1.d0, 1.d0 /)) ! multiplying constants for kernel1 and kernel2
         k8%kernel1 => k5
         k8%kernel2 => k6
-        kernel_to_pass => k8
 
-        gp1 = GP(k8%evaluate_kernel(times, times), kernel_to_pass)
-        if (nest_context / 100 == 2) then
-            gp1%mean_fun => mean_fun_keplerian
-            print *, 'Setting Keplerian mean function'
-        else
+        ! the sum of the jitter and quasi-periodic kernels
+        k7 = SumKernels((/1d0, 1d0/)) ! multiplying constants for kernel1 and kernel2
+        k7%kernel1 => k8 ! quasi-periodic
+        k7%kernel2 => k3 ! jitter
+
+        ! final kernel
+        kernel_to_pass => k7
+        ! we also want the GP object to have information about its subkernels
+        subk1 => k8
+        subk2 => k3
+
+        gp1 = GP(k7%evaluate_kernel(times, times), kernel_to_pass, subk1, subk2)
+!         if (nest_context / 100 == 2) then
+!             gp1%mean_fun => mean_fun_keplerian
+!         else
             gp1%mean_fun => mean_fun_constant
-        endif
-        !print *, gp1%gp_kernel%pars
+!         endif
         gp_n_planets = nplanets
         gp_n_planet_pars = 5*nplanets + nobserv
     end if
 
     !! extra parameters are systematic velocities for each observatory 
-    !! plus, if present, the jitter or the hyperparameters
+    !! plus, if present, the jitter, trends or the hyperparameters
     nextra = nextra + nobserv
 
 
@@ -238,20 +270,17 @@ program main
     ! the mathematical form is only used when rescaling
     do i = 1, sdim-nextra, 5
         !! Period, Jeffreys, 0.2d - 365000d
-        spriorran(i,1)= 0.2d0
-        !spriorran(i,2)= 365000d0
-        spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
-
-!         spriorran(i,1)= 1500.d0
-!         spriorran(i,2)= 1900.d0
+        spriorran(i,1)= 1d0 !0.2d0
+!         spriorran(i,2)= 365000d0
+       spriorran(i,2)= 1.d0*(maxval(times) - minval(times)) ! don't look for periods longer than timespan
 
         !! semi amplitude K, Mod. Jeffreys (or Uniform)
-        spriorran(i+1,1)=0.d0
-!         spriorran(i+1,1)=1.d0
-        spriorran(i+1,2)= maxval(rvs) - minval(rvs)
+!        spriorran(i+1,1)=1.d0
+        spriorran(i+1,1)= sum(errors) / n
+!         spriorran(i+1,2)= maxval(rvs) - minval(rvs)
         ! the true upper limit depends on e and P, and it will only be set when rescaling.
-        !spriorran(i+1,2)=kmax 
-        !spriorran(i+1,2)=30.d0
+!        spriorran(i+1,2)=kmax 
+        spriorran(i+1,2)=10.d0
 
         !! eccentricity, Uniform, 0-1
 !         spriorran(i+2,1)=0d0
@@ -276,8 +305,10 @@ program main
     ! parameter array organization in this case:
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], jitter, vsys_obs1, [vsys_obs2]
         i = sdim-nextra+1 ! index of jitter parameter
-        spriorran(i,1)= 1d0
-        spriorran(i,2)= kmax
+        !spriorran(i,1)= 1d0
+        spriorran(i,1)= sum(errors) / n
+        spriorran(i,2)= 10d0 !kmax
+!         spriorran(i,2)= maxval(rvs) - minval(rvs)
         ! when data is in km/s
 !         spriorran(i,1)= 0.001d0
 !         spriorran(i,2)= kmax * 1d-3
@@ -285,8 +316,15 @@ program main
 
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+2 
-        spriorran(i:,1)= -kmax/100.d0
-        spriorran(i:,2)= kmax/100.d0
+        spriorran(i,1)= minval(rvs) ! -kmax
+        spriorran(i,2)= maxval(rvs) ! kmax
+
+        !! trend 
+        if (trend_degree > 0) then
+            i = sdim-nextra+3
+            spriorran(i,1)= 0d0
+            spriorran(i,2)= 0.1d0
+        end if
 
     else if (using_gp) then
     ! parameter array organization in this case:
@@ -304,30 +342,36 @@ program main
             ! amplitude of GP
             i = sdim-nextra+nobserv+1
             spriorran(i,1)= 0.d0
-            spriorran(i,2)= 10d0
+            spriorran(i,2)= maxval(rvs) - minval(rvs)
+            ! jitter 
+            spriorran(i+1,1)= 0.d0
+            spriorran(i+1,2)= 0.d0 !maxval(rvs) - minval(rvs) !maxval(errors)
             ! timescale for growth / decay of active regions (d)
-            spriorran(i+1,1)= trained_parameters(2)
-            spriorran(i+1,2)= trained_parameters(2)
-            ! periodicity (recurrence) timescale -> rotation period of the star
             spriorran(i+2,1)= trained_parameters(3)
-            spriorran(i+2,2)= trained_parameters(3)
-            ! smoothing parameter (?)
+            spriorran(i+2,2)= trained_std(3)
+            ! periodicity (recurrence) timescale -> rotation period of the star
             spriorran(i+3,1)= trained_parameters(4)
-            spriorran(i+3,2)= trained_parameters(4)
+            spriorran(i+3,2)= trained_std(4)
+            ! smoothing parameter (?)
+            spriorran(i+4,1)= trained_parameters(5)
+            spriorran(i+4,2)= trained_std(5)
         else
             ! amplitude of GP
             i = sdim-nextra+nobserv+1
             spriorran(i,1)= 0.d0
-            spriorran(i,2)= 10d0
+            spriorran(i,2)= maxval(rvs) - minval(rvs)
+            ! jitter 
+            spriorran(i+1,1)= 0.d0
+            spriorran(i+1,2)= 0.d0
             ! timescale for growth / decay of active regions (d)
-            spriorran(i+1,1)= 20d0
-            spriorran(i+1,2)= 50.d0
+            spriorran(i+2,1)= 1d0
+            spriorran(i+2,2)= 1000.d0
             ! periodicity (recurrence) timescale -> rotation period of the star
-            spriorran(i+2,1)= 10.d0
-            spriorran(i+2,2)= 20.d0
+            spriorran(i+3,1)= 10.d0
+            spriorran(i+3,2)= 20.d0
             ! smoothing parameter (?)
-            spriorran(i+3,1)= 0.1d0
-            spriorran(i+3,2)= 10d0
+            spriorran(i+4,1)= 0.1d0
+            spriorran(i+4,2)= 10d0
         end if
         
     else
@@ -335,30 +379,36 @@ program main
     ! P1, K1, ecc1, omega1, t01, [P2, K2, ecc2, omega2, t02], vsys_obs1, [vsys_obs2]
         !! systematic velocity(ies), Uniform, -kmax - kmax
         i = sdim-nextra+1
-        spriorran(i:,1)= -500.d0
-        spriorran(i:,2)= 500.d0
+        spriorran(i,1)= minval(rvs) ! -kmax
+        spriorran(i,2)= maxval(rvs) ! kmax
+
+        !! trend 
+        if (trend_degree > 0) then
+            i = sdim-nextra+2
+            spriorran(i,1)= 0d0
+            spriorran(i,2)= 0.1d0
+        end if
 
     end if    
 
-!    call MPI_INIT(ierr)
-!    call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
-!    if (i==0) then
-!        write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
-!        write(*, fmt) spriorran(:,1)
-!        write(*, fmt) spriorran(:,2)
+!     call MPI_COMM_RANK(MPI_COMM_WORLD, i, ierr)
+!     if (i==0) then
+!         print *, 'Prior limits:'
+!         write(fmt,'(a,i2,a)')  '(',sdim,'f13.4)'
+!         write(*, fmt) spriorran(:,1)
+!         write(*, fmt) spriorran(:,2)
 !        !write(*,*) observ
-!    end if
-!    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
+!     end if
+!     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 !    print *, training, trained_parameters
 !     stop "we have to stop here"
 
-       call nest_Sample
+    call nest_Sample
 
-       ! deallocate memory
-       !call nullify(kernel_to_pass)
-       deallocate(n_each_observ)
-       call likelihood_finish
+    ! deallocate memory
+    !call nullify(kernel_to_pass)
+    deallocate(n_each_observ)
+    call likelihood_finish
 
 #ifdef PLOT 
     if (nest_liveplot) then

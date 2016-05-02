@@ -23,11 +23,10 @@ from numpy import sqrt, mean, min, delete, take
 # intra-package imports
 from .docopt import docopt, DocoptExit
 from .classes import rvSeries
-from .utils import stdout_write, ask_yes_no, selectable_plot, write_yorbit_macro
+from .utils import stdout_write, ask_yes_no, write_yorbit_macro
 from .logger import clogger, logging
 import core
 import periodograms
-from .ext.lopast import lopast
 
 ################################################################################
 ################################################################################
@@ -42,7 +41,7 @@ Options:
     -d                  Set this as default system.
     -v --verbose        Verbose output about data just read.
     --quiet             Do not print any output.
-    --skip=<sn>         How many header lines to skip [default: 0].
+    --skip=<sn>         How many header lines to skip [default: 2].
     --nomps             Do not convert data to m/s
     -h --help           Show this help message.
 """
@@ -59,11 +58,12 @@ Options:
 plot_usage = \
 """
 Usage:
-    plot (obs | fwhm | rhk | s | bis | contrast | resid) [--save=filename]
+    plot (obs|fwhm|rhk|s|bis|contrast|resid) [--together=q] [--save=filename]
     plot -n SYSTEM
     plot -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
+    --together=q     Plot together with another quantity
     --save=filename  Save figure as filename
     -h --help        Show this help message
 """
@@ -71,8 +71,8 @@ Options:
 per_usage = \
 """
 Usage:
-    per -n SYSTEM
-    per (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot]
+    per 
+    per [-n SYSTEM] (obs|bis|fwhm|rhk|contrast|resid) [-g|-m|-b|-l|-z|-r] [-v] [-f] [--hifac=<hf>] [--ofac=<of>] [--fap] [--bfap] [--save=filename] [--noplot] [--describe]
     per -h | --help
 Options:
     -n SYSTEM        Specify name of system (else use default)
@@ -80,6 +80,8 @@ Options:
     -m --bgls        Calculate the Bayesian Generalized Lomb-Scargle periodogram
     -b --bayes       Calculate the Bayesian LS periodogram
     -l --ls          Calculate the Lomb-Scargle periodogram with fast algorithm
+    -z --hoef        Calculate the Hoeffding-test "periodogram" with Zucker's algorithm
+    -r --multiband   Calculate the multiband periodogram; Vanderplas & Ivezic (2015)
     -f --force       Force recalculation
     --hifac=<hf>     hifac * Nyquist is lowest frequency used [default: 40]
     --ofac=<of>      Oversampling factor [default: 6]
@@ -88,6 +90,7 @@ Options:
     --save=filename  Save figure as filename
     --noplot         Don't plot the periodogram (just creates system.per* instance)
     -v --verbose     Verbose statistical output 
+    --describe       Show a very detailed help message
     -h --help        Show this help message
 """
 
@@ -97,11 +100,12 @@ wf_usage = \
 Usage:
     wf 
     wf -n SYSTEM
-    wf --dials
+    wf [--dials] [--freq]
     wf -h | --help
 Options:
     -n SYSTEM     Specify name of system (else use default)
     --dials       Plot phase "dials" in largest (3) peaks
+    --freq        Plot as a function of frequency
     -h --help     Show this help message
 """
 
@@ -128,10 +132,11 @@ Options:
 correlate_usage = \
 """
 Usage:
-    correlate <var1> <var2> [-v] [-r]
+    correlate <var1> <var2> [-v] [-r] [--chunks]
 Options:
     -v --verbose  Verbose statistical output 
     -r --remove   Remove linear dependence from RV
+    --chunks      Remove linear dependence on individual chunks
 """
 
 
@@ -206,6 +211,7 @@ Options:
     --gp          Perform model selection within Gaussian Process framework
     --jitter      Include a jitter parameter (incompatible with --gp)
     --train=None  Train the GP on quantity before using it in the RVs
+    --skip-mcmc   Skip the training MCMC: the user sets the appropriate namelist options
     --lin=None    Include linear dependence on quantity in the model
     --ncpu=<cpu>  Number of threads to use; by default use all available
     --noplot      Do not produce result plots
@@ -214,20 +220,24 @@ Options:
     --MAPfeed     Force feedback on the current MAP parameters
     --maxp=mp     Maximum number of planets to include in automatic run [default: 3]
     --restart     Fully restart a previous automatic model selection run
+    --nml=None    Specify the `full` path to the namelist file
+    --startp=None Comma-separated list of planets to start from the beginning (overide -r)
 """
 
 restrict_usage = \
 """
 Usage:
     restrict [(err <maxerr>)]
+    restrict [(sn <maxsn>)]
     restrict [(jd <minjd> <maxjd>)]
     restrict [(year <yr>)]
     restrict [(years <yr1> <yr2>)]
     restrict --gui
-    restrict --index=None
+    restrict --index=None [--noask]
 Options:
     --gui         Restrict data using a graphical interface (experimental)
     --index=None  Remove specific data points, providing their indices [default:None]
+    --noask       Do not confirm if removing observations
 """
 
 
@@ -283,34 +293,16 @@ command_list = \
 @magics_class
 class EmbeddedMagics(Magics):
 
-    # @line_magic
-    # def kill_embedded(self, parameter_s=''):
-    #     """%kill_embedded : deactivate for good the current embedded IPython.
-
-    #     This function (after asking for confirmation) sets an internal flag so
-    #     that an embedded IPython will never activate again.  This is useful to
-    #     permanently disable a shell that is being called inside a loop: once
-    #     you've figured out what you needed from it, you may then kill it and
-    #     the program will then continue to run without the interactive shell
-    #     interfering again.
-    #     """
-
-    #     kill = ask_yes_no("Are you sure you want to kill this embedded instance "
-    #                      "(y/n)? [y/N] ",'n')
-    #     if kill:
-    #         self.shell.embedded_active = False
-    #         print ("This embedded IPython will not reactivate anymore "
-    #                "once you exit.")
-
-
     @line_magic
     def develop(self, parameter_s=''):
         # reload(classes)
-        import reimport
+        import reimport, os
         mod = reimport.modified()
         reimport.reimport(*mod)
+        print 'Done re-importing'
         # reload(periodograms)
         # reload(core)
+        os.system('python scons/scons.py --gfortran=/home/joao/Software/mesasdk/bin/gfortran')
 
 
     @needs_local_scope
@@ -328,13 +320,19 @@ class EmbeddedMagics(Magics):
             return
 
         # take care of glob (and tilde) expansions
-        globs = [glob.glob(expanduser(f)) for f in args['<file>']]
+        files = args['<file>']
+
+        # hack for metal-poor files
+        if len(files) == 1 and files[0].startswith('HD'):
+            files = ['/home/joao/phd/data/'+files[0]+'_harps_mean_corr.rdb']
+        ##
+        globs = [glob.glob(expanduser(f)) for f in files]
         filenames = list(chain.from_iterable(globs)) # some magic...
 
         # if 'default' system is already set, return the rvSeries class
         # this is useful when working with various systems simultaneously so 
         # that we can do, e.g., HDXXXX = %read file1 file2
-        if local_ns.has_key('default') and not args['-d']:
+        if not args['-d']:
             try:
                 return rvSeries(*filenames, skip=args['--skip'], verbose=not args['--quiet'])
             except AttributeError:
@@ -355,12 +353,13 @@ class EmbeddedMagics(Magics):
             mean_vrad = mean(default.vrad)
 
             if not args['--quiet']:
-                msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
+                # msg = blue('INFO: ') + 'Converting to m/s and subtracting mean value of %f' % mean_vrad
+                msg = blue('INFO: ') + 'Converting to m/s'
                 clogger.info(msg)
 
-            default.vrad = (default.vrad - mean(default.vrad)) * 1e3
+            default.vrad = (default.vrad - mean_vrad)*1e3 + mean_vrad
             default.error *= 1e3
-            default.vrad_full = (default.vrad_full - mean(default.vrad_full)) * 1e3
+            default.vrad_full = (default.vrad_full - mean(default.vrad_full))*1e3 + mean(default.vrad_full)
             default.error_full *= 1e3
             default.units = 'm/s'
 
@@ -378,7 +377,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -410,7 +409,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -421,10 +420,17 @@ class EmbeddedMagics(Magics):
                                    'name with the -n option'
             clogger.fatal(msg)
             return
-        
+
+        together = False
+        if args['--together']:
+            together = True
+            second_quantity = args['--together']
+
         # plot the observed radial velocities
         if args['obs']:
-            system.do_plot_obs(save=args['--save'])
+            if together: system.do_plot_obs_together(q=second_quantity, save=args['--save'])
+            else: system.do_plot_obs(save=args['--save'])
+
         # plot residuals from fit
         if args['resid']:
             system.do_plot_resid(save=args['--save'])
@@ -438,11 +444,13 @@ class EmbeddedMagics(Magics):
                           'sn', 'sn', 'sn', 'sn']
         for i, e in enumerate(extras_available):
             try:
-                if args[extras_mapping[i]]: 
-                    system.do_plot_extras(e, save=args['--save'])
+                if args[extras_mapping[i]]:
+                    if together: system.do_plot_extras_together(e, save=args['--save'])
+                    else: system.do_plot_extras(e, save=args['--save'])
                     return
             except KeyError:
                 pass
+
 
     @needs_local_scope
     @line_magic
@@ -450,6 +458,7 @@ class EmbeddedMagics(Magics):
         """ Calculate periodograms of various quantities. 
         Type 'per -h' for more help. """
 
+        from shell_colors import red
         try:
             args = parse_arg_string('per', parameter_s)
         except DocoptExit:
@@ -459,21 +468,24 @@ class EmbeddedMagics(Magics):
             return
         # print args
         
+        if args['--describe']:
+            print periodograms.help_text
+            return
+
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
                 system = local_ns[system_name]
         except KeyError:
-            from shell_colors import red
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
             clogger.fatal(msg)
             return
         
-        verb = True if args['--verbose'] else False
+        # verb = True if args['--verbose'] else False
         hf = float(args.pop('--hifac'))
         of = float(args.pop('--ofac'))
         fap = args['--fap']
@@ -482,20 +494,31 @@ class EmbeddedMagics(Magics):
 
         # which periodogram should be calculated?
         per_fcn = None
-        if args['--bgls']:
+        if args['--hoef']:
+            per_fcn = periodograms.hoeffding
+            name = 'Hoeffding'
+        elif args['--bgls']:
             per_fcn = periodograms.bgls
             name = 'Bayesian Generalized Lomb-Scargle'
-        if args['--bayes']: 
+        elif args['--bayes']: 
             per_fcn = periodograms.bls
             name = 'Bayesian Lomb-Scargle'
-        if args['--ls']: 
+        elif args['--ls']: 
             per_fcn = periodograms.ls_PressRybicki
             name = 'Lomb Scargle'
-        if args['--gls']: 
+        elif args['--multiband']:
+            per_fcn = periodograms.MultiBandGLS
+            name = 'Multiband Lomb-Scargle'
+            tempmask = system.time > 57170
+            if (~tempmask).all():
+                msg = red('ERROR: ') + 'All observations are before 57170. Multiband periodogram is not appropriate'
+                clogger.fatal(msg)
+                return
+        elif args['--gls']: 
             per_fcn = periodograms.gls
             name ='Generalized Lomb-Scargle'
         # this is the default if user did not specify arguments
-        if per_fcn is None: 
+        else: 
             per_fcn = periodograms.gls
             name ='Generalized Lomb-Scargle'
 
@@ -551,7 +574,7 @@ class EmbeddedMagics(Magics):
         """
         # use default system or user defined
         try:
-            if local_ns.has_key('default'):
+            if 'default' in local_ns:
                 system = local_ns['default']
         except KeyError:
             from shell_colors import red
@@ -574,7 +597,7 @@ class EmbeddedMagics(Magics):
         
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -596,7 +619,10 @@ class EmbeddedMagics(Magics):
             print green(' done')
         
         try: 
-            system.wf._plot()
+            if args['--freq']:
+                system.wf._plot_freq()
+            else:
+                system.wf._plot()
         except AttributeError:
             system.wf = periodograms.SpectralWindow(system.per.freq, system.time)
 
@@ -613,7 +639,7 @@ class EmbeddedMagics(Magics):
         
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -649,7 +675,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
             if system.model is None: system.model = {}
             system.model['k'] = k = int(args[0][1])
@@ -675,7 +701,7 @@ class EmbeddedMagics(Magics):
 
         verb = True if args['--verbose'] else False
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
             result = core.do_fit(system, verb)
             if result is not None:
@@ -702,7 +728,7 @@ class EmbeddedMagics(Magics):
 
         # verb = True if args['--verbose'] else False
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -723,8 +749,9 @@ class EmbeddedMagics(Magics):
 
         verb = args['--verbose']
         rem = args['--remove']
+        chunks = args['--chunks']
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -734,7 +761,8 @@ class EmbeddedMagics(Magics):
 
         var1 = args['<var1>']
         var2 = args['<var2>']
-        result = core.do_correlate(system, vars=(var1, var2), verbose=verb, remove=rem)
+
+        result = core.do_correlate(system, vars=(var1, var2), verbose=verb, remove=rem, chunks=chunks)
 
     @needs_local_scope
     @line_magic
@@ -754,7 +782,7 @@ class EmbeddedMagics(Magics):
         npop = int(args.pop('--npop'))
         
         # default system?
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -780,7 +808,7 @@ class EmbeddedMagics(Magics):
         except SystemExit:
             return
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -814,7 +842,7 @@ class EmbeddedMagics(Magics):
         npop = int(args.pop('--npop'))
 
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -830,7 +858,7 @@ class EmbeddedMagics(Magics):
     def genyorbit(self, parameter_s='', local_ns=None):
         """ Run the genetic algorithm minimization - stub """
         from shell_colors import red
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -858,7 +886,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -876,7 +904,7 @@ class EmbeddedMagics(Magics):
         fwhm = args['fwhm']
         rhk = args['rhk']
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -901,7 +929,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -913,7 +941,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return 
 
-        print args
+        # print args
         noise = float(args['<number>'])
         kms = system.error.mean() < 0.01
         if kms:
@@ -935,11 +963,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default'):
-                system = local_ns['default']
-            # else:
-            #     system_name = args['-n']
-            #     system = local_ns[system_name]
+            system = local_ns['default']
         except KeyError:
             from shell_colors import red
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -947,13 +971,29 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return 
 
-        f = 1./60
+        core.do_lowpass_filter(system) 
+        # f = 1./60
 
-        msg = blue('INFO: ') + 'Converting to m/s'
-        clogger.info(msg)
+        # temp = lopast(system.extras.rhk, system.time, f)
 
-        temp = lopast(system.extras.rhk, system.time, f)
-        system.vrad = system.vrad - temp
+        # print plt
+
+        # system.vrad = system.vrad - temp
+
+    @needs_local_scope
+    @line_magic
+    def detection_limits(self, parameter_s='', local_ns=None):
+        # use default system or user defined
+        if 'default' in local_ns:
+            system = local_ns['default']
+        else:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'Set a default system or provide a system '+\
+                                   'name with the -n option'
+            clogger.fatal(msg)
+            return
+
+        core.do_detection_limits(system)
 
 
     @needs_local_scope
@@ -978,7 +1018,7 @@ class EmbeddedMagics(Magics):
             return
         # print args
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -1001,6 +1041,13 @@ class EmbeddedMagics(Magics):
         doMAPfeedback = args['--MAPfeed']
         maxp = int(args['--maxp'])
         restart = args['--restart']
+        nml_path = args['--nml']
+
+        startp = args['--startp']
+        if startp is not None:
+            startp = [int(i) for i in startp.split(',')]
+        else:
+            startp = []
 
         try: 
             ncpu = int(args['--ncpu'])
@@ -1008,6 +1055,7 @@ class EmbeddedMagics(Magics):
             ncpu = None
 
         train_quantity = args['--train'] if bool(args['--train']) else None
+        skip_train_mcmc = args['--skip-mcmc']
         lin_quantity = args['--lin'] if bool(args['--lin']) else None
 
         if bool(args['--train']) and not system.is_in_extras(train_quantity):
@@ -1017,9 +1065,9 @@ class EmbeddedMagics(Magics):
 
         core.do_multinest(system, user, gp, jitter, maxp=maxp,
                           resume=resume, ncpu=ncpu, verbose=verbose,
-                          training=train_quantity, lin=lin_quantity, 
+                          training=train_quantity, skip_train_mcmc=skip_train_mcmc, lin=lin_quantity, 
                           doplot=doplot, saveplot=saveplot, feed=dofeedback, MAPfeed=doMAPfeedback,
-                          restart=restart)
+                          restart=restart, nml=nml_path, startp=startp)
 
     @needs_local_scope
     @line_magic
@@ -1056,7 +1104,7 @@ class EmbeddedMagics(Magics):
             return
 
         # use default system or user defined
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -1074,12 +1122,23 @@ class EmbeddedMagics(Magics):
                 return
             core.do_restrict(system, 'error', maxerr)
 
+        if args['sn']: 
+            try:
+                maxsn = float(args['<maxsn>'])
+            except ValueError:
+                msg = red('ERROR: ') + 'maxsn shoud be a number!'
+                clogger.fatal(msg)
+                return
+            core.do_restrict(system, 'sn', maxsn)
+
+
+
         if args['jd']:
             try:
                 maxjd = int(args['<maxjd>'])
                 minjd = int(args['<minjd>'])
             except ValueError:
-                msg = red('ERROR: ') + 'minjd and maxjd shoud be numbers!'
+                msg = red('ERROR: ') + 'minjd and maxjd shoud be integer numbers!'
                 clogger.fatal(msg)
                 return
             core.do_restrict(system, 'date', minjd, maxjd)
@@ -1103,41 +1162,53 @@ class EmbeddedMagics(Magics):
                 return
             core.do_restrict(system, 'years', yr1, yr2)
 
-        if args['--gui'] or args['--index']:
-            if args['--index']:
-                ind_to_remove = map(int, args['--index'].split(','))
-                ind_to_remove = [i-1 for i in ind_to_remove]
-                for i in ind_to_remove:
-                    x, y = take(system.time, i), take(system.vrad, i)
-                    msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i+1, x, y)
-                    clogger.info(msg)
-            else:
-                ind_to_remove = selectable_plot(system, style='ro')
+        if args['--gui']:
+            core.do_restrict(system, 'gui')
 
-            n = len(ind_to_remove)
-            if n == 0:
-                msg = blue('    : ') + 'Not removing any observations'
-                clogger.info(msg)
-                return
+        if args['--index']:
+            core.do_restrict(system, 'index', args['--index'], noask=args['--noask'])
 
-            if ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
-                system.provenance.values()[0][1] += n
-                # remove observations with indices ind_to_remove from
-                # system.(time,vrad,error); leave *_full arrays intact
-                system.time = delete(system.time, ind_to_remove)
-                system.vrad = delete(system.vrad, ind_to_remove)
-                system.error = delete(system.error, ind_to_remove)
-                # remove observations with indices ind_to_remove from
-                # system.extras.*; leave system.extras_full.* arrays intact
-                for i, arr in enumerate(system.extras):
-                    field_name = system.extras._fields[i]
-                    replacer = {field_name:delete(arr, ind_to_remove)}
-                    system.extras = system.extras._replace(**replacer)
-                msg = blue('    : ') + 'Done'
-                clogger.info(msg)                
-            else:
-                msg = blue('    : ') + 'Not removing any observations.'
-                clogger.info(msg)                
+        # if args['--gui'] or args['--index']:
+        #     if args['--index']:
+        #         ind_to_remove = map(int, args['--index'].split(','))
+        #         ind_to_remove = [i-1 for i in ind_to_remove]
+        #         for i in ind_to_remove:
+        #             x, y = take(system.time, i), take(system.vrad, i)
+        #             msg = blue('INFO: ') + 'going to remove observation %d -> %8.2f, %8.2f\n' % (i+1, x, y)
+        #             clogger.info(msg)
+        #     else:
+        #         ind_to_remove = selectable_plot(system, style='ro')
+
+        #     n = len(ind_to_remove)
+        #     if n == 0:
+        #         msg = blue('    : ') + 'Not removing any observations'
+        #         clogger.info(msg)
+        #         return
+
+        #     if args['--noask'] or ask_yes_no(red('    : ') + 'Are you sure you want to remove %d observations? (Y/n) ' % n, default=True):
+        #         system.provenance.values()[0][1] += n
+        #         # remove observations with indices ind_to_remove from
+        #         # system.(time,vrad,error); leave *_full arrays intact
+        #         system.time = delete(system.time, ind_to_remove)
+        #         system.vrad = delete(system.vrad, ind_to_remove)
+        #         system.error = delete(system.error, ind_to_remove)
+        #         # remove observations with indices ind_to_remove from
+        #         # system.extras.*; leave system.extras_full.* arrays intact
+        #         for i, arr in enumerate(system.extras):
+        #             field_name = system.extras._fields[i]
+        #             replacer = {field_name:delete(arr, ind_to_remove)}
+        #             system.extras = system.extras._replace(**replacer)
+        #         msg = blue('    : ') + 'Done'
+        #         clogger.info(msg)
+
+        #         # delete system.per to force re-calculation
+        #         try:
+        #             del system.per
+        #         except AttributeError:
+        #             pass
+        #     else:
+        #         msg = blue('    : ') + 'Not removing any observations.'
+        #         clogger.info(msg)                
 
 
     @needs_local_scope
@@ -1149,7 +1220,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['SYSTEM']
@@ -1188,7 +1259,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['SYSTEM']
