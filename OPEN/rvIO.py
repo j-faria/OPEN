@@ -48,7 +48,7 @@ def read_rv(*filenames, **kwargs):
     verbose = kwargs.get('verbose', True)
 
     # how many header lines to skip?
-    if (kwargs.has_key('skip')): header_skip = int(kwargs['skip'])
+    if ('skip' in kwargs): header_skip = int(kwargs['skip'])
 
     dic = {} # will hold how many values per file
     for filename in sorted(filenames):

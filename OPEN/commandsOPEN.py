@@ -332,7 +332,7 @@ class EmbeddedMagics(Magics):
         # if 'default' system is already set, return the rvSeries class
         # this is useful when working with various systems simultaneously so 
         # that we can do, e.g., HDXXXX = %read file1 file2
-        if local_ns.has_key('default') and not args['-d']:
+        if not args['-d']:
             try:
                 return rvSeries(*filenames, skip=args['--skip'], verbose=not args['--quiet'])
             except AttributeError:
@@ -377,7 +377,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -409,7 +409,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -474,7 +474,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -574,7 +574,7 @@ class EmbeddedMagics(Magics):
         """
         # use default system or user defined
         try:
-            if local_ns.has_key('default'):
+            if 'default' in local_ns:
                 system = local_ns['default']
         except KeyError:
             from shell_colors import red
@@ -597,7 +597,7 @@ class EmbeddedMagics(Magics):
         
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -639,7 +639,7 @@ class EmbeddedMagics(Magics):
         
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -675,7 +675,7 @@ class EmbeddedMagics(Magics):
             clogger.fatal(msg)
             return
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
             if system.model is None: system.model = {}
             system.model['k'] = k = int(args[0][1])
@@ -701,7 +701,7 @@ class EmbeddedMagics(Magics):
 
         verb = True if args['--verbose'] else False
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
             result = core.do_fit(system, verb)
             if result is not None:
@@ -728,7 +728,7 @@ class EmbeddedMagics(Magics):
 
         # verb = True if args['--verbose'] else False
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -751,7 +751,7 @@ class EmbeddedMagics(Magics):
         rem = args['--remove']
         chunks = args['--chunks']
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -782,7 +782,7 @@ class EmbeddedMagics(Magics):
         npop = int(args.pop('--npop'))
         
         # default system?
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -808,7 +808,7 @@ class EmbeddedMagics(Magics):
         except SystemExit:
             return
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -842,7 +842,7 @@ class EmbeddedMagics(Magics):
         npop = int(args.pop('--npop'))
 
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -858,7 +858,7 @@ class EmbeddedMagics(Magics):
     def genyorbit(self, parameter_s='', local_ns=None):
         """ Run the genetic algorithm minimization - stub """
         from shell_colors import red
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -886,7 +886,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -904,7 +904,7 @@ class EmbeddedMagics(Magics):
         fwhm = args['fwhm']
         rhk = args['rhk']
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -929,7 +929,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['-n']
@@ -984,7 +984,7 @@ class EmbeddedMagics(Magics):
     @line_magic
     def detection_limits(self, parameter_s='', local_ns=None):
         # use default system or user defined
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             from shell_colors import red
@@ -1018,7 +1018,7 @@ class EmbeddedMagics(Magics):
             return
         # print args
 
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -1104,7 +1104,7 @@ class EmbeddedMagics(Magics):
             return
 
         # use default system or user defined
-        if local_ns.has_key('default'):
+        if 'default' in local_ns:
             system = local_ns['default']
         else:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
@@ -1220,7 +1220,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['SYSTEM']
@@ -1259,7 +1259,7 @@ class EmbeddedMagics(Magics):
 
         # use default system or user defined
         try:
-            if local_ns.has_key('default') and not args['-n']:
+            if 'default' in local_ns and not args['-n']:
                 system = local_ns['default']
             else:
                 system_name = args['SYSTEM']

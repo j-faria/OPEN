@@ -66,7 +66,7 @@ def do_fit(system, verbose):
         degree = system.model['d']
         ## trend removal
         # did we already remove this trend?
-        if (system.model.has_key('drift') and degree == len(system.model['drift'])-1):
+        if ('drift' in system.model and degree == len(system.model['drift'])-1):
             msg = yellow('RESULT: ') + 'Fit of degree %d done! Coefficients:' % degree
             clogger.info(msg)
             if degree == 1:
@@ -77,7 +77,7 @@ def do_fit(system, verbose):
             return
 
         # did we already remove a different trend?
-        if (system.model.has_key('drift') and degree != len(system.model['drift'])-1):
+        if ('drift' in system.model and degree != len(system.model['drift'])-1):
             system.vrad = system.vrad_full
 
         if degree > 0:
@@ -1076,7 +1076,6 @@ def do_multinest(system, user, gp, jitter, maxp=3, resume=False, verbose=False, 
             msg = yellow('Warning: ') + 'File "%s" will be changed' % nml
             clogger.info(msg)
             namelist_file = nml
-
 
     nest_exec = os.path.join(this_file_abs_path, 'multinest/nest')
 
