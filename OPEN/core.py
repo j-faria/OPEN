@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 # see http://docs.scipy.org/doc/numpy/reference/generated/numpy.polyfit.html
 from scipy.optimize import leastsq, curve_fit, minimize
 from scipy.stats.stats import spearmanr, pearsonr
-from scipy.stats import nanmean, nanstd
+from scipy import nanmean, nanstd
 from scipy.odr import odrpack
 
 # intra-package imports
@@ -1808,11 +1808,13 @@ def do_RJ_DNest3(system, resume=False, verbose=False, ncpu=None):
             fmt=['%12.6f', '%7.5f', '%7.5f'])
 
 
+    cmd_option = '-r' if resume else ''
+
     msg = blue('    : ') + 'Starting RJ-DNest3 (%d threads) ...' % (ncpu,)
     clogger.info(msg)
 
     start = time()
-    cmd = './RJDNest3/run --ncpu %d' % (ncpu,)
+    cmd = './RJDNest3/run --ncpu %d %s' % (ncpu, cmd_option)
     # cmd = './RJDNest3/main -t %d -d ../input.rv' % (ncpu,)
     rc = subprocess.call(cmd, shell=True)
 
