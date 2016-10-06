@@ -2253,30 +2253,25 @@ def do_remove_rotation(system, prot=None, nrem=1, fwhm=False, rhk=False, fix_p=F
 
 
 
-def get_rotation_period(system):
+def get_rotation_period(system, batch=False):
     """
     Calculate rotation period from the activity-rotation calibration
     """
     from uncertainties import ufloat
 
     # try to find name of star automatically
-    import re
-    filename = system.provenance.keys()[0]
-    regex = re.compile("HD[0-9]*")
-    try:
-        temp_star_name = regex.findall(filename)[0]
-    except IndexError:
-        from os.path import basename, splitext
-        temp_star_name = splitext(basename(filename))[0]
+    from .utils import get_star_name
+    temp_star_name = get_star_name(system)
 
-    if ask_yes_no('Is "%s" the star (Y/n)? ' % temp_star_name, default=True):
-        pass
-    else:
-        temp_star_name = raw_input('Name of the star: ').upper()
+    if not batch:
+        if ask_yes_no('Is "%s" the star (Y/n)? ' % temp_star_name, default=True):
+            pass
+        else:
+            temp_star_name = raw_input('Name of the star: ').upper()
 
-    print  # newline
-    msg = blue('INFO: ') + 'Calculating rotation period for %s' % temp_star_name
-    clogger.info(msg)
+        print  # newline
+        msg = blue('INFO: ') + 'Calculating rotation period for %s' % temp_star_name
+        clogger.info(msg)
 
     data_path = '/home/joao/phd/data/'
     filepath = data_path + 'metadata/sample_simbad.rdb'
@@ -2291,9 +2286,11 @@ def get_rotation_period(system):
         spect = star_info[1]
         Vmag = float(star_info[2])
         Bmag = float(star_info[3])
-        msg = blue('    : ') + '%s, V=%s  B=%s' % (spect, Bmag, Vmag)
-        clogger.info(msg)
+        if not batch:
+	        msg = blue('    : ') + '%s, V=%s  B=%s' % (spect, Bmag, Vmag)
+	        clogger.info(msg)
     else:
+    	if batch: return (None, None)
         # msg = red('ERROR: ') + 'Cannot find B-V information for %s' % temp_star_name
         # clogger.fatal(msg)
         print  # newline
@@ -2315,23 +2312,36 @@ def get_rotation_period(system):
     x = 1 - (Bmag - Vmag)
     ## Noyes (1984), Eq 4
     log_tau = (1.362 - 0.166*x + 0.025*x**2 - 5.323*x**3) if x > 0 else (1.362 - 0.14*x)
+    if (system.extras.rhk == 0.).any():
+        good_indices = np.nonzero(system.extras.rhk)
+        rhk = system.extras.rhk[good_indices]
+        sig_rhk = system.extras.sig_rhk[good_indices]
 
-    lrhk = np.average(system.extras.rhk, weights=1/(system.extras.sig_rhk**2))
-    std_lrhk = np.sqrt(var(system.extras.rhk, weights=1./system.extras.sig_rhk**2))
+        where_is_zero = np.where(system.extras.rhk == 0)[0]
+
+        msg = yellow('WARNING: ') + "Not using %d R'hk observation(s)" % where_is_zero.size
+        clogger.info(msg)
+    else:
+        rhk = system.extras.rhk
+        sig_rhk = system.extras.sig_rhk
+
+    lrhk = np.average(rhk, weights=1/(sig_rhk**2))
+    std_lrhk = np.sqrt(var(rhk, weights=1./sig_rhk**2))
     lrhk = ufloat(lrhk, std_lrhk)
 
-
-    msg = blue('INFO: ') + "Using weighted average of R'hk: %6.3f (+- %4.3f)" % (lrhk.n, lrhk.s)
-    clogger.info(msg)
-    print 
+    if not batch:
+        msg = blue('INFO: ') + "Using weighted average of R'hk: %6.3f (+- %4.3f)" % (lrhk.n, lrhk.s)
+        clogger.info(msg)
+        print 
 
 
     y = 5. + lrhk
     ## Noyes (1984), Eq 3
     log_P = (0.324 - 0.4*y - 0.283*y**2 - 1.325*y**3) + log_tau
 
-    msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f (+- %f) d' % (10**log_P.n, 10**log_P.s)
-    clogger.info(msg)
+    if not batch:
+        msg = yellow('RESULT: ') + 'from Noyes (1984), Prot = %f (+- %f) d' % (10**log_P.n, 10**log_P.s)
+        clogger.info(msg)
 
 
     ## Use same tau as from Noyes
@@ -2341,8 +2351,12 @@ def get_rotation_period(system):
     Ro = (0.808 - 2.966*(lrhk+4.52))
     P = Ro * tau
 
-    msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f (+- %f) d' % (P.n, 10**P.s)
-    clogger.info(msg)
+    if not batch:
+        msg = yellow('RESULT: ') + 'from Mamajek & Hillenbrand (2008), Prot = %f (+- %f) d' % (P.n, 10**P.s)
+        clogger.info(msg)
+
+    if batch:
+        return (10**log_P.n, 10**log_P.s), (P.n, 10**P.s)
 
 
 
@@ -3149,6 +3163,11 @@ def do_create_planets(s):
             obs = raw_input('How many observed RVs? ("r" for random) ')
             nobs = np.random.randint(30, 220) if obs in ('r', '') else int(obs)
 
+        # user can decide if injecting planet or creating from scratch
+        if use_error_bars and use_number_points:
+            choice = raw_input('[1] Inject planet in data from file or [2] create from scratch? ')
+            injecting = True if choice is '1' else False
+
         noise = 'wrong_option'
         while noise not in ('no', 'w', '', 'r', 'R', 'wr', 'rw'):
             noise = raw_input('What type of noise? (no / W / r / wr) ')
@@ -3163,13 +3182,18 @@ def do_create_planets(s):
             else:
                 print "I don't understand that. Try 'no', w', 'r' or 'wr'."
 
+    save_filename = None
+
     if not '--quiet' in s:
         print
         msg = blue('INFO: ') + 'Generating %d planet(s)\n' % (nplanets)
         if filename is not None:
             msg += blue('    : ') + '-> sampling from %s\n' % (filename)
             if use_only_start_end: msg += blue('    : ') + '-> using first and last timestamp\n'
-            if use_error_bars and use_number_points: msg += blue('    : ') + '-> using errorbars from this file\n'
+            if use_error_bars and use_number_points: 
+                msg += blue('    : ') + '-> using errorbars from this file\n'
+                if injecting:
+                    msg += blue('    : ') + '-> injecting planet, not creating from scratch\n'
         else:
             msg += blue('    : ') + '-> randomly spaced sampling\n'
         msg += blue('    : ') + '-> %d observations\n' % (nobs)
@@ -3178,14 +3202,14 @@ def do_create_planets(s):
             msg += blue('    : ') + '-> saving output to %s\n' % save_filename
         clogger.info(msg)
 
-
-    save_filename = None
-    options = (filename, save_filename, type_noise, use_only_start_end, use_error_bars)
+    options = (filename, save_filename, type_noise, use_only_start_end, use_error_bars, injecting)
 
     # get rv curve with random parameters
     def gen_rv(nplanets, nobs, options, periods, eccentricities, amplitudes, temp):
 
-        sampling_file, saving_file, type_noise, use_only_start_end, use_error_bars = options
+        sampling_file, saving_file, type_noise, \
+        use_only_start_end, use_error_bars, \
+        injecting = options
 
         if sampling_file is not None:  # the sampling is set in the file
             times_sampled_from_file = np.loadtxt(sampling_file, usecols=(0,), skiprows=2)
@@ -3193,6 +3217,9 @@ def do_create_planets(s):
             times_full = np.linspace(min(times_sampled_from_file), max(times_sampled_from_file), 1000)
             if use_error_bars:
                 noise = np.loadtxt(sampling_file, usecols=(2,), skiprows=2)
+                if injecting: # need to read the RVs contained in the file
+                    vel_from_file = np.loadtxt(sampling_file, usecols=(1,), skiprows=2)
+
         else:  # the sampling is random
             times_full = np.linspace(2449460, 2452860, 1000)
             # sample (N points) randomly from the data to produce unevenly sampled time series
@@ -3232,37 +3259,51 @@ def do_create_planets(s):
 
             omega = np.random.rand()*2.*pi 
 
+            t0 = np.random.randint(times.min(), times.max())
+
             if type_noise is 'white':
                 if use_error_bars:
-                    # add extra white noise with the same std as the uncertainties
-                    added_noise = noise.std() * np.random.randn(len(vel_each))
+                    # add extra white noise with the same std as the RVs
+                    added_noise = noise.mean() * np.random.randn(len(vel_each))
+                    noise += added_noise
                 else:
                     added_noise = np.random.randn(len(vel_each))  # sigma=1 ??????
                     noise = added_noise
+            elif type_noise is 'no':
+                added_noise = np.zeros_like(vel_each)
             else:
                 noise = np.ones_like(vel_each)
 
+
             # log
-            temp.write(output % (planet+1, P, K, ecc, omega, 2452000))
+            temp.write(output % (planet+1, P, K, ecc, omega, t0))
 
             # get RVs for this planet
-            get_rvn(times, P, K, ecc, omega, 2452000, 0., vel_each)
+            get_rvn(times, P, K, ecc, omega, t0, 0., vel_each)
             if type_noise is 'white':
                 vel_each = vel_each + noise  # add noise
 
             # get RVs for this planet at oversampled times
-            get_rvn(times_full, P, K, ecc, omega, 2452000, 0., vel_full_each)
+            get_rvn(times_full, P, K, ecc, omega, t0, 0., vel_full_each)
 
             # store
             vel_all[:,planet] = vel_each
             vel_total += vel_each
             vel_full += vel_full_each
 
+        if injecting:
+            vel_from_file = (vel_from_file - vel_from_file.mean())*1e3 + vel_from_file.mean()
+            vel_total += vel_from_file
+        else:
+            vel_total += added_noise
+
         return times_full, vel_full, times, vel_total, vel_all, noise
 
     # wrapper function that takes care of adding noise and logging to file
     def generate_planets(nplanets, nobs, options, periods, eccentricities, amplitudes):
-        sampling_file, saving_file, type_noise, use_only_start_end, use_error_bars = options
+        sampling_file, saving_file, type_noise, \
+        use_only_start_end, use_error_bars, \
+        injecting = options
 
         if saving_file is None:
             # create temporary file to store simulation info
@@ -3283,6 +3324,7 @@ def do_create_planets(s):
             e_multiplier = 1.
         else:
             e_multiplier = 1e-3
+        print e_multiplier
 
         for t, v, e in zip(times, vel, noise):
             tf.write('%f\t%f\t%f\n' % (t, v*1e-3, abs(e*e_multiplier)))
