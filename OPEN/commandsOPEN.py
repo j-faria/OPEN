@@ -227,14 +227,16 @@ Options:
 restrict_usage = \
 """
 Usage:
+    restrict [-n SYSTEM]
     restrict [(err <maxerr>)]
     restrict [(sn <maxsn>)]
     restrict [(jd <minjd> <maxjd>)]
     restrict [(year <yr>)]
     restrict [(years <yr1> <yr2>)]
     restrict --gui
-    restrict --index=None [--noask]
+    restrict --index=None [--noask] [-n SYSTEM]
 Options:
+    -n SYSTEM   Specify name of system (else use default)
     --gui         Restrict data using a graphical interface (experimental)
     --index=None  Remove specific data points, providing their indices [default:None]
     --noask       Do not confirm if removing observations
@@ -1104,13 +1106,17 @@ class EmbeddedMagics(Magics):
             return
 
         # use default system or user defined
-        if 'default' in local_ns:
-            system = local_ns['default']
-        else:
+        try:
+            if 'default' in local_ns and not args['-n']:
+                system = local_ns['default']
+            else:
+                system_name = args['-n']
+                system = local_ns[system_name]
+        except KeyError:
             msg = red('ERROR: ') + 'Set a default system or provide a system '+\
                                    'name with the -n option'
             clogger.fatal(msg)
-            return
+            return 
 
 
         if args['err']: 
