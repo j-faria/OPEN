@@ -36,14 +36,6 @@ from ext.gp import gp_predictor
 from ext.julian import caldat
 
 
-# if the interpreter calls open.py from another directory, matplotlib will not
-# access the matplotlibrc file and will revert to its defaults. This makes sure
-# we use it!
-# p = os.path.dirname(os.path.realpath(__file__)) # path to this file (classes.py)
-# rc( rc_params_from_file( p+'/../matplotlibrc' ) )
-# plt.ion()
-
-
 # matplotlib parameters for publication plots
 import matplotlib.ticker as ticker
 import re
@@ -52,7 +44,8 @@ import re
 params = {'text.latex.preamble': [r'\usepackage{lmodern}', 
                                   r'\usepackage{amsfonts,amsmath,amssymb}',
                                   r'\mathchardef\mhyphen="2D',
-                                  r'\DeclareMathOperator{\ms}{m\,s^{-1}}'],
+                                  r'\DeclareMathOperator{\ms}{m\,s^{-1}}'
+                                  r'\DeclareMathOperator{\kms}{km\,s^{-1}}'],
           'text.usetex' : True,
           'font.size'   : 8,
           'font.family' : 'lmodern',
@@ -201,8 +194,8 @@ class rvSeries:
         self.__star_name = get_star_name(self)
         return self.__star_name
 
-    def save(self, filename):
-        rvIO.write_rv(self, filename)
+    def save(self, filename, **kwargs):
+        rvIO.write_rv(self, filename, **kwargs)
 
     def stats(self):
         # verbose stats about data
@@ -251,8 +244,103 @@ class rvSeries:
             clogger.info(stats)
 
             
+    def set_errors_indicators(self):
+        """
+        Set the photon noise uncertainty in various diagnoses,
+        using the scaling coefficients (for HARPS) from Santerne et al. (2015, Table 1).
+        It only changes (and adds to) the `extras` quantities.
+        """
+        if self.is_in_extras('noise'):  # we can only scale from the RV photon noise
+            noise = self.extras.noise
 
-    def do_plot_obs(self, newFig=True, leg=True, save=None, offsets=None, LP=False):
+            noiseFWHM = 2. * noise
+            noiseBIS = 2. * noise
+
+            self.data['sig_fwhm'] = noiseFWHM
+            self.data['sig_bis'] = noiseBIS
+
+            ### here we should check if other indicators are present
+            ### BiGauss = 2.1
+            ### Vspan = 1.5
+            ### Wspan = 5.8
+            ### Vasy = 5.6e10  (do not use according to Santerne+2015)
+
+            extra = namedtuple('Extra', self.data.keys(), verbose=False)
+            self.extras = extra(**self.data)
+            self.extras_names = self.data.keys()
+
+        else:
+            from shell_colors import red
+            msg = red('ERROR: ') + 'The name "noise" is not available in extras.\n'
+            msg += red('     : ') + 'We need the RV photon noise to scale the noise in the diagnoses.'
+            clogger.fatal(msg)
+            return       
+
+    def transform_to_sane_units(self):
+        """
+        Transform the measurements to units that can be plotted easily,
+        i.e. are of order unity (or close). This changes RVs, BIS.
+        FWHM in km/s is closer to unity than in m/s.
+        Returns (weighted_average_RV, weighted_average_BIS)
+        """
+        self.set_errors_indicators()
+
+        if self.units == 'km/s':
+            weighted_average_RV = np.average(self.vrad, weights=1./self.error**2)
+            weighted_average_BIS = np.average(self.extras.bis_span, weights=1./self.error**2)
+
+            # subtract average and transform to m/s
+            self.vrad = (self.vrad - weighted_average_RV) * 1e3
+            self.error *= 1e3
+            self.units = 'm/s'
+
+            # convert the BIS to m/s
+            newBIS = (self.extras.bis_span - weighted_average_BIS) * 1e3
+            newBISsig = self.extras.sig_bis * 1e3
+            self.extras = self.extras._replace(bis_span = newBIS, sig_bis=newBISsig)
+
+
+            msg = blue('INFO: ') + 'Subtracted weighted average (%f km/s) from RV\n' % weighted_average_RV
+            msg += blue('    : ') + '                            (%f km/s) from BIS\n' % weighted_average_BIS
+            msg += blue('INFO: ') + 'Converted to m/s.'
+            clogger.info(msg)
+
+
+        return weighted_average_RV, weighted_average_BIS
+
+
+    def save_before_after_fibers(self):
+        """ Save the observations in two separate files before and after fiber change. """
+        
+        time_of_offset = 57170  # HARPS upgrade
+        assert (self.time > time_of_offset).any(), 'No observations after BJD=%d' % time_of_offset
+
+        # the index of the first observation after time_of_offset
+        ind_change = np.where(self.time > time_of_offset)[0][0]
+
+        # assume only one file
+        assert len(self.provenance) == 1
+        original_filename = os.path.basename(self.provenance.keys()[0])
+        filename1 = original_filename.split('_')
+        filename1.insert(1, '_BeforeOffset_')
+        filename1 = ''.join(filename1)
+
+        msg = blue('INFO: ') + 'Writing observations before %d to file "%s"' % (time_of_offset, filename1)
+        clogger.info(msg)
+        #
+        rvIO.write_rv(self, filename1, imax=ind_change)
+
+        filename2 = original_filename.split('_')
+        filename2.insert(1, '_AfterOffset_')
+        filename2 = ''.join(filename2)
+
+        msg = blue('INFO: ') + 'Writing observations after %d to file "%s"' % (time_of_offset, filename2)
+        clogger.info(msg)
+        #
+        rvIO.write_rv(self, filename2, imin=ind_change)
+
+
+    def do_plot_obs(self, newFig=True, axis=None, leg=True, save=None, offsets=None, LP=False):
         """ Plot the observed radial velocities as a function of time.
         Data from each file are color coded and labeled.
         """
@@ -2755,44 +2843,71 @@ class MCMC_nest:
             # clogger.info(msg)
 
         # Sturges' formula for the optimal number of bins in the histograms
-        n = self.posterior_samples.shape[1]
+        n = self.nest_samples.shape[1]
         k = int(np.log2(n) + 1)
-        k = 50
+        k = 100
 
         fig_ysize = 6 if self.npar==2 else 12
         fig_ysize = 4 if self.only_vsys else fig_ysize
 
+
+        plt.figure()
+        nsubplots = 1
+        ax1 = plt.subplot(j+1,1,nsubplots)
+        nsubplots += 1
+        # ax1.hist(self.nest_samples[-1, burnin:].T, bins=k, normed=True, label='vsys')
+        # hist(self.ptrace.par7, bins='knuth', ax=ax1, normed=True, color='r')
+        hist(self.nest_samples[-j, burnin:].T, bins='knuth', ax=ax1, normed=True, label='vsys', alpha=0.5)
+        ax1.set_xlabel('Vsys [m/s]')
+
+        if self.jitter:
+            ax2 = plt.subplot(j+1,1,nsubplots)
+            nsubplots += 1
+            # ax2.hist(self.nest_samples[-2, burnin:].T, bins=k, normed=True)
+            # hist(self.ptrace.par6, bins='knuth', ax=ax2, normed=True, color='r')
+            hist(self.nest_samples[-j-1, burnin:].T, bins='knuth', ax=ax2, normed=True, alpha=0.5)
+            ax2.set_xlabel('jitter [m/s]')
+
+        if self.trend:
+            ax2 = plt.subplot(j+1,1,nsubplots)
+            nsubplots += 1
+
+            # tr = np.loadtxt(self.root+'.txt', usecols=(3,))
+            # hist(tr, color='r', bins=100, ax=ax2, normed=True)
+
+            # tr = np.loadtxt(self.root+'post_equal_weights.dat', usecols=(1,))
+            # hist(tr, color='g', bins=100, ax=ax2, normed=True)            
+
+            # ax2.hist(self.nest_samples[-2, burnin:].T, bins=k, normed=True)
+            hist(self.nest_samples[j, burnin:].T, bins=100, ax=ax2, normed=True)
+            # ax2.axvline(x=self.par_map[j], lw=2, color='k')
+            # ax2.axvline(x=self.par_mle[j], lw=2, color='k')
+            # ax2.axvline(x=self.par_mean[j], lw=2, color='k')
+            ax2.set_xlabel('trend [m/s]')
+
+
+        plt.tight_layout()
+        if self.nplanets == 0: return
+
         plt.figure(figsize=(8, fig_ysize))
         gs = gridspec.GridSpec(min(5,self.npar), 1)
 
-        if self.nplanets < 1:
-            ax1 = plt.subplot(gs[0])
-            ax1.hist(self.posterior_samples[-1, :].T, bins=k, normed=True, label='vsys')
-            ax1.set_xlabel('Vsys [m/s]')
-            ax1.legend(frameon=False)
-
-            if self.jitter:
-                ax2 = plt.subplot(gs[1])
-                ax2.hist(self.posterior_samples[-2, :].T, bins=k, normed=True)
-                ax2.set_xlabel('jitter [m/s]')
-
-            plt.tight_layout()
-            return
-
         # period histogram(s)
         ax1 = plt.subplot(gs[0])
-        ax1.hist(self.posterior_samples[0:-1-j:5, :].T, bins=k, normed=True, label=['planet1', 'planet2', 'planet3'])
+        # ax1.hist(self.nest_samples[0:-1-j:5, burnin:].T.flatten(), bins=100, range=[50, 80], normed=True, label=['planet1', 'planet2', 'planet3'])
+        hist(self.ptrace.par1, ax=ax1, bins='knuth', normed=True, color='r')
+        hist(self.nest_samples[0:-1-j:5, :].T.flatten(), ax=ax1, bins='knuth', normed=True, alpha=0.5, label=['planet1', 'planet2', 'planet3'])
         # if show_priors:
-            # xx = np.linspace(1.5*10, 1000, 200)
-            # ax1.plot(np.log10(xx), jeffreys(xx, 1.5*10, 1000), lw=3, color='k')
+        #     xx = np.logspace(np.log10(1.), np.log10(4000), 200)
+        #     ax1.plot(xx, jeffreys(xx, 1., 4000), lw=3, color='k')
         ax1.set_xlabel('P [d]')
         ax1.legend(frameon=False)
 
         # semi amplitude histogram(s) - actually log of it because usually the prior spans a big range
         ax2 = plt.subplot(gs[1])
-        ax2.hist(self.posterior_samples[1:-1-j:5, :].T, bins=k, normed=True)
+        ax2.hist(self.nest_samples[1:-1-j:5, burnin:].T, bins=200, normed=True, range=[0, 10])
         if show_priors:
-        #     m = np.min(self.posterior_samples[1:-1-j:5, :].T)
+        #     m = np.min(self.nest_samples[1:-1-j:5, :].T)
         #     xx = np.logspace(np.log(m), np.log10(2129), 200)
         #     ax2.plot(np.log(xx), modjeffreys(xx, 1., 2129), lw=3, color='k')
             xx = np.linspace(0, 60, 200)

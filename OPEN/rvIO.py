@@ -107,7 +107,7 @@ def read_rv(*filenames, **kwargs):
     
     
 
-def write_rv(system, filename, **kwargs):
+def write_rv(system, filename, imin=None, imax=None, **kwargs):
     """
     Write system's RVs (and everything else) to a file.
     
@@ -117,6 +117,8 @@ def write_rv(system, filename, **kwargs):
         System for which to save information.
     filename: string
         Name of the output file.
+    imin, imax: ints
+        Write data from index imin to index imax.
 
     Optional kwargs
     ---------------
@@ -140,17 +142,23 @@ def write_rv(system, filename, **kwargs):
         header1 = f.readline()
         header2 = f.readline()
 
+    # print header1
     extras_original_order = header1.split()[3:]
+    # print extras_original_order
+
     if system.units == 'm/s':
         mean_vrad = system.vrad.mean()
-        X = [system.time, (system.vrad - mean_vrad)*1e-3 + mean_vrad, system.error*1e-3]
+        X = [system.time[imin:imax], 
+             (system.vrad[imin:imax] - mean_vrad)*1e-3 + mean_vrad, 
+             system.error[imin:imax]*1e-3
+            ]
     else:
-        X = [system.time, system.vrad, system.error]
+        X = [system.time[imin:imax], system.vrad[imin:imax], system.error[imin:imax]]
 
     for e in extras_original_order:
         # find extras index
         i = system.extras._fields.index(e)
-        X.append(system.extras[i])
+        X.append(system.extras[i][imin:imax])
 
 
     fmt = ['%12.6f', '%8.5f', '%7.5f'] + ['%7.5f']*len(system.extras)
